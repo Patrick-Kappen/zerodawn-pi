@@ -12,7 +12,14 @@ const result = (id: string, text = big, extra: Record<string, unknown> = {}) => 
 
 test("prunes big results older than the kept turns", () => {
   const branch = [user("u1"), result("r1"), user("u2"), result("r2"), user("u3"), result("r3")];
-  assert.deepEqual(selectEdits(branch).map((e) => e.targetId), ["r1"]);
+  assert.deepEqual(selectEdits(branch, 2, 1500, 0).map((e) => e.targetId), ["r1"]);
+});
+
+test("waits until a batch is worth a cache break", () => {
+  const branch = [user("u1"), result("r1"), user("u2"), user("u3")];
+  assert.deepEqual(selectEdits(branch), []);
+  const many = [user("u1"), ...Array.from({ length: 10 }, (_, i) => result(`r${i}`)), user("u2"), user("u3")];
+  assert.equal(selectEdits(many).length, 10);
 });
 
 test("skips small results and results that are already edited", () => {
@@ -29,6 +36,6 @@ test("the stub names the tool, the size, the first line and the log", () => {
 
 test("prunedChars counts the saved characters", () => {
   const branch = [user("u1"), result("r1"), user("u2"), user("u3")];
-  const edits = selectEdits(branch);
+  const edits = selectEdits(branch, 2, 1500, 0);
   assert.equal(prunedChars(branch, edits), 2000 - edits[0].replacement.content.length);
 });

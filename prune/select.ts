@@ -1,5 +1,6 @@
 export const KEEP_TURNS = 2;
 export const MIN_CHARS = 1500;
+export const BATCH_CHARS = 16_000;
 
 type Content = { type: string; text?: string };
 type Entry = {
@@ -24,7 +25,7 @@ export function stub(toolName: string, text: string, details: Record<string, unk
   return `[pruned ${toolName} ${state}: ${size}. First line: ${first}.${log || " Run the tool again when you need it."}]`;
 }
 
-export function selectEdits(branch: Entry[], keepTurns = KEEP_TURNS, minChars = MIN_CHARS): Edit[] {
+export function selectEdits(branch: Entry[], keepTurns = KEEP_TURNS, minChars = MIN_CHARS, batchChars = BATCH_CHARS): Edit[] {
   const edited = new Set(branch.filter((e) => e.type === "context_edit" && e.targetId).map((e) => e.targetId as string));
   const usersAfter: number[] = new Array(branch.length).fill(0);
   let users = 0;
@@ -40,7 +41,7 @@ export function selectEdits(branch: Entry[], keepTurns = KEEP_TURNS, minChars = 
     if (text.length < minChars) return;
     edits.push({ targetId: e.id, replacement: { content: stub(e.message.toolName ?? "tool", text, e.message.details, e.message.isError) } });
   });
-  return edits;
+  return prunedChars(branch, edits) >= batchChars ? edits : [];
 }
 
 export const prunedChars = (branch: Entry[], edits: Edit[]): number =>
