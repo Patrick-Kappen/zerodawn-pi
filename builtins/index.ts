@@ -1,17 +1,11 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { DEFAULT_MAX_LINES, formatSize, truncateHead, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { DEFAULT_MAX_LINES, type ExtensionAPI, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
+import { outFile, shorten } from "../shared/store.ts";
+import { absolutePath, textOf } from "../shared/util.ts";
+import { GREP_LINE_MAX, registerBuiltins, WRITE_MAX_LINES } from "./builtins.ts";
 
 const MAX_BYTES = 16 * 1024;
-import { GREP_LINE_MAX, registerBuiltins, WRITE_MAX_LINES } from "./builtins.ts";
-import { outFile, shorten } from "../shared/store.ts";
-import { absolutePath } from "../shared/util.ts";
-
 const WORKFLOW = `A codemode result above ${DEFAULT_MAX_LINES} lines or ${formatSize(MAX_BYTES)} is cut. The full text goes to a log file. Return only the data you need from codemode.`;
-
-function textOf(content: any[]): string | undefined {
-  if (!content.every((c) => c.type === "text")) return undefined;
-  return content.map((c) => c.text).join("");
-}
 
 export default function (pi: ExtensionAPI) {
   registerBuiltins(pi);
@@ -30,7 +24,7 @@ export default function (pi: ExtensionAPI) {
       if (err.code === "ENOENT") return;
       throw err;
     }
-    const lines = old.split("\n").length;
+    const lines = old.split("\n").length - (old.endsWith("\n") ? 1 : 0);
     if (lines > WRITE_MAX_LINES)
       return {
         block: true,

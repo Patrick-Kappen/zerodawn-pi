@@ -1,5 +1,5 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { checkGit } from "./guard.ts";
 
 const blocked = ["git status", "git -C /repo diff --stat", "git --no-pager log -5", "cd /x && git show HEAD~1"];

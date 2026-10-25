@@ -62,7 +62,13 @@ class FollowView {
     const lines = out.lines.slice(-max).map((line) => cut(`  ${t.fg("dim", "│")} ${line}`));
     const hidden = out.lines.length - Math.min(out.lines.length, max);
     const foot: string[] = [];
-    if (hidden > 0 || out.cut) foot.push(t.fg("muted", `  … ${hidden > 0 ? `${hidden} more lines` : "earlier output not shown"}${this.expanded ? "" : " · ctrl+o shows more"} · log: ${shorten(this.data.log)}`));
+    if (hidden > 0 || out.cut)
+      foot.push(
+        t.fg(
+          "muted",
+          `  … ${hidden > 0 ? `${hidden} more lines` : "earlier output not shown"}${this.expanded ? "" : " · ctrl+o shows more"} · log: ${shorten(this.data.log)}`,
+        ),
+      );
     else if (!out.lines.length) foot.push(t.fg("dim", "  (no output yet)"));
     return [cut(head), ...shownCommand, ...lines, ...foot];
   }
@@ -77,5 +83,8 @@ class FollowView {
 }
 
 export function registerFollowView(pi: ExtensionAPI, s: State) {
-  pi.registerEntryRenderer<FollowData>(ENTRY, (entry, { expanded }, theme) => new FollowView(entry.data, s, theme, expanded));
+  pi.registerEntryRenderer<FollowData>(ENTRY, (entry, { expanded }, theme) => {
+    if (!entry.data) throw new Error(`bash-jobs: the ${ENTRY} entry ${entry.id} has no data. The session file is damaged at that entry.`);
+    return new FollowView(entry.data, s, theme, expanded);
+  });
 }

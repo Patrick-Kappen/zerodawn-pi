@@ -1,6 +1,6 @@
 import { type ExtensionAPI, type ExtensionCommandContext, getAgentDir, getSettingsListTheme } from "@earendil-works/pi-coding-agent";
 import { Container, Key, matchesKey, type SettingItem, SettingsList, wrapTextWithAnsi } from "@earendil-works/pi-tui";
-import { type Env, findRow, loadRows, refOf, type Row, type Scope, settingsPath, toggle } from "./settings.ts";
+import { type Env, findRow, loadRows, type Row, refOf, type Scope, settingsPath, toggle } from "./settings.ts";
 
 const USAGE = "Usage: /ext | /ext list | /ext on <name> [--project] | /ext off <name> [--project]";
 
@@ -105,8 +105,7 @@ function parseArgs(args: string): { verb: string; name: string; scope: Scope } {
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("ext", {
     description: "Enable or disable extensions, skills, prompts and themes, then reload",
-    getArgumentCompletions: (prefix) =>
-      ["list", "on", "off"].filter((v) => v.startsWith(prefix)).map((v) => ({ value: v, label: v })),
+    getArgumentCompletions: (prefix) => ["list", "on", "off"].filter((v) => v.startsWith(prefix)).map((v) => ({ value: v, label: v })),
     handler: async (args, ctx) => {
       const env = environment(ctx);
       const { verb, name, scope } = parseArgs(args);

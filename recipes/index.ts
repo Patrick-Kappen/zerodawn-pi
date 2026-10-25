@@ -1,10 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { textOf } from "../shared/util.ts";
 import { loadRecipes, promptText, type Recipes, Tracker } from "./recipes.ts";
-
-function textOf(content: any[]): string | undefined {
-  if (!content.every((c) => c.type === "text")) return undefined;
-  return content.map((c) => c.text).join("");
-}
 
 export default function (pi: ExtensionAPI) {
   let tracker = new Tracker();

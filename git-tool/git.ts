@@ -2,9 +2,10 @@ import { execFile } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { promisify } from "node:util";
 import { StringEnum } from "@earendil-works/pi-ai";
-import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import { outFile, shorten } from "../shared/store.ts";
+import { absolutePath } from "../shared/util.ts";
 
 const run = promisify(execFile);
 const PATCH = ["-U1", "--no-color", "--no-ext-diff"];
@@ -92,15 +93,11 @@ export function registerGit(pi: ExtensionAPI) {
     description:
       "Compact read-only git: status, diff, log, show. diff and show return a file summary (+added -deleted per file, large directories merged) unless you give paths; with paths they return the patch with 1 line of context. Large output goes to a log file. Use bash for git commands that change state (add, commit, checkout, rebase).",
     promptSnippet: "Compact git status, diff, log and show",
-    promptGuidelines: [
-      "git diff and show give a file summary first. Then ask for the patch of the paths you need.",
-    ],
+    promptGuidelines: ["git diff and show give a file summary first. Then ask for the patch of the paths you need."],
     parameters: Type.Object({
       action: StringEnum(["status", "diff", "log", "show"] as const),
       repo: Type.Optional(Type.String({ description: "Repository path. Default: current directory." })),
-      ref: Type.Optional(
-        Type.String({ description: "diff: a commit or range (main..HEAD). log: a range. show: a commit (default HEAD)." }),
-      ),
+      ref: Type.Optional(Type.String({ description: "diff: a commit or range (main..HEAD). log: a range. show: a commit (default HEAD)." })),
       staged: Type.Optional(Type.Boolean({ description: "diff: show staged changes." })),
       paths: Type.Optional(Type.Array(Type.String(), { description: "Limit to these paths. diff/show: return the full content for them." })),
       n: Type.Optional(Type.Number({ description: `log: number of commits. Default ${LOG_DEFAULT}, max ${LOG_MAX}.` })),
@@ -131,7 +128,7 @@ export function registerGit(pi: ExtensionAPI) {
           break;
       }
 
-      const cwd = params.repo ?? ctx.cwd;
+      const cwd = params.repo ? absolutePath(params.repo, ctx.cwd, { toolPath: false }) : ctx.cwd;
       let stdout: string;
       try {
         ({ stdout } = await run("git", ["-C", cwd, "--no-pager", ...args], { signal, maxBuffer: 64 * 1024 * 1024 }));
@@ -155,7 +152,9 @@ export function registerGit(pi: ExtensionAPI) {
       writeFileSync(log, text);
       const lines = text.split("\n").length;
       return {
-        content: [{ type: "text", text: `git ${params.action}: ${lines} lines, ${text.length} chars · log: ${shorten(log)} · use fewer paths for a smaller result` }],
+        content: [
+          { type: "text", text: `git ${params.action}: ${lines} lines, ${text.length} chars · log: ${shorten(log)} · use fewer paths for a smaller result` },
+        ],
         details: { log },
       };
     },

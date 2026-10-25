@@ -5,7 +5,7 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 export function sessionDir(ctx: ExtensionContext): string {
   const file = ctx.sessionManager.getSessionFile();
-  if (!file) throw new Error("tool-output: this session has no session file, so there is no place for the output. Start pi with a session.");
+  if (!file) throw new Error("bash-jobs: this session has no session file, so there is no place for the output. Start pi with a session.");
   return file.replace(/\.jsonl$/, "");
 }
 

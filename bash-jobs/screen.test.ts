@@ -137,9 +137,7 @@ describe("SGR", () => {
   test("reset inside a sequence, empty m, and extended colors", () => {
     const s = new Screen();
     s.feed(`${E}[1ma${E}[0;4mb${E}[mc${E}[38;5;200md${E}[38;2;1;2;3me`);
-    expect(s.lines()).toEqual([
-      `${E}[1ma${E}[0m${E}[4mb${E}[0mc${E}[38;5;200md${E}[0m${E}[38;5;200;38;2;1;2;3me${E}[0m`,
-    ]);
+    expect(s.lines()).toEqual([`${E}[1ma${E}[0m${E}[4mb${E}[0mc${E}[38;5;200md${E}[0m${E}[38;5;200;38;2;1;2;3me${E}[0m`]);
   });
   test("overwriting keeps the new style", () => {
     const s = new Screen();
@@ -164,13 +162,7 @@ describe("stripScript", () => {
 describe("fixtures", () => {
   test("progress.txt: bar overwritten, then line fixed with 1A 2K", () => {
     const s = render("progress.txt");
-    expect(s.plain()).toEqual([
-      "[####################] 100%",
-      "done",
-      "step 1",
-      "step 2 (fixed)",
-      "",
-    ]);
+    expect(s.plain()).toEqual(["[####################] 100%", "done", "step 1", "step 2 (fixed)", ""]);
     const lines = s.lines();
     expect(lines[0]).toBe(`${E}[32m[####################]${E}[0m 100%`);
     expect(lines[1]).toBe(`${E}[1mdone${E}[0m`);

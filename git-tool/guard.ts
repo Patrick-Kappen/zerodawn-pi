@@ -1,16 +1,11 @@
+import { stripQuoted } from "../shared/util.ts";
+
 const GIT_READ = new Set(["status", "diff", "log", "show"]);
 export const RAW_GIT = "# raw-git";
 
-function strip(cmd: string): string {
-  return cmd
-    .replace(/<<-?\s*(['"]?)(\w+)\1([^\n]*)\n[\s\S]*?\n\s*\2\s*(?=\n|$)/g, "<<H$3")
-    .replace(/'[^']*'/g, "Q")
-    .replace(/"(?:[^"\\]|\\.)*"/g, "Q");
-}
-
 export function checkGit(command: string): string | undefined {
   if (command.includes(RAW_GIT)) return undefined;
-  for (const segment of strip(command).split(/&&|\|\||;|\n/)) {
+  for (const segment of stripQuoted(command).split(/&&|\|\||;|\n/)) {
     const words = segment
       .split("|")[0]
       .trim()

@@ -1,4 +1,3 @@
-
 type Fix = { oldText: string; newText: string };
 
 const indentOf = (line: string) => line.match(/^[ \t]*/)![0];
@@ -27,13 +26,18 @@ export function fixIndent(text: string, oldText: string, newText: string): Fix |
 
 function similarity(a: string, b: string): number {
   const pairs = (s: string) => {
-    const t = s.split("\n").map((l) => l.trim()).join("\n");
+    const t = s
+      .split("\n")
+      .map((l) => l.trim())
+      .join("\n");
     const m = new Map<string, number>();
     for (let i = 0; i < t.length - 1; i++) m.set(t.slice(i, i + 2), (m.get(t.slice(i, i + 2)) ?? 0) + 1);
     return m;
   };
-  const pa = pairs(a), pb = pairs(b);
-  let shared = 0, total = 0;
+  const pa = pairs(a),
+    pb = pairs(b);
+  let shared = 0,
+    total = 0;
   for (const [k, n] of pa) shared += Math.min(n, pb.get(k) ?? 0);
   for (const n of pa.values()) total += n;
   for (const n of pb.values()) total += n;
@@ -49,7 +53,10 @@ export function nearest(text: string, oldText: string): { from: number; to: numb
     if (s > best.score) best = { from: i, score: s };
   }
   if (best.score < 0.5) return undefined;
-  const region = lines.slice(best.from, best.from + n).map((l, k) => `${best.from + k + 1}| ${l}`).join("\n");
+  const region = lines
+    .slice(best.from, best.from + n)
+    .map((l, k) => `${best.from + k + 1}| ${l}`)
+    .join("\n");
   return { from: best.from + 1, to: best.from + n, score: best.score, region };
 }
 
@@ -61,7 +68,13 @@ export function freshLines(text: string, newTexts: string[], margin = 3): string
     if (at < 0) continue;
     const first = text.slice(0, at).split("\n").length;
     const last = first + n.split("\n").length - 1;
-    const edges: [number, number][] = last - first + 1 > 2 * margin + 2 ? [[first, first + margin - 1], [last - margin + 1, last]] : [[first, last]];
+    const edges: [number, number][] =
+      last - first + 1 > 2 * margin + 2
+        ? [
+            [first, first + margin - 1],
+            [last - margin + 1, last],
+          ]
+        : [[first, last]];
     for (const [a, b] of edges) ranges.push([Math.max(1, a - margin), Math.min(lines.length, b + margin)]);
   }
   ranges.sort((a, b) => a[0] - b[0]);
@@ -71,7 +84,12 @@ export function freshLines(text: string, newTexts: string[], margin = 3): string
     if (prev && r[0] <= prev[1] + 1) prev[1] = Math.max(prev[1], r[1]);
     else merged.push([...r]);
   }
-  const parts = merged.map(([from, to]) => lines.slice(from - 1, to).map((l, k) => `${from + k}| ${l}`).join("\n"));
+  const parts = merged.map(([from, to]) =>
+    lines
+      .slice(from - 1, to)
+      .map((l, k) => `${from + k}| ${l}`)
+      .join("\n"),
+  );
   return parts.length ? `Current lines (the "N| " prefix is not part of the file):\n${parts.join("\n...\n")}` : undefined;
 }
 

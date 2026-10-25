@@ -8,7 +8,8 @@ export type Recipes = { tool: "just" | "make"; file: string; list: Recipe[] };
 const REPEAT_MAX = 2;
 const LONG = 80;
 const RERUN = "# rerun";
-const TEST = /(^|[\s;&|(])(just\s+(test|check)\S*|make\s+(test|check)\S*|npm\s+(run\s+)?test|pnpm\s+test|yarn\s+test|bun\s+test|node\s+(--\S+\s+)*--test|pytest|python3?\s+-m\s+pytest|cargo\s+(test|nextest)|go\s+test|nix\s+flake\s+check|vitest|jest)(\s|$)/;
+const TEST =
+  /(^|[\s;&|(])(just\s+(test|check)\S*|make\s+(test|check)\S*|npm\s+(run\s+)?test|pnpm\s+test|yarn\s+test|bun\s+test|node\s+(--\S+\s+)*--test|pytest|python3?\s+-m\s+pytest|cargo\s+(test|nextest)|go\s+test|nix\s+flake\s+check|vitest|jest)(\s|$)/;
 
 export const isTest = (command: string) => TEST.test(command);
 
@@ -74,7 +75,11 @@ export function loadRecipes(cwd: string): Recipes | undefined {
       ? parseJust(execFileSync("just", ["--justfile", just, "--dump", "--dump-format", "json"], { cwd, encoding: "utf8" }), just)
       : parseMake(readFileSync(file, "utf8"), file);
   } catch (err) {
-    throw new Error(`recipes: cannot read the recipes of ${file}: ${(err as Error).message}. Fix the file, or run "just --list" to see the error.`, { cause: err });
+    if ((err as NodeJS.ErrnoException).code === "ENOENT" && just)
+      throw new Error(`recipes: ${just} exists but "just" is not installed. Install just, or remove the justfile.`, { cause: err });
+    throw new Error(`recipes: cannot read the recipes of ${file}: ${(err as Error).message}. Fix the file, or run "just --list" to see the error.`, {
+      cause: err,
+    });
   }
   cache.set(file, { mtime, recipes });
   return recipes;

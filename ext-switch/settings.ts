@@ -32,7 +32,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 export type Scope = "user" | "project";
 export type Kind = "builtin" | "extension" | "skill" | "prompt" | "theme";
@@ -155,7 +155,14 @@ function findPackage(settings: Settings, scope: Scope, env: Env, identity: strin
 // ---- Discovery
 
 const globRegExp = (glob: string) =>
-  new RegExp(`^${glob.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*/g, "\0").replace(/\*/g, "[^/]*").replace(/\0/g, ".*").replace(/\?/g, "[^/]")}$`);
+  new RegExp(
+    `^${glob
+      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*\*/g, "\0")
+      .replace(/\*/g, "[^/]*")
+      .replace(/\0/g, ".*")
+      .replace(/\?/g, "[^/]")}$`,
+  );
 
 function ownFile(kind: Exclude<Kind, "builtin">, dir: string): string | undefined {
   const names = kind === "extension" ? ["index.ts", "index.js"] : kind === "skill" ? ["SKILL.md"] : [];
@@ -265,7 +272,10 @@ export function discover(env: Env, user: Settings, project: Settings): Discovery
   }
 
   const seen = new Set<string>();
-  for (const [scope, settings] of [["user", user], ["project", project]] as const) {
+  for (const [scope, settings] of [
+    ["user", user],
+    ["project", project],
+  ] as const) {
     for (const { source } of packageEntries(settings, settingsPath(scope, env))) {
       if (!isLocal(source)) {
         skipped.push(`Package ${source} is not a local path. /ext lists local packages only; use \`pi config\` for it.`);
@@ -351,7 +361,8 @@ export function loadRows(env: Env): { rows: Row[]; skipped: string[] } {
   const user = readSettings("user", env);
   const project = readSettings("project", env);
   const { resources, skipped } = discover(env, user, project);
-  const order = (r: Resource) => (r.group === "Built-in" ? 0 : r.group === "Extensions" ? 1 : r.group.startsWith("Package: ") ? 2 : r.group === "Skills" ? 3 : r.group === "Prompts" ? 4 : 5);
+  const order = (r: Resource) =>
+    r.group === "Built-in" ? 0 : r.group === "Extensions" ? 1 : r.group.startsWith("Package: ") ? 2 : r.group === "Skills" ? 3 : r.group === "Prompts" ? 4 : 5;
   const rows = resources
     .map((r) => ({ ...r, ...stateOf(r, env, user, project) }))
     .sort((a, b) => order(a) - order(b) || a.group.localeCompare(b.group) || a.name.localeCompare(b.name) || a.origin.localeCompare(b.origin));

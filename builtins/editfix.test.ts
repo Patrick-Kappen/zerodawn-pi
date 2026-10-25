@@ -1,17 +1,17 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { explain, fixIndent, freshLines, nearest } from "./editfix.ts";
 
-const file = ["switch (x) {", "\t\t\tcase \"rm\":", "\t\t\t\tdel();", "\t\t\t\tbreak;", "}"].join("\n");
+const file = ["switch (x) {", '\t\t\tcase "rm":', "\t\t\t\tdel();", "\t\t\t\tbreak;", "}"].join("\n");
 
 test("fixIndent: one tab too few on all lines is fixed, newText too", () => {
-  const f = fixIndent(file, "\t\tcase \"rm\":\n\t\t\tdel();", "\t\tcase \"rm\":\n\t\t\tdel2();")!;
-  assert.equal(f.oldText, "\t\t\tcase \"rm\":\n\t\t\t\tdel();");
-  assert.equal(f.newText, "\t\t\tcase \"rm\":\n\t\t\t\tdel2();");
+  const f = fixIndent(file, '\t\tcase "rm":\n\t\t\tdel();', '\t\tcase "rm":\n\t\t\tdel2();')!;
+  assert.equal(f.oldText, '\t\t\tcase "rm":\n\t\t\t\tdel();');
+  assert.equal(f.newText, '\t\t\tcase "rm":\n\t\t\t\tdel2();');
 });
 
 test("fixIndent: the case of 2026-10-19 (only the last line one tab off) is not consistent, so no fix", () => {
-  assert.equal(fixIndent(file, "\t\t\tcase \"rm\":\n\t\t\t\tdel();\n\t\t\tbreak;", "x"), undefined);
+  assert.equal(fixIndent(file, '\t\t\tcase "rm":\n\t\t\t\tdel();\n\t\t\tbreak;', "x"), undefined);
 });
 
 test("fixIndent: two places with the same lines is not fixed", () => {
@@ -20,11 +20,11 @@ test("fixIndent: two places with the same lines is not fixed", () => {
 });
 
 test("fixIndent: text that differs is not fixed", () => {
-  assert.equal(fixIndent(file, "\t\tcase \"rmdir\":", "x"), undefined);
+  assert.equal(fixIndent(file, '\t\tcase "rmdir":', "x"), undefined);
 });
 
 test("nearest: finds the similar lines with line numbers", () => {
-  const n = nearest(file, "\t\t\tcase \"rm\":\n\t\t\t\tdel();\n\t\t\tbreak;")!;
+  const n = nearest(file, '\t\t\tcase "rm":\n\t\t\t\tdel();\n\t\t\tbreak;')!;
   assert.equal(n.from, 2);
   assert.equal(n.to, 4);
   assert.ok(n.score > 0.9);
@@ -32,7 +32,7 @@ test("nearest: finds the similar lines with line numbers", () => {
 });
 
 test("explain: an insert written as oldText gets the insert hint", () => {
-  assert.match(explain(file, "\ttar: [\"-C\"],", "\ttar: [\"-C\"],"), /To insert, use the line before or after/);
+  assert.match(explain(file, '\ttar: ["-C"],', '\ttar: ["-C"],'), /To insert, use the line before or after/);
 });
 
 test("freshLines: the lines around each new text, numbered", () => {

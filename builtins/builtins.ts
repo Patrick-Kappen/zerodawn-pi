@@ -7,8 +7,8 @@ import {
   type ExtensionAPI,
   type ExtensionToolContext,
 } from "@earendil-works/pi-coding-agent";
-import { explain, fixIndent, freshLines } from "./editfix.ts";
 import { absolutePath } from "../shared/util.ts";
+import { explain, fixIndent, freshLines } from "./editfix.ts";
 
 export const WRITE_MAX_LINES = 100;
 export const GREP_LINE_MAX = 200;
@@ -36,7 +36,10 @@ export function registerBuiltins(pi: ExtensionAPI) {
     async execute(toolCallId: string, params: any, signal: any, onUpdate: any, ctx: ExtensionToolContext) {
       const file = absolutePath(String(params.path), ctx?.cwd ?? cwd);
       const withFresh = (result: any, edits: any[], note?: string) => {
-        const fresh = freshLines(readFileSync(file, "utf8"), edits.map((e) => e.newText));
+        const fresh = freshLines(
+          readFileSync(file, "utf8"),
+          edits.map((e) => e.newText),
+        );
         const extra = [note, fresh].filter(Boolean).map((text) => ({ type: "text" as const, text: `${text}\n` }));
         return { ...result, content: [...(result.content ?? []), ...extra] };
       };

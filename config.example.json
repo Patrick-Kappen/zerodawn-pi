@@ -1,0 +1,4 @@
+{
+  "astGrep": "/path/to/ast-grep",
+  "nixosRepo": "/home/me/nixos-config"
+}

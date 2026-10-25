@@ -1,3 +1,4 @@
 .pre-commit-config.yaml
 .direnv/
 node_modules/
+config.json
