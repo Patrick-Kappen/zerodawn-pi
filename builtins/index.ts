@@ -1,10 +1,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { DEFAULT_MAX_LINES, formatSize, truncateHead, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+const MAX_BYTES = 16 * 1024;
 import { GREP_LINE_MAX, registerBuiltins, WRITE_MAX_LINES } from "./builtins.ts";
 import { outFile, shorten } from "../shared/store.ts";
 import { absolutePath } from "../shared/util.ts";
 
-const WORKFLOW = `A codemode result above ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)} is cut. The full text goes to a log file. Return only the data you need from codemode.`;
+const WORKFLOW = `A codemode result above ${DEFAULT_MAX_LINES} lines or ${formatSize(MAX_BYTES)} is cut. The full text goes to a log file. Return only the data you need from codemode.`;
 
 function textOf(content: any[]): string | undefined {
   if (!content.every((c) => c.type === "text")) return undefined;
@@ -49,7 +51,7 @@ export default function (pi: ExtensionAPI) {
     if (event.toolName !== "codemode" || event.parentToolCallId) return;
     const text = textOf(event.content);
     if (text === undefined) return;
-    const cut = truncateHead(text, { maxLines: DEFAULT_MAX_LINES, maxBytes: DEFAULT_MAX_BYTES });
+    const cut = truncateHead(text, { maxLines: DEFAULT_MAX_LINES, maxBytes: MAX_BYTES });
     if (!cut.truncated) return;
     const log = outFile(ctx, event.toolCallId, "codemode");
     writeFileSync(log, text);
