@@ -14,7 +14,7 @@ A [pi](https://pi.dev) package with independent extensions. Each extension has i
 | [ast-grep](ast-grep/README.md) | `ast_grep` tool: structural code search |
 | [opencode-subagent](opencode-subagent/README.md) | `opencode` tool: one task for an OpenCode agent |
 | [system-state](system-state/README.md) | active NixOS system and deployed revision in the system prompt |
-| [stall-watchdog.ts](stall-watchdog.ts) | aborts a run that stalls and continues from the last good point; `/unstick` |
+| [stall-watchdog](stall-watchdog/README.md) | aborts a run that stalls and continues from the last good point; `/unstick` |
 | [gateway-session](gateway-session/README.md) | sends the session id to agentgateway, so its logs group requests by session |
 
 ## Install
