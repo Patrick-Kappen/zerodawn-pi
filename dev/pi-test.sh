@@ -53,7 +53,7 @@ case "${1:-start}" in
     tmux new-session -d -s "$session" -x 160 -y 45 -c "$sandbox"
     exts=""
     for index in "$root"/*/index.ts; do exts="$exts -e '$index'"; done
-    tmux send-keys -t "$session" -l -- "pi -ne -e builtin:codemode -e '$HOME/.pi/agent/extensions/claude-subscription/index.ts'$exts -e '$HOME/.pi/agent/extensions/tidy-ui/index.ts' --model '$model'"
+    tmux send-keys -t "$session" -l -- "pi -ne -e builtin:codemode -e '$HOME/.pi/agent/extensions/claude-subscription/index.ts'$exts --model '$model'"
     tmux send-keys -t "$session" Enter
     echo "started session $session in $sandbox; attach with: tmux attach -t $session"
     ;;
