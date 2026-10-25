@@ -64,7 +64,7 @@ Releases: `just bump <version>` sets the version in `package.json` and commits i
 | `just lint` | format and lint check (`biome`) |
 | `just fmt` | format and apply safe fixes |
 | `just check` | lint, types, tests, `nix flake check` |
-| `just dev` | pi in a tmux sandbox with all extensions (`dev/pi-test.sh`) |
+| `just dev` | pi in a tmux sandbox with all extensions; `just dev-screen`, `just dev-send "…"`, `just dev-key C-c`, `just dev-stop` |
 | `just bump <version>` | set and commit a new version |
 
 CI (`.github/workflows/ci.yml`) runs `nix flake check` and `just types` on every push and pull request.

@@ -27,17 +27,27 @@
         );
       inherit (nixpkgs) lib;
       inherit (builtins.fromJSON (builtins.readFile ./package.json)) version;
-      # Files that the tests need: sources, tests, PTY fixtures, manifest.
       own = fileset: lib.fileset.difference fileset (lib.fileset.maybeMissing ./node_modules);
-      sources = lib.fileset.toSource {
-        root = ./.;
-        fileset = own (
-          lib.fileset.unions [
+      hasTests =
+        name:
+        lib.fileset.toList (
+          lib.fileset.fileFilter (file: lib.hasSuffix ".test.ts" file.name) (./extensions + "/${name}")
+        ) != [ ];
+      extensions = builtins.filter hasTests (
+        builtins.attrNames (lib.filterAttrs (_: type: type == "directory") (builtins.readDir ./extensions))
+      );
+      # One test derivation per extension, with only that extension, shared/ and the manifest as input,
+      # so an extension without changes is a cache hit.
+      testSources =
+        name:
+        lib.fileset.toSource {
+          root = ./.;
+          fileset = lib.fileset.unions [
             ./package.json
-            (lib.fileset.fileFilter (file: file.hasExt "ts" || file.hasExt "txt") ./.)
-          ]
-        );
-      };
+            (lib.fileset.fileFilter (file: file.hasExt "ts") ./shared)
+            (lib.fileset.fileFilter (file: file.hasExt "ts" || file.hasExt "txt") (./extensions + "/${name}"))
+          ];
+        };
       # The pi package: manifest and sources, without tests. Pi loads it from settings.json "packages".
       package =
         pkgs:
@@ -202,28 +212,33 @@
             };
           };
 
-          # The job tests spawn bash and script in a PTY; the sandbox has /dev/pts.
-          tests =
-            pkgs.runCommand "zerodawn-pi-tests"
-              {
-                src = sources;
-                nativeBuildInputs = [
-                  pkgs.bun
-                  pkgs.bashInteractive
-                  pkgs.util-linux
-                  pkgs.coreutils
-                  pkgs.gnused
-                  pkgs.gnugrep
-                ];
-              }
-              ''
-                cp -r "$src" src
-                chmod -R u+w src
-                cd src
-                HOME="$TMPDIR" bun test
-                touch "$out"
-              '';
         }
+        // lib.listToAttrs (
+          map (name: {
+            name = "tests-${name}";
+            value =
+              # The job tests spawn bash and script in a PTY; the sandbox has /dev/pts.
+              pkgs.runCommand "zerodawn-pi-tests-${name}"
+                {
+                  src = testSources name;
+                  nativeBuildInputs = [
+                    pkgs.bun
+                    pkgs.bashInteractive
+                    pkgs.util-linux
+                    pkgs.coreutils
+                    pkgs.gnused
+                    pkgs.gnugrep
+                  ];
+                }
+                ''
+                  cp -r "$src" src
+                  chmod -R u+w src
+                  cd src
+                  HOME="$TMPDIR" bun test
+                  touch "$out"
+                '';
+          }) extensions
+        )
       );
 
       devShells = forAll (
