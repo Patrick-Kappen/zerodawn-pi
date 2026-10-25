@@ -1,16 +1,17 @@
 /**
- * Stall watchdog: herstelt pi-runs die onzichtbaar blijven hangen.
+ * Stall watchdog: recovers pi runs that hang without a visible error.
  *
- * Draait stil. Na 2/3 van de drempel zonder activiteit verzamelt hij bewijs
- * (stream, lopende tools, child-processen van pi, staart van de sessie) en
- * vraagt Jev of de run met zekerheid hangt.
- * Zo ja: afbreken, via de tree terug naar het laatste werkende punt, verder.
- * De derde keer binnen één prompt: agent stoppen en melden.
+ * Runs silently. After 2/3 of the threshold without activity it collects evidence
+ * (stream, running tools, child processes of pi, tail of the session) and asks
+ * the classifier whether the run hangs for sure.
+ * If so: abort, go back through the tree to the last working point, continue.
+ * The third time within one prompt: stop the agent and report.
  *
  * Env:
- *   PI_WATCHDOG_STALL_S       drempel zonder lopende tool (default 180)
- *   PI_WATCHDOG_TOOL_STALL_S  drempel terwijl een tool loopt (default 180); CPU-gebruik van child-processen telt als activiteit
- *   PI_WATCHDOG_CERTAINTY     minimale kans op "hangt" (default 0.75)
+ *   PI_WATCHDOG_STALL_S       threshold without a running tool (default 180)
+ *   PI_WATCHDOG_TOOL_STALL_S  threshold while a tool runs (default 180); CPU use of child processes counts as activity
+ *   PI_WATCHDOG_CERTAINTY     minimum probability of "hangs" (default 0.75)
+ *   PI_WATCHDOG_CLASSIFIER    classifier model as provider/model (default typesafe/jev-latest); without it the watchdog never aborts
  */
 import { readdirSync, readFileSync, readlinkSync } from "node:fs";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -19,9 +20,10 @@ const num = (v: string | undefined, d: number) => (v && Number.isFinite(Number(v
 const STALL_MS = num(process.env.PI_WATCHDOG_STALL_S, 180) * 1000;
 const TOOL_STALL_MS = num(process.env.PI_WATCHDOG_TOOL_STALL_S, 180) * 1000;
 const CERTAINTY = num(process.env.PI_WATCHDOG_CERTAINTY, 0.75);
+const CLASSIFIER = (process.env.PI_WATCHDOG_CLASSIFIER ?? "typesafe/jev-latest").split("/") as [string, string];
 const MAX_STALLS = 3;
 const TICK_MS = 5000;
-const CONTINUE_TEXT = "Je vorige antwoord bleef hangen en is automatisch afgebroken. Ga verder waar je gebleven was.";
+const CONTINUE_TEXT = "Your previous answer hung and was aborted automatically. Continue where you were.";
 
 type Tool = {
   name: string;
@@ -46,7 +48,7 @@ const readOr = (f: () => string, d = "") => {
   }
 };
 
-/** Alle nakomelingen van dit proces (Linux /proc). */
+/** All descendants of this process (Linux /proc). */
 function descendants(root = process.pid): Proc[] {
   const out: Proc[] = [];
   const walk = (pid: number, depth: number) => {
@@ -92,7 +94,7 @@ const clip = (v: unknown, n: number) => {
   return s.length > n ? `${s.slice(0, n)}…` : s;
 };
 
-/** Korte samenvatting van de laatste sessie-entries. */
+/** Short summary of the last session entries. */
 function sessionTail(ctx: ExtensionContext, n = 8) {
   return (ctx.sessionManager.getBranch() as any[]).slice(-n).map((e) => {
     if (e.type !== "message") return { type: e.type, at: e.timestamp };
@@ -181,10 +183,10 @@ export default function (pi: ExtensionAPI) {
     tools.clear();
   });
 
-  /** Vraagt Jev of de run met zekerheid hangt. Fouten = niet zeker. */
+  /** Asks the classifier whether the run hangs for sure. Errors = not sure. */
   async function confirmStall(ctx: ExtensionContext, idleMs: number, limitMs: number): Promise<boolean> {
     const now = Date.now();
-    // Elke tick met CPU-voortgang telt als activiteit, dus tijdens idleSeconds gebruikte geen child CPU.
+    // Every tick with CPU progress counts as activity, so no child used CPU during idleSeconds.
     const processes = descendants().map((p) => ({
       cmd: p.cmd,
       state: p.state,
@@ -210,9 +212,9 @@ export default function (pi: ExtensionAPI) {
     };
 
     const reg = ctx.modelRegistry as any;
-    const model = reg.findOfType?.("classifier", "typesafe", "jev-latest");
+    const model = reg.findOfType?.("classifier", ...CLASSIFIER);
     if (!model) return false;
-    // Jev onderscheidt hangende commando's van bewust wachten alleen goed met een vraag per situatie.
+    // The classifier tells a hanging command from deliberate waiting only with a question per situation.
     const question =
       tools.size > 0
         ? {
@@ -264,7 +266,7 @@ export default function (pi: ExtensionAPI) {
         nextCheckAt = Date.now() + limit / 3;
         return;
       }
-      if (!busy || Date.now() - lastActivity < idle) return; // intussen weer actief
+      if (!busy || Date.now() - lastActivity < idle) return; // active again in the meantime
 
       stalls++;
       ctx.abort();
@@ -273,12 +275,12 @@ export default function (pi: ExtensionAPI) {
       busy = false;
 
       if (stalls >= MAX_STALLS) {
-        ctx.ui.notify(`Agent ${MAX_STALLS}× vastgelopen, gestopt.`, "error");
+        ctx.ui.notify(`Agent stalled ${MAX_STALLS} times, stopped.`, "error");
         return;
       }
       pi.sendUserMessage("/unstick", { expandPromptTemplates: true } as any);
     } catch {
-      // stil: geen ruis in de UI
+      // silent: no noise in the UI
     } finally {
       working = false;
     }
@@ -296,7 +298,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.registerCommand("unstick", {
-    description: "Hangende run afbreken, terug naar laatste werkende punt en verder",
+    description: "Abort a hanging run, go back to the last working point and continue",
     handler: async (_args, ctx) => {
       if (!ctx.isIdle()) {
         ctx.abort();
@@ -324,7 +326,7 @@ export default function (pi: ExtensionAPI) {
       } else {
         pi.sendUserMessage(CONTINUE_TEXT);
       }
-      ctx.ui.notify(`Vastgelopen run hersteld (${stalls}/${MAX_STALLS}).`, "info");
+      ctx.ui.notify(`Stalled run recovered (${stalls}/${MAX_STALLS}).`, "info");
     },
   });
 }
