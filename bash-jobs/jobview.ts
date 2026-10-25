@@ -1,30 +1,28 @@
-import { closeSync, existsSync, openSync, readSync, statSync } from "node:fs";
 import { matchesKey, truncateToWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { age } from "../shared/util.ts";
+import { VIEW_TAIL_BYTES } from "./config.ts";
+import { ending, type Job, render } from "./jobproc.ts";
 
-const TAIL_BYTES = 4_000_000;
 const REFRESH_MS = 500;
-const ANSI = /\x1b\[[0-9;?]*[A-Za-z]/g;
 export const HEIGHT_SHARE = 0.6;
 const COMMAND_LINES = 4;
 
 export type ViewJob = { id: string; command: string; log: string; start: number; state: () => string };
 
 function tail(path: string): string[] {
-  if (!existsSync(path)) return ["(no output yet)"];
-  const size = statSync(path).size;
-  const from = Math.max(0, size - TAIL_BYTES);
-  const buf = Buffer.alloc(size - from);
-  const fd = openSync(path, "r");
-  try {
-    readSync(fd, buf, 0, buf.length, from);
-  } finally {
-    closeSync(fd);
-  }
-  const lines = buf.toString("utf8").replace(ANSI, "").replace(/\r(?!\n)/g, "\n").replace(/\t/g, "  ").split("\n");
-  if (lines[lines.length - 1] === "") lines.pop();
-  if (from > 0) lines[0] = `(first ${Math.round(from / 1024)} KB not shown)`;
-  return lines;
+  const out = render(path, VIEW_TAIL_BYTES);
+  if (!out.lines.length) return ["(no output yet)"];
+  if (out.cut) out.lines.unshift(`(first part of the log not shown; log: ${path})`);
+  return out.lines;
+}
+
+export async function view(ui: any, job: Job) {
+  const state = () => ending(job) ?? (job.bg ? "running in the background" : "running");
+  await ui.custom(
+    (tui: any, theme: any, _keys: any, done: (r: undefined) => void) =>
+      new JobLogView({ id: job.id, command: job.command, log: job.log, start: job.start, state }, tui, theme, () => done(undefined)),
+    { overlay: true, overlayOptions: { anchor: "center", width: "80%", maxHeight: `${HEIGHT_SHARE * 100}%` } },
+  );
 }
 
 export class JobLogView {

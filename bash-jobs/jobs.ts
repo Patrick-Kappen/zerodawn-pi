@@ -8,11 +8,14 @@ import { alive, describe, ending, type Job, kill, type Meta, saveMeta, statsOf, 
 import { hasBackgroundJob, type State } from "./state.ts";
 import { shorten, storeDir } from "../shared/store.ts";
 import { commandLine } from "../shared/util.ts";
-import { view, type Widget } from "./widget.ts";
+import { type Widget } from "./dashboard.ts";
+import { view } from "./jobview.ts";
 
 const RESEND_MS = 20_000;
 const SHOW_ENDED_MS = 30 * 60_000;
 const SHOW_ENDED_MAX = 20;
+
+export type JobReport = { jobs: string; items: { id: string; command: string; status: string; ok: boolean; log: string }[] };
 
 export type Reports = {
   report: (job: Job, m: Meta, text: string, triggerTurn: boolean) => void;
@@ -53,10 +56,14 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
     const head = `${items.length === 1 ? "A bash job" : `${items.length} bash jobs`} ended${whileWorking ? " while you worked" : ""}.`;
     const decide = whileWorking ? " Decide: use the result now, or finish your current task first." : "";
     const body = items.map((it) => `- job ${it.job.id} (${commandLine(it.job.command, 80)}): ${it.text}`).join("\n");
+    const details: JobReport = {
+      jobs: key,
+      items: items.map((it) => ({ id: it.job.id, command: it.job.command, status: it.text.split("\n")[0].split(" \u00b7 ")[0], ok: it.job.ok === true, log: it.job.log })),
+    };
     try {
-      pi.sendMessage({ customType: "bash-job", content: `${head}${decide}\n${body}`, display: true, details: { jobs: key } }, { triggerTurn });
+      pi.sendMessage({ customType: "bash-job", content: `${head}${decide}\n${body}`, display: true, details }, { triggerTurn });
     } catch (err) {
-      s.ui?.notify(`tool-output: the report of job ${key} failed: ${(err as Error).message}. It is sent again in ${RESEND_MS / 1000} s.`, "error");
+      s.ui?.notify(`bash-jobs: the report of job ${key} failed: ${(err as Error).message}. It is sent again in ${RESEND_MS / 1000} s.`, "error");
     }
   };
   pi.on("message_end", (event) => {

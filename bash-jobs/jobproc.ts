@@ -10,6 +10,7 @@ export type Job = {
   command: string;
   log: string;
   meta: string;
+  toolCallId?: string;
   pid?: number;
   start: number;
   bg: boolean;

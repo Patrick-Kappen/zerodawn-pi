@@ -9,7 +9,8 @@ import { DEFAULT_LIMIT_S, FOREGROUND_MS, MAX_BYTES, MAX_LINES, NO_TIME_LIMIT, ST
 import { type Job, kill, limitText, type Meta, render, resultText, saveMeta, spawnJob, statsOf } from "./jobproc.ts";
 import type { Reports } from "./jobs.ts";
 import type { State } from "./state.ts";
-import type { Widget } from "./widget.ts";
+import type { Widget } from "./dashboard.ts";
+import { renderCall, renderResult } from "./render.ts";
 
 export function registerBackgroundShortcut(pi: ExtensionAPI, { waiting }: State) {
   pi.registerShortcut(Key.ctrlShift("b"), {
@@ -46,6 +47,8 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       background: Type.Optional(Type.Boolean({ description: "Run in the background at once; a message reports the result." })),
       group: Type.Optional(Type.String({ description: "Jobs with the same group report together, in one message when the last one ends." })),
     }),
+    renderCall: (args, theme) => renderCall(args, theme),
+    renderResult: (result, options, theme) => renderResult(result as any, options, theme),
 
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const outDir = storeDir(ctx, "out");
@@ -58,7 +61,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       const child = spawnJob({ commandFile: `${base}.sh`, status: `${base}.status`, limit, log, cwd: ctx.cwd });
       const meta: Meta = { id, command: params.command, log, status: `${base}.status`, pid: child.pid, start: Date.now(), limit, bg: false, group: params.group, reported: false };
       saveMeta(`${base}.json`, meta);
-      const job: Job = { id, command: params.command, log, meta: `${base}.json`, pid: child.pid, start: meta.start, bg: false, group: params.group, stats: () => statsOf(log) };
+      const job: Job = { id, command: params.command, log, meta: `${base}.json`, toolCallId, pid: child.pid, start: meta.start, bg: false, group: params.group, stats: () => statsOf(log) };
       jobs.set(id, job);
       s.ui = ctx.ui;
       widget.refresh();
