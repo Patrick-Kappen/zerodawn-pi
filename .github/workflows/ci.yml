@@ -18,54 +18,12 @@ jobs:
           fetch-depth: 0
       - uses: DeterminateSystems/nix-installer-action@v16
       - uses: DeterminateSystems/magic-nix-cache-action@v9
-      - name: "PR: every commit message is <scope>: subject"
+      - name: "PR: commit subjects, checks for what changed, compat"
         if: github.event_name == 'pull_request'
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: scripts/check-branch-msgs.sh "$BASE"
-      - name: "PR: what kind of change"
-        if: github.event_name == 'pull_request'
-        id: kind
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          # A release PR changes only versions, changelogs and READMEs; the code was tested when it merged.
-          changed="$(git diff --name-only "$BASE...HEAD")"
-          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '(^|/)(package\.json|CHANGELOG\.md|README\.md)$' \
-             && ! git diff "$BASE...HEAD" -- package.json '*/package.json' | grep -E '^[+-] ' | grep -qv '"version"'; then
-            echo "kind=release" >> "$GITHUB_OUTPUT"; echo "release PR"; exit 0
-          fi
-          echo "kind=code" >> "$GITHUB_OUTPUT"
-          checks="pre-commit types"
-          if printf '%s\n' "$changed" | grep -qv '^extensions/'; then
-            checks="$(nix flake show --json 2>/dev/null | jq -r '.checks["x86_64-linux"] | keys[]' | tr '\n' ' ')"
-          else
-            for name in $(printf '%s\n' "$changed" | grep '^extensions/' | cut -d/ -f2 | sort -u); do checks="$checks tests-$name"; done
-          fi
-          echo "checks=$checks" >> "$GITHUB_OUTPUT"; echo "checks: $checks"
-      - name: "PR with code: checks for what changed"
-        if: steps.kind.outputs.kind == 'code'
-        run: |
-          # shellcheck disable=SC2086
-          nix build --no-link -L $(for c in ${{ steps.kind.outputs.checks }}; do printf '.#checks.x86_64-linux.%s ' "$c"; done)
-      - name: "PR with code: released extensions against the current shared/"
-        if: steps.kind.outputs.kind == 'code'
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if git diff --quiet "$BASE...HEAD" -- shared package.json bun.lock; then echo "shared unchanged"; exit 0; fi
-          nix develop --command just compat
-      - name: "Release PR: versions, changelogs and README blocks are complete"
-        if: steps.kind.outputs.kind == 'release'
-        run: |
-          nix build --no-link -L .#checks.x86_64-linux.pre-commit
-          nix develop --command just release-check
-      - name: "main: all checks"
+        run: scripts/ci-checks.sh pr "${{ github.event.pull_request.base.sha }}"
+      - name: "main: every check and compat"
         if: github.event_name == 'push'
-        run: nix flake check -L
-      - name: "main: released extensions against the current shared/"
-        if: github.event_name == 'push'
-        run: nix develop --command just compat
+        run: scripts/ci-checks.sh main
 
   release:
     needs: check
@@ -80,27 +38,4 @@ jobs:
       - name: Tag new versions and release the package
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          # section FILE VERSION: the changelog section of VERSION, without its heading
-          section() { awk -v v="$2" '/^## /{p=($2==v)} p && !/^## /' "$1"; }
-          # One tag per extension whose version is new: <name>-v<version>, annotated with its changelog section.
-          for manifest in shared/package.json extensions/*/package.json; do
-            name="$(jq -r .name "$manifest")"; version="$(jq -r .version "$manifest")"; tag="$name-v$version"
-            if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then continue; fi
-            notes="$(section "$(dirname "$manifest")/CHANGELOG.md" "$version")"
-            git tag -a "$tag" -m "$tag" -m "${notes:-No changelog section.}"
-            git push origin "$tag"
-            echo "tagged $tag"
-          done
-          # The package: tag v<version> and a GitHub release with the section from CHANGELOG.md.
-          version="$(jq -r .version package.json)"; tag="v$version"
-          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-            echo "$tag exists; no release"
-          else
-            notes="$(section CHANGELOG.md "$version")"
-            git tag -a "$tag" -m "$tag"
-            git push origin "$tag"
-            gh release create "$tag" --title "$tag" --notes "${notes:-No changelog section.}"
-          fi
+        run: scripts/ci-release.sh
