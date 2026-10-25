@@ -11,7 +11,9 @@ The edits are written only when they free at least 16 KB together, so the prompt
 ## Changes
 
 <!-- changelog:start -->
-No release yet.
+## 0.1.0 — 2026-10-25
+
+- First release.
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

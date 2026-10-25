@@ -7,7 +7,9 @@ The gateway stores the id as the log group and removes the header before the req
 ## Changes
 
 <!-- changelog:start -->
-No release yet.
+## 0.1.0 — 2026-10-25
+
+- First release.
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
