@@ -15,7 +15,7 @@ const COMMAND_LINES = 4;
 type FollowData = { seq: number; job: string; command: string; log: string; start: number };
 
 export function isFollowed(s: State, job: Job): boolean {
-  return s.follow?.job === job.id;
+  return s.follow === job.id;
 }
 
 export function closeFollow(s: State) {
@@ -25,8 +25,10 @@ export function closeFollow(s: State) {
 
 export function toggleFollow(pi: ExtensionAPI, s: State, job: Job) {
   if (isFollowed(s, job)) return closeFollow(s);
-  const seq = (s.follow?.seq ?? 0) + 1;
-  s.follow = { seq, job: job.id };
+  s.follow = job.id;
+  if (s.followEntries.has(job.id)) return s.tui?.requestRender();
+  const seq = Date.now();
+  s.followEntries.set(job.id, seq);
   pi.appendEntry<FollowData>(ENTRY, { seq, job: job.id, command: job.command, log: job.log, start: job.start });
 }
 
@@ -39,7 +41,7 @@ class FollowView {
   ) {}
 
   private open(): boolean {
-    return this.s.follow?.seq === this.data.seq && this.s.follow.job === this.data.job;
+    return this.s.follow === this.data.job && this.s.followEntries.get(this.data.job) === this.data.seq;
   }
 
   render(width: number): string[] {
