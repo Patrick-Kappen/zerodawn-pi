@@ -1,3 +1,5 @@
+sibling := "zerodawn-pi-private"
+
 # Run the unit tests
 test:
     bun test
@@ -9,28 +11,65 @@ types:
 # Lint and check the format
 lint:
     biome check .
+    shellcheck scripts/*.sh
 
 # Format and apply safe lint fixes
 fmt:
     biome check --write .
     nix fmt
 
-# Run every check: lint, types, tests, nix
+# Run every check: lint, types, tests, nix (nix flake check includes tsc and the tests per extension)
 check: lint types test
     nix flake check
+
+# Run the tests of every extension's last released version against the current shared/ and package.json
+compat:
+    scripts/compat.sh
+
+# Bump every extension that changed since its last tag, and the package: just bump-changed minor|patch|major
+bump-changed level="minor":
+    scripts/bump-changed.sh {{level}}
+
+# Fail when an extension changed since its last tag without a higher version; CI runs this on a release PR
+release-check:
+    scripts/release-check.sh
+
+# Write the changelog blocks into the README of each extension and the root README
+notes:
+    scripts/notes.sh
+
+# Write the hash of the pinned npm packages into flake.nix; run after a change of bun.lock
+deps-hash:
+    scripts/deps-hash.sh
+
+# Fail when the repository behaviour (CI, scripts, flake checks, dev shell, justfile) differs from the sibling repository
+sync-check other=("../" + sibling):
+    scripts/sync-check.sh {{other}}
 
 # Install the pinned pi types for tsc and the LSP
 install:
     bun install --frozen-lockfile
 
-# Start pi with these extensions in a tmux sandbox
-dev:
-    dev/pi-test.sh start
+# Set a version and commit it; CI tags it after the push. Package: just bump 0.3.0. Extension: just bump 0.2.0 bash
+bump version extension="":
+    scripts/bump.sh {{version}} {{extension}}
 
-# Set the version in package.json and commit it; CI tags and releases it after the push: just bump 0.2.0
-bump version:
-    test -z "$(git status --porcelain)" || { echo "bump: commit or stash your changes first" >&2; exit 1; }
-    jq --arg v "{{version}}" '.version = $v' package.json > package.json.tmp && mv package.json.tmp package.json
-    biome format --write package.json
-    git commit -q -m "release: v{{version}}" package.json
-    @echo "committed v{{version}}; push main and CI creates the tag and the release"
+# Start pi with all extensions in a detached tmux session, in a sandbox project; PI_TEST_ARGS adds pi arguments
+dev:
+    scripts/dev.sh
+
+# Stop the sandbox session
+dev-stop:
+    scripts/dev.sh stop
+
+# Show the sandbox screen
+dev-screen:
+    scripts/dev.sh screen
+
+# Type text into the sandbox and press enter: just dev-send "ls"
+dev-send text:
+    scripts/dev.sh send "{{text}}"
+
+# Send a tmux key to the sandbox: just dev-key C-c
+dev-key key:
+    scripts/dev.sh key "{{key}}"
