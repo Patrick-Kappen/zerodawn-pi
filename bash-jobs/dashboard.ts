@@ -194,6 +194,7 @@ export function createDashboard(pi: ExtensionAPI, s: State): Widget {
     s.ui = ctx.ui;
     calls.clear();
     counts = { done: 0, failed: 0 };
+    for (const j of bgJobs()) if (turnEnd !== undefined && (j.endedAt ?? 0) >= turnEnd) counted.delete(j.id);
     turnStart = Date.now();
     turnEnd = undefined;
     refresh();
