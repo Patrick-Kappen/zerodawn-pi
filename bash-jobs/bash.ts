@@ -10,7 +10,6 @@ import { type Job, kill, limitText, type Meta, render, resultText, saveMeta, spa
 import type { Reports } from "./jobs.ts";
 import type { State } from "./state.ts";
 import type { Widget } from "./dashboard.ts";
-import { renderCall, renderResult } from "./render.ts";
 
 export function registerBackgroundShortcut(pi: ExtensionAPI, { waiting }: State) {
   pi.registerShortcut(Key.ctrlShift("b"), {
@@ -48,8 +47,6 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       background: Type.Optional(Type.Boolean({ description: "Run in the background at once; a message reports the result." })),
       group: Type.Optional(Type.String({ description: "Jobs with the same group report together, in one message when the last one ends." })),
     }),
-    renderCall: (args, theme) => renderCall(args, theme),
-    renderResult: (result, options, theme) => renderResult(result as any, options, theme),
 
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const outDir = storeDir(ctx, "out");

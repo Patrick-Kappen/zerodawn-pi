@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { homedir } from "node:os";
 import { age, commandLine } from "../shared/util.ts";
-import { ENDED_MS, STREAM_TAIL_BYTES, TAIL_ROWS } from "./config.ts";
+import { DASHBOARD_ROWS, STREAM_TAIL_BYTES, TAIL_ROWS } from "./config.ts";
 import { ICON_HEADER, STATUS, toolIcon } from "./icons.ts";
 import { ending, type Job, render } from "./jobproc.ts";
 import { toggleFollow } from "./jobview.ts";
@@ -15,7 +15,7 @@ const SUMMARY_MAX = 60;
 
 export type Widget = { refresh: () => void; stop: () => void };
 
-type Call = { id: string; parent?: string; tool: string; summary: string; start: number; end?: number; ok?: boolean; background?: boolean };
+type Call = { id: string; parent?: string; tool: string; summary: string; start: number; end?: number; ok?: boolean; background?: boolean; error?: string };
 type Row = { text: string; job?: Job };
 
 const ARG_KEYS = ["command", "path", "pattern", "query", "url", "task", "code", "action"];
@@ -29,12 +29,19 @@ export function argSummary(tool: string, args: unknown): string {
   return raw.startsWith(`${homedir()}/`) ? `~${raw.slice(homedir().length)}` : raw;
 }
 
+function firstLine(result: unknown): string | undefined {
+  const content = (result as { content?: { type: string; text?: string }[] } | undefined)?.content;
+  const text = content?.find((c) => c.type === "text" && c.text)?.text;
+  return text ? commandLine(text.replace(/^Error: /, ""), SUMMARY_MAX).trim() : undefined;
+}
+
 export function createDashboard(pi: ExtensionAPI, s: State): Widget {
   const calls = new Map<string, Call>();
   const counted = new Set<string>();
   let counts = { done: 0, failed: 0 };
   let turnStart = 0;
   let turnEnd: number | undefined;
+  let since = 0;
   let expanded = false;
   let mounted: unknown;
   let tui: { requestRender: () => void } | undefined;
@@ -43,7 +50,7 @@ export function createDashboard(pi: ExtensionAPI, s: State): Widget {
   const jobOf = (call: Call) => [...s.jobs.values()].find((j) => j.toolCallId === call.id);
   const bgJobs = () => [...s.jobs.values()].filter((j) => j.bg);
   const runningJobs = () => bgJobs().filter((j) => !j.result);
-  const recent = (end: number | undefined) => end !== undefined && Date.now() - end < ENDED_MS;
+  const inTurn = (end: number | undefined) => end !== undefined && end >= since;
 
   const countJobs = () => {
     for (const j of bgJobs()) {
@@ -55,19 +62,13 @@ export function createDashboard(pi: ExtensionAPI, s: State): Widget {
   };
 
   const anythingRunning = () => [...calls.values()].some((c) => c.end === undefined) || runningJobs().length > 0;
-  const anythingRecent = () => [...calls.values()].some((c) => recent(c.end)) || bgJobs().some((j) => recent(j.endedAt));
-  const visible = () => calls.size > 0 || bgJobs().length > 0 || counts.done + counts.failed > 0;
-
-  const prune = () => {
-    for (const [id, c] of calls) if (c.end !== undefined && !recent(c.end)) calls.delete(id);
-  };
+  const visible = () => calls.size > 0 || runningJobs().length > 0 || counts.done + counts.failed > 0;
 
   const tick = () => {
-    if (!anythingRunning() && !anythingRecent()) {
+    if (!anythingRunning()) {
       clearInterval(ticker);
       ticker = undefined;
     }
-    prune();
     tui?.requestRender();
   };
 
@@ -90,7 +91,8 @@ export function createDashboard(pi: ExtensionAPI, s: State): Widget {
     const done = c.end !== undefined;
     const status = !done ? theme.fg("accent", STATUS.running) : c.ok ? theme.fg("success", STATUS.done) : theme.fg("error", STATUS.failed);
     const right = !done ? theme.fg("dim", age(Date.now() - c.start)) : theme.fg("dim", `${c.ok ? "done" : "failed"} · ${age(c.end! - c.start)}`);
-    return row(theme, width, depth, status, c.tool, c.summary, right, job);
+    const summary = done && !c.ok && c.error ? `${c.summary} ${theme.fg("error", `→ ${c.error}`)}` : c.summary;
+    return row(theme, width, depth, status, c.tool, summary, right, job);
   };
 
   const jobRow = (theme: any, j: Job, width: number): Row => {
@@ -116,19 +118,31 @@ export function createDashboard(pi: ExtensionAPI, s: State): Widget {
       .map((line) => ({ text: truncateToWidth(`      ${theme.fg("dim", "│")} ${line}`, width, "…"), job }));
 
   const rows = (theme: any, width: number): Row[] => {
-    const out: Row[] = [];
-    const top = [...calls.values()].filter((c) => !c.parent).sort((a, b) => a.start - b.start);
+    type Item = { start: number; running: boolean; rows: Row[] };
+    const items: Item[] = [];
+    const top = [...calls.values()].filter((c) => !c.parent);
     for (const c of top) {
       const job = c.tool === "bash" ? jobOf(c) : undefined;
       if (job?.bg) continue;
-      out.push(callRow(theme, c, job, width, 0));
-      if (job && c.end === undefined) out.push(...tailRows(theme, job, width));
-      for (const n of [...calls.values()].filter((x) => x.parent === c.id).sort((a, b) => a.start - b.start)) out.push(callRow(theme, n, undefined, width, 1));
+      const own = [callRow(theme, c, job, width, 0)];
+      if (job && c.end === undefined) own.push(...tailRows(theme, job, width));
+      for (const n of [...calls.values()].filter((x) => x.parent === c.id).sort((a, b) => a.start - b.start)) own.push(callRow(theme, n, undefined, width, 1));
+      items.push({ start: c.start, running: c.end === undefined, rows: own });
     }
-    for (const j of bgJobs().filter((j) => !j.result || recent(j.endedAt)).sort((a, b) => a.start - b.start)) {
-      out.push(jobRow(theme, j, width));
-      if (!j.result) out.push(...tailRows(theme, j, width));
+    for (const j of bgJobs().filter((j) => !j.result || inTurn(j.endedAt))) {
+      const own = [jobRow(theme, j, width)];
+      if (!j.result) own.push(...tailRows(theme, j, width));
+      items.push({ start: j.start, running: !j.result, rows: own });
     }
+    items.sort((a, b) => a.start - b.start);
+    const running = items.filter((it) => it.running).length;
+    const room = Math.max(0, DASHBOARD_ROWS - running);
+    const ended = items.filter((it) => !it.running);
+    const hidden = Math.max(0, ended.length - room);
+    const dropped = new Set(ended.slice(0, hidden));
+    const shown = items.filter((it) => !dropped.has(it));
+    const out = shown.flatMap((it) => it.rows);
+    if (hidden > 0) out.unshift({ text: truncateToWidth(theme.fg("dim", `  … ${hidden} earlier ${hidden === 1 ? "call" : "calls"}`), width, "…") });
     return out;
   };
 
@@ -140,7 +154,7 @@ export function createDashboard(pi: ExtensionAPI, s: State): Widget {
       mounted = tui = undefined;
       return;
     }
-    if ((anythingRunning() || anythingRecent()) && !ticker) ticker = setInterval(tick, TICK_MS);
+    if (anythingRunning() && !ticker) ticker = setInterval(tick, TICK_MS);
     if (mounted === s.ui) return tui?.requestRender();
     mounted = s.ui;
     let shown: Row[] = [];
@@ -151,7 +165,6 @@ export function createDashboard(pi: ExtensionAPI, s: State): Widget {
         s.tui = t;
         return {
           render(width: number) {
-            prune();
             shown = expanded ? rows(theme, width) : [];
             return [truncateToWidth(header(theme, width), width, "…"), ...shown.map((r) => r.text)];
           },
@@ -196,6 +209,7 @@ export function createDashboard(pi: ExtensionAPI, s: State): Widget {
     calls.clear();
     counts = { done: 0, failed: 0 };
     for (const j of bgJobs()) if (turnEnd !== undefined && (j.endedAt ?? 0) >= turnEnd) counted.delete(j.id);
+    since = turnEnd ?? Date.now();
     turnStart = Date.now();
     turnEnd = undefined;
     refresh();
@@ -213,6 +227,7 @@ export function createDashboard(pi: ExtensionAPI, s: State): Widget {
     if (!c) return;
     c.end = Date.now();
     c.ok = !event.isError;
+    if (event.isError) c.error = firstLine(event.result);
     c.background = (event.result as { details?: { background?: boolean } } | undefined)?.details?.background === true;
     if (!c.parent && !c.background) {
       if (c.ok) counts.done++;
