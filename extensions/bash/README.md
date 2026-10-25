@@ -44,7 +44,9 @@ Jobs survive a pi restart: `session_start` reads the job files, reports jobs tha
 ## Changes
 
 <!-- changelog:start -->
-No release yet.
+## 0.1.0 — 2026-10-25
+
+- First release.
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

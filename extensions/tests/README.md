@@ -22,7 +22,9 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 ## Changes
 
 <!-- changelog:start -->
-No release yet.
+## 0.1.0 — 2026-10-25
+
+- First release.
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

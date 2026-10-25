@@ -13,7 +13,9 @@ Structural code search with [ast-grep](https://ast-grep.github.io): the pattern 
 ## Changes
 
 <!-- changelog:start -->
-No release yet.
+## 0.1.0 — 2026-10-25
+
+- First release.
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

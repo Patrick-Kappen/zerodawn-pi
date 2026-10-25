@@ -12,7 +12,9 @@ Adds two sections to the system prompt and keeps them current during the session
 ## Changes
 
 <!-- changelog:start -->
-No release yet.
+## 0.1.0 — 2026-10-25
+
+- First release.
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

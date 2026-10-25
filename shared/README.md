@@ -23,7 +23,9 @@ Tests: `util.test.ts`, `store.test.ts`, `config.test.ts`.
 ## Changes
 
 <!-- changelog:start -->
-No release yet.
+## 0.1.0 — 2026-10-25
+
+- First release.
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
