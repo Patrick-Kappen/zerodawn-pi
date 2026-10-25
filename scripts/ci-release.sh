@@ -25,8 +25,8 @@ for manifest in shared/package.json extensions/*/package.json; do
   tag="$name-v$version"
   git rev-parse -q --verify "refs/tags/$tag" >/dev/null && continue
   notes="$(section "$(dirname "$manifest")/CHANGELOG.md" "$version")"
-  [ -n "$notes" ] || fail "$(dirname "$manifest")/CHANGELOG.md has no section '## $version'" \
-    "the release PR must come from just bump-changed, which writes it; add the section and tag by hand: git tag -a $tag"
+  # No section: this version was never released through bump-changed (for example the initial 0.1.0); not a tag.
+  if [ -z "$notes" ]; then echo "$tag: no changelog section, not released"; continue; fi
   tag_it "$tag" "$notes"; tagged=$((tagged+1))
 done
 
@@ -36,8 +36,7 @@ if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
   exit 0
 fi
 notes="$(section CHANGELOG.md "$version")"
-[ -n "$notes" ] || fail "CHANGELOG.md has no section '## $version'" \
-  "the release PR must come from just bump-changed; add the section, then rerun this job"
+if [ -z "$notes" ]; then echo "$tag: no changelog section in CHANGELOG.md, not released ($tagged component tags)"; exit 0; fi
 tag_it "$tag" "$notes"
 gh release create "$tag" --title "$tag" --notes "$notes" ||
   fail "tag $tag is pushed but the GitHub release was not created" "create it by hand with the section of CHANGELOG.md: gh release create $tag --title $tag --notes-file FILE"
