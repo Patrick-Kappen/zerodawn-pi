@@ -1,0 +1,3 @@
+Building
+[Kstep 1/3[Kstep 2/3[K[32mstep 3/3 ok[0m
+end
