@@ -5,7 +5,7 @@ import { age, commandLine } from "../shared/util.ts";
 import { ENDED_MS, STREAM_TAIL_BYTES, TAIL_ROWS } from "./config.ts";
 import { ICON_HEADER, STATUS, toolIcon } from "./icons.ts";
 import { ending, type Job, render } from "./jobproc.ts";
-import { openLog } from "./jobview.ts";
+import { view } from "./jobview.ts";
 import type { State } from "./state.ts";
 
 const KEY = "tools";
@@ -35,7 +35,7 @@ export function createDashboard(pi: ExtensionAPI, s: State): Widget {
   let counts = { done: 0, failed: 0 };
   let turnStart = 0;
   let turnEnd: number | undefined;
-  let expanded = true;
+  let expanded = false;
   let mounted: unknown;
   let tui: { requestRender: () => void } | undefined;
   let ticker: ReturnType<typeof setInterval> | undefined;
@@ -163,7 +163,7 @@ export function createDashboard(pi: ExtensionAPI, s: State): Widget {
             }
             const r = shown[event.y - 1];
             if (!r?.job) return undefined;
-            openLog(pi, r.job);
+            void view(s.ui, r.job);
             return { handled: true };
           },
           invalidate() {},
