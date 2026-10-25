@@ -67,6 +67,7 @@
             '';
             packages = [
               pkgs.nodejs_24
+              pkgs.bun
               pkgs.typescript
               pkgs.biome
               pkgs.jq
