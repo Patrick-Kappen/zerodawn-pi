@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { render, resultText, spawnJob, summarizeFromDisk, tailLimit } from "./jobproc.ts";
+import { digest, errorLines, render, resultText, spawnJob, summarizeFromDisk, tailLimit } from "./jobproc.ts";
 
 function run(command: string, limit = 10): Promise<{ code: number | null; sig: string | null; dir: string; log: string; status: string }> {
   const dir = mkdtempSync(join(tmpdir(), "bash-jobs-"));
@@ -50,12 +50,32 @@ test("tailLimit keeps the last lines inside both limits", () => {
   assert.deepEqual(tailLimit([], 10, 10), { kept: [], truncated: false });
 });
 
-test("long output returns a tail and the log path", async () => {
-  const r = await run("seq 1 3000");
+test("long output returns head, error lines, tail and the path of the clean output", async () => {
+  const r = await run("seq 1 3000 | sed '1500s/.*/error: thing 1500 broke/; 2000s/.*/FAIL case 2000/'");
   const text = resultText(r.log, "exit 0 (1s)");
   const lines = text.split("\n");
-  assert.match(lines[0], /^exit 0 \(1s\) · 3000 lines, \d+ bytes · last 2000 lines:$/);
-  assert.equal(lines[1], "1001");
-  assert.equal(lines[lines.length - 2], "3000");
-  assert.match(lines[lines.length - 1], /^log: /);
+  assert.match(lines[0], /^exit 0 \(1s\) · 3000 lines, \d+ bytes · output: .*\.txt$/);
+  assert.equal(lines[1], "first 20 lines:");
+  assert.equal(lines[2], "1");
+  assert.equal(lines[21], "20");
+  assert.match(lines[22], /^… \d+ lines not shown · 2 of them look like errors \(line: text\):$/);
+  assert.equal(lines[23], "  1500: error: thing 1500 broke");
+  assert.equal(lines[24], "  2000: FAIL case 2000");
+  assert.match(lines[25], /^last \d+ lines:$/);
+  assert.equal(lines[lines.length - 1], "3000");
+  const txt = r.log.replace(/\.log$/, ".txt");
+  assert.equal(readFileSync(txt, "utf8").split("\n")[1499], "error: thing 1500 broke");
+});
+
+test("digest keeps everything when it fits", () => {
+  assert.deepEqual(digest(["a", "b"]), { head: [], errors: [], tail: ["a", "b"], hidden: 0, truncated: false });
+});
+
+test("errorLines reports each distinct error once with its line number", () => {
+  const lines = ["ok", "error: x", "fine", "error: x", "panic: y", "Error 123"];
+  assert.deepEqual(errorLines(lines, 0, lines.length, 10, 1000), [
+    { n: 2, text: "error: x" },
+    { n: 5, text: "panic: y" },
+    { n: 6, text: "Error 123" },
+  ]);
 });

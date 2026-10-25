@@ -29,7 +29,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
   pi.registerTool({
     name: "bash",
     label: "bash",
-    description: `Run a bash command and return its output (up to ${MAX_LINES} lines; more goes to a log). background: true returns the job id at once; the result comes later as a message, or through jobs wait.`,
+    description: `Run a bash command and return its output (up to ${MAX_LINES} lines or ${MAX_BYTES} bytes; longer output: first lines, lines that look like errors, last lines, and the path of the full output). background: true returns the job id at once; the result comes later as a message, or through jobs wait.`,
     promptSnippet: "Run a bash command and wait for it; background: true to keep working",
     promptGuidelines: [
       "Independent commands: put them in one message; they run in parallel.",
