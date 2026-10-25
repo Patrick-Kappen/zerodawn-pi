@@ -11,7 +11,8 @@ for manifest in shared/package.json extensions/*/package.json; do
   tag="$(git tag --list "$name-v*" --sort=-v:refname | head -n1)"
   if [ -n "$tag" ] && git diff --quiet "$tag" -- "$(dirname "$manifest")"; then continue; fi
   if [ -n "$tag" ] && [ "$version" != "${tag#"$name-v"}" ]; then continue; fi
-  new="$(next "$version")"
+  # A component without a tag ships its current version as its first release; only a released one is bumped.
+  if [ -n "$tag" ]; then new="$(next "$version")"; else new="$version"; fi
   jq --arg v "$new" '.version = $v' "$manifest" > "$manifest.tmp" && mv "$manifest.tmp" "$manifest"
   bumped+=("$name $version -> $new $(dirname "$manifest")")
 done
@@ -25,7 +26,7 @@ root="## $new — $today"
 for entry in "${bumped[@]}"; do
   read -r name _ _ to dir <<< "$entry"
   tag="$(git tag --list "$name-v*" --sort=-v:refname | head -n1)"
-  if [ -n "$tag" ]; then lines="$(git log --format='- %s' "$tag..HEAD" -- "$dir" | sed "s/^- $name: /- /")"; else lines="- First tagged release."; fi
+  if [ -n "$tag" ]; then lines="$(git log --format='- %s' "$tag..HEAD" -- "$dir" | sed "s/^- $name: /- /")"; else lines="- First release."; fi
   [ -f "$dir/CHANGELOG.md" ] || printf '# Changelog\n' > "$dir/CHANGELOG.md"
   prepend "$dir/CHANGELOG.md" "$(printf '## %s — %s\n\n%s' "$to" "$today" "$lines")"
   root="$(printf '%s\n\n### %s %s\n\n%s' "$root" "$name" "$to" "$lines")"
