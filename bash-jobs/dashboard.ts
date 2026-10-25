@@ -5,7 +5,7 @@ import { age, commandLine } from "../shared/util.ts";
 import { ENDED_MS, STREAM_TAIL_BYTES, TAIL_ROWS } from "./config.ts";
 import { ICON_HEADER, STATUS, toolIcon } from "./icons.ts";
 import { ending, type Job, render } from "./jobproc.ts";
-import { view } from "./jobview.ts";
+import { toggleFollow } from "./jobview.ts";
 import type { State } from "./state.ts";
 
 const KEY = "tools";
@@ -148,6 +148,7 @@ export function createDashboard(pi: ExtensionAPI, s: State): Widget {
       KEY,
       (t: any, theme: any) => {
         tui = t;
+        s.tui = t;
         return {
           render(width: number) {
             prune();
@@ -163,7 +164,7 @@ export function createDashboard(pi: ExtensionAPI, s: State): Widget {
             }
             const r = shown[event.y - 1];
             if (!r?.job) return undefined;
-            void view(s.ui, r.job);
+            toggleFollow(pi, s, r.job);
             return { handled: true };
           },
           invalidate() {},

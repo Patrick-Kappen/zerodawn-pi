@@ -9,7 +9,7 @@ import { hasBackgroundJob, type State } from "./state.ts";
 import { shorten, storeDir } from "../shared/store.ts";
 import { commandLine } from "../shared/util.ts";
 import { type Widget } from "./dashboard.ts";
-import { view } from "./jobview.ts";
+import { closeFollow, toggleFollow } from "./jobview.ts";
 
 const RESEND_MS = 20_000;
 const SHOW_ENDED_MS = 30 * 60_000;
@@ -168,18 +168,19 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
   });
 
   const pick = async (ctx: any) => {
+    if (s.follow) return closeFollow(s);
     const sorted = visible();
     if (!sorted.length) return ctx.ui.notify("No running bash jobs, and none ended in the last 30 minutes.", "info");
-    if (sorted.length === 1) return view(ctx.ui, sorted[0]);
+    if (sorted.length === 1) return toggleFollow(pi, s, sorted[0]);
     const label = (j: Job) => `${j.id} · ${ending(j) ?? "running"} · ${commandLine(j.command, 70)}`;
-    const chosen = await ctx.ui.select("Bash jobs: pick one to view its output", sorted.map(label));
+    const chosen = await ctx.ui.select("Bash jobs: pick one to follow in the chat", sorted.map(label));
     const job = sorted.find((j) => label(j) === chosen);
-    if (job) await view(ctx.ui, job);
+    if (job) toggleFollow(pi, s, job);
   };
-  pi.registerShortcut(Key.ctrlShift("j"), { description: "Follow the output of a bash job", handler: pick });
+  pi.registerShortcut(Key.ctrlShift("j"), { description: "Follow a bash job in the chat, again to close", handler: pick });
 
   pi.registerCommand("jobs", {
-    description: "Follow the output of a bash job; /jobs list, /jobs show <id>, /jobs kill <id>",
+    description: "Follow a bash job in the chat, again to close; /jobs list, /jobs show <id>, /jobs kill <id>",
     handler: async (args, ctx) => {
       const [action, id] = (args ?? "").trim().split(/\s+/);
       if (!action) return pick(ctx);
@@ -189,7 +190,7 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
         if (action === "kill") return ctx.ui.notify(killById(id), "info");
         const job = jobs.get(id);
         if (!job) throw new Error(`/jobs show: no job ${id}. Known jobs: ${[...jobs.keys()].join(", ") || "none"}.`);
-        return view(ctx.ui, job);
+        return toggleFollow(pi, s, job);
       }
       throw new Error(`/jobs: unknown action "${action}". Use /jobs, /jobs list, /jobs show <id> or /jobs kill <id>.`);
     },

@@ -3,6 +3,8 @@ import type { Job } from "./jobproc.ts";
 export type State = {
   jobs: Map<string, Job>;
   ui: any;
+  tui?: { requestRender: () => void };
+  follow?: { seq: number; job: string };
   waiting: Map<string, () => void>;
 };
 

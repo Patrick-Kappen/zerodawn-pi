@@ -1,93 +1,79 @@
-import { matchesKey, truncateToWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth } from "@earendil-works/pi-tui";
+import { shorten } from "../shared/store.ts";
 import { age } from "../shared/util.ts";
-import { VIEW_TAIL_BYTES } from "./config.ts";
+import { STREAM_TAIL_BYTES, VIEW_TAIL_BYTES } from "./config.ts";
+import { STATUS, toolIcon } from "./icons.ts";
 import { ending, type Job, render } from "./jobproc.ts";
+import type { State } from "./state.ts";
 
-const REFRESH_MS = 500;
-export const HEIGHT_SHARE = 0.6;
+const ENTRY = "bash-follow";
+const COLLAPSED_LINES = 40;
+const EXPANDED_LINES = 500;
 const COMMAND_LINES = 4;
 
-export type ViewJob = { id: string; command: string; log: string; start: number; state: () => string };
+type FollowData = { seq: number; job: string; command: string; log: string; start: number };
 
-function tail(path: string): string[] {
-  const out = render(path, VIEW_TAIL_BYTES);
-  if (!out.lines.length) return ["(no output yet)"];
-  if (out.cut) out.lines.unshift(`(first part of the log not shown; log: ${path})`);
-  return out.lines;
+export function isFollowed(s: State, job: Job): boolean {
+  return s.follow?.job === job.id;
 }
 
-export async function view(ui: any, job: Job) {
-  const state = () => ending(job) ?? (job.bg ? "running in the background" : "running");
-  await ui.custom(
-    (tui: any, theme: any, _keys: any, done: (r: undefined) => void) =>
-      new JobLogView({ id: job.id, command: job.command, log: job.log, start: job.start, state }, tui, theme, () => done(undefined)),
-    { overlay: false },
-  );
+export function closeFollow(s: State) {
+  s.follow = undefined;
+  s.tui?.requestRender();
 }
 
-export class JobLogView {
-  private follow = true;
-  private top = 0;
-  private timer: ReturnType<typeof setInterval>;
-  private lines: string[] = [];
-  private bodyHeight = 5;
+export function toggleFollow(pi: ExtensionAPI, s: State, job: Job) {
+  if (isFollowed(s, job)) return closeFollow(s);
+  const seq = (s.follow?.seq ?? 0) + 1;
+  s.follow = { seq, job: job.id };
+  pi.appendEntry<FollowData>(ENTRY, { seq, job: job.id, command: job.command, log: job.log, start: job.start });
+}
 
+class FollowView {
   constructor(
-    private job: ViewJob,
-    private tui: any,
+    private data: FollowData,
+    private s: State,
     private theme: any,
-    private done: () => void,
-  ) {
-    this.lines = tail(job.log);
-    this.timer = setInterval(() => {
-      this.lines = tail(job.log);
-      this.tui.requestRender();
-    }, REFRESH_MS);
-  }
+    private expanded: boolean,
+  ) {}
 
-  handleInput(data: string): void {
-    const h = this.bodyHeight;
-    const max = Math.max(0, this.lines.length - h);
-    const from = this.follow ? max : this.top;
-    if (matchesKey(data, "escape") || data === "q") {
-      clearInterval(this.timer);
-      this.done();
-      return;
-    }
-    if (matchesKey(data, "end")) this.follow = true;
-    else if (matchesKey(data, "up")) this.scroll(from - 1, max);
-    else if (matchesKey(data, "down")) this.scroll(from + 1, max);
-    else if (matchesKey(data, "pageUp")) this.scroll(from - h, max);
-    else if (matchesKey(data, "pageDown")) this.scroll(from + h, max);
-    else if (matchesKey(data, "home")) this.scroll(0, max);
-    this.tui.requestRender();
-  }
-
-  private scroll(to: number, max: number) {
-    this.top = Math.min(max, Math.max(0, to));
-    this.follow = this.top >= max;
-  }
-
-  private command(width: number): string[] {
-    const wrapped = `$ ${this.job.command.trim()}`.split("\n").flatMap((line) => wrapTextWithAnsi(line, width));
-    const shown = wrapped.slice(0, COMMAND_LINES);
-    if (wrapped.length > COMMAND_LINES) shown[COMMAND_LINES - 1] = truncateToWidth(`${shown[COMMAND_LINES - 1]} …`, width, "…");
-    return shown.map((line) => this.theme.fg("accent", line));
+  private open(): boolean {
+    return this.s.follow?.seq === this.data.seq && this.s.follow.job === this.data.job;
   }
 
   render(width: number): string[] {
-    const cut = (s: string) => truncateToWidth(s, width, "…");
-    const command = this.command(width);
-    const total = Math.max(8, Math.floor((process.stdout.rows || 40) * HEIGHT_SHARE));
-    const h = (this.bodyHeight = Math.max(3, total - command.length - 3));
-    const max = Math.max(0, this.lines.length - h);
-    const from = this.follow ? max : Math.min(this.top, max);
-    const head = `job ${this.job.id} · ${this.job.state()} · ${age(Date.now() - this.job.start)}`;
-    const body = this.lines.slice(from, from + h).map(cut);
-    while (body.length < h) body.push("");
-    const foot = `${from + 1}-${Math.min(from + h, this.lines.length)} of ${this.lines.length} · ${this.follow ? "live" : "scrolled"} · ↑↓ PgUp PgDn End · esc back to chat`;
-    return [this.theme.bold(cut(head)), ...command, this.theme.fg("dim", "─".repeat(width)), ...body, this.theme.fg("dim", cut(foot))];
+    if (!this.open()) return [];
+    const t = this.theme;
+    const cut = (line: string) => truncateToWidth(line, width, "…");
+    const job = this.s.jobs.get(this.data.job);
+    const running = job !== undefined && job.result === undefined;
+    const state = job ? (ending(job) ?? (job.bg ? "running in the background" : "running")) : "ended";
+    const mark = running ? t.fg("accent", STATUS.running) : job?.ok === false ? t.fg("error", STATUS.failed) : t.fg("success", STATUS.done);
+    const elapsed = running ? ` · ${age(Date.now() - this.data.start)}` : "";
+    const head = `${mark} ${t.fg("muted", toolIcon("bash"))} ${t.bold(`job ${this.data.job}`)} ${t.fg("dim", `· ${state}${elapsed} · click or ctrl+shift+j closes`)}`;
+    const command = this.data.command.trim().split("\n");
+    const shownCommand = command.slice(0, COMMAND_LINES).map((line, i) => cut(`  ${t.fg("accent", `${i === 0 ? "$ " : "  "}${line}`)}`));
+    if (command.length > COMMAND_LINES) shownCommand.push(t.fg("dim", `    … ${command.length - COMMAND_LINES} more command lines`));
+    const out = render(this.data.log, this.expanded ? VIEW_TAIL_BYTES : STREAM_TAIL_BYTES);
+    const max = this.expanded ? EXPANDED_LINES : COLLAPSED_LINES;
+    const lines = out.lines.slice(-max).map((line) => cut(`  ${t.fg("dim", "│")} ${line}`));
+    const hidden = out.lines.length - Math.min(out.lines.length, max);
+    const foot: string[] = [];
+    if (hidden > 0 || out.cut) foot.push(t.fg("muted", `  … ${hidden > 0 ? `${hidden} more lines` : "earlier output not shown"}${this.expanded ? "" : " · ctrl+o shows more"} · log: ${shorten(this.data.log)}`));
+    else if (!out.lines.length) foot.push(t.fg("dim", "  (no output yet)"));
+    return [cut(head), ...shownCommand, ...lines, ...foot];
+  }
+
+  handleMouse(event: { type: string; button?: string }) {
+    if (event.type !== "click" || event.button !== "left" || !this.open()) return undefined;
+    closeFollow(this.s);
+    return { handled: true };
   }
 
   invalidate(): void {}
+}
+
+export function registerFollowView(pi: ExtensionAPI, s: State) {
+  pi.registerEntryRenderer<FollowData>(ENTRY, (entry, { expanded }, theme) => new FollowView(entry.data, s, theme, expanded));
 }
