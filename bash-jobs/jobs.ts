@@ -94,6 +94,7 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
   const report = (job: Job, m: Meta, text: string, triggerTurn: boolean) => {
     changes++;
     job.result = text;
+    job.ok ??= /^exit 0\b/.test(text);
     job.endedAt = Date.now();
     widget.refresh();
     if (!job.group) return deliver([{ job, m, text }], triggerTurn);

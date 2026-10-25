@@ -1,0 +1,12 @@
+export const FOREGROUND_MS = 30_000;
+export const STREAM_MS = 250;
+export const STREAM_LINES = 40;
+export const STREAM_TAIL_BYTES = 64 * 1024;
+export const RESULT_TAIL_BYTES = 1024 * 1024;
+export const MAX_LINES = 2000;
+export const MAX_BYTES = 50 * 1024;
+export const DEFAULT_LIMIT_S = 3600;
+export const NO_TIME_LIMIT = "# no-time-limit";
+export const DEFAULT_COLUMNS = 120;
+export const DEFAULT_ROWS = 40;
+export const ENDED_MS = 10_000;
