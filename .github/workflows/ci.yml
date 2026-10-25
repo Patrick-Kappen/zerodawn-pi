@@ -22,12 +22,7 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          status=0
-          while IFS= read -r sha; do
-            scripts/check-commit-msg.sh -m "$(git log -1 --format=%B "$sha")" || status=1
-          done < <(git rev-list --no-merges "$BASE..HEAD")
-          exit $status
+        run: scripts/check-branch-msgs.sh "$BASE"
       - name: "PR: what kind of change"
         if: github.event_name == 'pull_request'
         id: kind

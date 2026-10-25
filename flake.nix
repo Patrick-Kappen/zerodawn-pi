@@ -314,6 +314,14 @@
                 stages = [ "commit-msg" ];
                 pass_filenames = true;
               };
+              branch-msgs = {
+                enable = true;
+                name = "every commit on the branch has <scope>: subject";
+                entry = "${pkgs.bash}/bin/bash scripts/check-branch-msgs.sh";
+                stages = [ "pre-push" ];
+                pass_filenames = false;
+                always_run = true;
+              };
               gitleaks = {
                 enable = true;
                 name = "gitleaks";
