@@ -12,6 +12,7 @@
 
 # Backlog
 
+- New extension, working name `pick`: typing `$` in the chat opens a picker, like `@` for files. `$skill` inserts a skill, `$prompt` a prompt template, `$model` switches to a model with a saved setup (thinking level, tools, system prompt additions), `$profile` a named bundle of all of these. Generally everything that is now a slash command with arguments becomes pickable inline, with fuzzy search over one list. Needs: pi's editor hook for a trigger character, a registry of sources (skills, prompts, models, profiles from a config file), and one keystroke to confirm.
 - A poller for the status after a push. It watches the PR checks, the merge, the release tags and `nix flake update` in nixos-config, and reports on its own: green as a small notification (active or in the history, to be decided), red with the error and nothing else. No more asking or checking by hand.
 - Think of subagents / Agent profiles
 - Think of orchastration and orchastration of orchastration
