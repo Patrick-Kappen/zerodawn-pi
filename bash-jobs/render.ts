@@ -17,7 +17,7 @@ function statusLine(theme: any, status: string, ok: boolean): string {
 }
 
 function more(theme: any, hidden: number): string[] {
-  return hidden > 0 ? [theme.fg("muted", `… ${hidden} more lines · ctrl+shift+j for the log`)] : [];
+  return hidden > 0 ? [theme.fg("muted", `… ${hidden} more lines · /jobs show <id> for the full log`)] : [];
 }
 
 export function outputLines(theme: any, log: string | undefined, fallback: string[], max: number): string[] {
