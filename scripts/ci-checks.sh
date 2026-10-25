@@ -55,8 +55,9 @@ case "$mode" in
 
     if printf '%s\n' "$changed" | grep -qv '^extensions/'; then
       step "files outside extensions/ changed: every nix check"
-      checks="$(nix flake show --json 2>/dev/null | jq -r ".checks[\"$system\"] | keys[]" | tr '\n' ' ')"
-      [ -n "$checks" ] || fail "nix flake show returned no checks" "the flake does not evaluate; run nix flake show locally"
+      checks="$(nix eval --json ".#checks.$system" --apply builtins.attrNames 2>/tmp/eval.err | jq -r '.[]' | tr '\n' ' ')" ||
+        fail "the flake does not evaluate: $(tail -n 3 /tmp/eval.err | tr '\n' ' ')" "run nix eval .#checks.$system --apply builtins.attrNames locally"
+      [ -n "$checks" ] || fail "the flake has no checks for $system" "nix eval .#checks.$system --apply builtins.attrNames"
     else
       checks="pre-commit types"
       for name in $(printf '%s\n' "$changed" | grep '^extensions/' | cut -d/ -f2 | sort -u); do

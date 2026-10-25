@@ -16,3 +16,5 @@
 - A poller for the status after a push. It watches the PR checks, the merge, the release tags and `nix flake update` in nixos-config, and reports on its own: green as a small notification (active or in the history, to be decided), red with the error and nothing else. No more asking or checking by hand.
 - Think of subagents / Agent profiles
 - Think of orchastration and orchastration of orchastration
+- Make nvimx open the file that the agent is editting preferably before the agent start changing stuff. I guess there are also tpyes of extensions that can help with that? https://github.com/aliou/nvim-pi
+- Extension for a quick branch off conversation like /btw
