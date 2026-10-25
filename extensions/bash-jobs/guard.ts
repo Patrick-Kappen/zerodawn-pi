@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { stripQuoted } from "../shared/util.ts";
+import { stripQuoted } from "../../shared/util.ts";
 import { hasBackgroundJob, type State } from "./state.ts";
 
 const WAIT = new Set(["sleep", "wait", "true", ":"]);

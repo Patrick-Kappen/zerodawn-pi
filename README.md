@@ -1,21 +1,21 @@
 # zerodawn-pi
 
-A [pi](https://pi.dev) package with independent extensions. Each extension has its own directory and README.
+A [pi](https://pi.dev) package with independent extensions. Each extension has its own directory under `extensions/` and a README.
 
 | Extension | What it does |
 |---|---|
-| [bash-jobs](bash-jobs/README.md) | `bash` tool in a PTY, job dashboard, background jobs with reports, `jobs` tool |
-| [builtins](builtins/README.md) | `read`, `grep`, `edit`, `write` with shorter descriptions, an indent fix for `edit`, a write guard |
-| [git-tool](git-tool/README.md) | compact read-only `git` tool; blocks `git status/diff/log/show` in bash |
-| [recipes](recipes/README.md) | justfile and Makefile recipes in the system prompt; blocks a repeated test run |
-| [prune](prune/README.md) | replaces old large tool results with one line |
-| [ext-switch](ext-switch/README.md) | `/ext`: enable or disable extensions, skills, prompts and themes |
-| [tidy-ui](tidy-ui/README.md) | transcript views, message style, footer, code blocks, working indicator |
-| [ast-grep](ast-grep/README.md) | `ast_grep` tool: structural code search |
-| [opencode-subagent](opencode-subagent/README.md) | `opencode` tool: one task for an OpenCode agent |
-| [system-state](system-state/README.md) | active NixOS system and deployed revision in the system prompt |
-| [stall-watchdog](stall-watchdog/README.md) | aborts a run that stalls and continues from the last good point; `/unstick` |
-| [gateway-session](gateway-session/README.md) | sends the session id to agentgateway, so its logs group requests by session |
+| [bash-jobs](extensions/bash-jobs/README.md) | `bash` tool in a PTY, job dashboard, background jobs with reports, `jobs` tool |
+| [builtins](extensions/builtins/README.md) | `read`, `grep`, `edit`, `write` with shorter descriptions, an indent fix for `edit`, a write guard |
+| [git-tool](extensions/git-tool/README.md) | compact read-only `git` tool; blocks `git status/diff/log/show` in bash |
+| [recipes](extensions/recipes/README.md) | justfile and Makefile recipes in the system prompt; blocks a repeated test run |
+| [prune](extensions/prune/README.md) | replaces old large tool results with one line |
+| [ext-switch](extensions/ext-switch/README.md) | `/ext`: enable or disable extensions, skills, prompts and themes |
+| [tidy-ui](extensions/tidy-ui/README.md) | transcript views, message style, footer, code blocks, working indicator |
+| [ast-grep](extensions/ast-grep/README.md) | `ast_grep` tool: structural code search |
+| [opencode-subagent](extensions/opencode-subagent/README.md) | `opencode` tool: one task for an OpenCode agent |
+| [system-state](extensions/system-state/README.md) | active NixOS system and deployed revision in the system prompt |
+| [stall-watchdog](extensions/stall-watchdog/README.md) | aborts a run that stalls and continues from the last good point; `/unstick` |
+| [gateway-session](extensions/gateway-session/README.md) | sends the session id to agentgateway, so its logs group requests by session |
 
 ## Install
 

@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { age, argSummary, commandLine } from "../shared/util.ts";
+import { age, argSummary, commandLine } from "../../shared/util.ts";
 import { DASHBOARD_ROWS, STREAM_TAIL_BYTES, TAIL_ROWS } from "./config.ts";
 import { ICON_HEADER, STATUS, toolIcon } from "./icons.ts";
 import { ending, type Job, render } from "./jobproc.ts";

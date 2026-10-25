@@ -1,4 +1,4 @@
-import { stripQuoted } from "../shared/util.ts";
+import { stripQuoted } from "../../shared/util.ts";
 
 const GIT_READ = new Set(["status", "diff", "log", "show"]);
 export const RAW_GIT = "# raw-git";

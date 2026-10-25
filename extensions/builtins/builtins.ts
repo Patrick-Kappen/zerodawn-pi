@@ -7,7 +7,7 @@ import {
   type ExtensionAPI,
   type ExtensionToolContext,
 } from "@earendil-works/pi-coding-agent";
-import { absolutePath } from "../shared/util.ts";
+import { absolutePath } from "../../shared/util.ts";
 import { explain, fixIndent, freshLines } from "./editfix.ts";
 
 export const WRITE_MAX_LINES = 100;

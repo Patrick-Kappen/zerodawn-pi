@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { config } from "../shared/config.ts";
+import { config } from "../../shared/config.ts";
 
 const run = promisify(execFile);
 const repoPath = config().nixosRepo;

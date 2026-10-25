@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync, readSync, renameSync, statSync, writeFileSync } from "node:fs";
-import { shorten } from "../shared/store.ts";
-import { age, commandLine } from "../shared/util.ts";
+import { shorten } from "../../shared/store.ts";
+import { age, commandLine } from "../../shared/util.ts";
 import {
   DEFAULT_COLUMNS,
   DEFAULT_LIMIT_S,

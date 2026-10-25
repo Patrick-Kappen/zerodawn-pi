@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { textOf } from "../shared/util.ts";
+import { textOf } from "../../shared/util.ts";
 import { loadRecipes, promptText, type Recipes, Tracker } from "./recipes.ts";
 
 export default function (pi: ExtensionAPI) {

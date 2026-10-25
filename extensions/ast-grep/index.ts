@@ -6,7 +6,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { config } from "../shared/config.ts";
+import { config } from "../../shared/config.ts";
 
 const astGrep = config().astGrep ?? "ast-grep";
 const maxBuffer = 64 * 1024 * 1024;

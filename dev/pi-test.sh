@@ -57,7 +57,7 @@ case "${1:-start}" in
     fi
     tmux new-session -d -s "$session" -x 160 -y 45 -c "$sandbox"
     exts=""
-    for index in "$root"/*/index.ts; do exts="$exts -e '$index'"; done
+    for index in "$root"/extensions/*/index.ts; do exts="$exts -e '$index'"; done
     tmux send-keys -t "$session" -l -- "pi -ne -e builtin:codemode$exts --model '$model' ${PI_TEST_ARGS:-}"
     tmux send-keys -t "$session" Enter
     echo "started session $session in $sandbox; attach with: tmux attach -t $session"

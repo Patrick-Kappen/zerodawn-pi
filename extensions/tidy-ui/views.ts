@@ -9,7 +9,7 @@ import {
   ToolExecutionComponent,
 } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
-import { argSummary } from "../shared/util.ts";
+import { argSummary } from "../../shared/util.ts";
 import { hook, type Layer, unhook } from "./hook.ts";
 import { uiTheme, whenSession } from "./theme.ts";
 import { globalState } from "./util.ts";
