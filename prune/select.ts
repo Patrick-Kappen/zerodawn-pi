@@ -1,0 +1,47 @@
+export const KEEP_TURNS = 2;
+export const MIN_CHARS = 1500;
+
+type Content = { type: string; text?: string };
+type Entry = {
+  type: string;
+  id: string;
+  targetId?: string;
+  message?: { role: string; toolName?: string; content?: Content[]; details?: Record<string, unknown>; isError?: boolean };
+};
+
+export type Edit = { targetId: string; replacement: { content: string } };
+
+function textOf(content: Content[] | undefined): string {
+  return (content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+}
+
+export function stub(toolName: string, text: string, details: Record<string, unknown> | undefined, isError: boolean | undefined): string {
+  const lines = text.split("\n");
+  const size = `${lines.length} lines, ${text.length} chars`;
+  const first = lines[0]?.slice(0, 120) ?? "";
+  const log = typeof details?.log === "string" ? ` Full output: ${details.log}` : "";
+  const state = isError ? "error" : "result";
+  return `[pruned ${toolName} ${state}: ${size}. First line: ${first}.${log || " Run the tool again when you need it."}]`;
+}
+
+export function selectEdits(branch: Entry[], keepTurns = KEEP_TURNS, minChars = MIN_CHARS): Edit[] {
+  const edited = new Set(branch.filter((e) => e.type === "context_edit" && e.targetId).map((e) => e.targetId as string));
+  const usersAfter: number[] = new Array(branch.length).fill(0);
+  let users = 0;
+  for (let i = branch.length - 1; i >= 0; i--) {
+    usersAfter[i] = users;
+    if (branch[i].type === "message" && branch[i].message?.role === "user") users++;
+  }
+  const edits: Edit[] = [];
+  branch.forEach((e, i) => {
+    if (e.type !== "message" || e.message?.role !== "toolResult" || edited.has(e.id)) return;
+    if (usersAfter[i] < keepTurns) return;
+    const text = textOf(e.message.content);
+    if (text.length < minChars) return;
+    edits.push({ targetId: e.id, replacement: { content: stub(e.message.toolName ?? "tool", text, e.message.details, e.message.isError) } });
+  });
+  return edits;
+}
+
+export const prunedChars = (branch: Entry[], edits: Edit[]): number =>
+  edits.reduce((sum, edit) => sum + textOf(branch.find((e) => e.id === edit.targetId)?.message?.content).length - edit.replacement.content.length, 0);
