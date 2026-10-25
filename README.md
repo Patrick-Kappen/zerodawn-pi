@@ -51,7 +51,7 @@ The module:
 - adds the install path to `~/.pi/agent/settings.json` `packages` on activation, and leaves the rest of that file alone, so `/ext` keeps working;
 - adds a daily timer that removes the tool output of sessions that are gone or unchanged for 30 days (`logCleanup.enable`, `logCleanup.days`).
 
-Releases: `just bump <version>` sets the version in `package.json` and commits it. After the push to `main`, CI runs all checks, tags `v<version>` and creates the GitHub release. A push without a new version creates no release. The package version comes from `package.json`.
+Releases: `just bump <version>` sets the version in `package.json` and commits it. After the push to `main`, CI runs all checks, tags `v<version>` and creates the GitHub release. Each extension has its own `package.json` with a version; `just bump <version> <extension>` bumps one, and CI tags it as `<extension>-v<version>`. A push without a new version creates no tag. Every extension needs a `package.json` and at least one `*.test.ts`; `nix flake check` fails without them.
 
 ## Develop
 
@@ -65,7 +65,7 @@ Releases: `just bump <version>` sets the version in `package.json` and commits i
 | `just fmt` | format and apply safe fixes |
 | `just check` | lint, types, tests, `nix flake check` |
 | `just dev` | pi in a tmux sandbox with all extensions; `just dev-screen`, `just dev-send "…"`, `just dev-key C-c`, `just dev-stop` |
-| `just bump <version>` | set and commit a new version |
+| `just bump <version> [extension]` | set and commit a new version of the package or of one extension |
 
 CI (`.github/workflows/ci.yml`) runs `nix flake check` and `just types` on every push and pull request.
 

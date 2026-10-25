@@ -28,12 +28,23 @@
       inherit (nixpkgs) lib;
       inherit (builtins.fromJSON (builtins.readFile ./package.json)) version;
       own = fileset: lib.fileset.difference fileset (lib.fileset.maybeMissing ./node_modules);
-      hasTests =
+      # Every extension has a package.json with a version and at least one test; a missing one fails the evaluation.
+      checkExtension =
         name:
-        lib.fileset.toList (
-          lib.fileset.fileFilter (file: lib.hasSuffix ".test.ts" file.name) (./extensions + "/${name}")
-        ) != [ ];
-      extensions = builtins.filter hasTests (
+        let
+          dir = ./extensions + "/${name}";
+          manifest = dir + "/package.json";
+          tests = lib.fileset.toList (lib.fileset.fileFilter (file: lib.hasSuffix ".test.ts" file.name) dir);
+        in
+        if !builtins.pathExists manifest then
+          throw "extensions/${name}/package.json is missing; add it with name, version and description"
+        else if !((builtins.fromJSON (builtins.readFile manifest)) ? version) then
+          throw "extensions/${name}/package.json has no version"
+        else if tests == [ ] then
+          throw "extensions/${name} has no *.test.ts; add a test"
+        else
+          name;
+      extensions = map checkExtension (
         builtins.attrNames (lib.filterAttrs (_: type: type == "directory") (builtins.readDir ./extensions))
       );
       # One test derivation per extension, with only that extension, shared/ and the manifest as input,
@@ -45,7 +56,9 @@
           fileset = lib.fileset.unions [
             ./package.json
             (lib.fileset.fileFilter (file: file.hasExt "ts") ./shared)
-            (lib.fileset.fileFilter (file: file.hasExt "ts" || file.hasExt "txt") (./extensions + "/${name}"))
+            (lib.fileset.fileFilter (
+              file: file.hasExt "ts" || file.hasExt "txt" || file.name == "package.json"
+            ) (./extensions + "/${name}"))
           ];
         };
       # The pi package: manifest and sources, without tests. Pi loads it from settings.json "packages".
@@ -59,7 +72,10 @@
             fileset = own (
               lib.fileset.unions [
                 ./package.json
-                (lib.fileset.fileFilter (file: file.hasExt "ts" && !lib.hasSuffix ".test.ts" file.name) ./.)
+                (lib.fileset.fileFilter (
+                  file: (file.hasExt "ts" && !lib.hasSuffix ".test.ts" file.name) || file.name == "package.json"
+                ) ./extensions)
+                (lib.fileset.fileFilter (file: file.hasExt "ts" && !lib.hasSuffix ".test.ts" file.name) ./shared)
               ]
             );
           };

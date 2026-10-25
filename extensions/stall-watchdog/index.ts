@@ -16,7 +16,7 @@
 import { readdirSync, readFileSync, readlinkSync } from "node:fs";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-const num = (v: string | undefined, d: number) => (v && Number.isFinite(Number(v)) ? Number(v) : d);
+export const num = (v: string | undefined, d: number) => (v && Number.isFinite(Number(v)) ? Number(v) : d);
 const STALL_MS = num(process.env.PI_WATCHDOG_STALL_S, 180) * 1000;
 const TOOL_STALL_MS = num(process.env.PI_WATCHDOG_TOOL_STALL_S, 180) * 1000;
 const CERTAINTY = num(process.env.PI_WATCHDOG_CERTAINTY, 0.75);
@@ -89,14 +89,18 @@ function descendants(root = process.pid): Proc[] {
   return out;
 }
 
-const clip = (v: unknown, n: number) => {
+export const clip = (v: unknown, n: number) => {
   const s = typeof v === "string" ? v : JSON.stringify(v ?? "");
   return s.length > n ? `${s.slice(0, n)}…` : s;
 };
 
 /** Short summary of the last session entries. */
 function sessionTail(ctx: ExtensionContext, n = 8) {
-  return (ctx.sessionManager.getBranch() as any[]).slice(-n).map((e) => {
+  return summarizeEntries(ctx.sessionManager.getBranch() as any[], n);
+}
+
+export function summarizeEntries(entries: any[], n: number) {
+  return entries.slice(-n).map((e) => {
     if (e.type !== "message") return { type: e.type, at: e.timestamp };
     const m = e.message;
     const text = Array.isArray(m.content)

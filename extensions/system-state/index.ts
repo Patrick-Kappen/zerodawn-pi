@@ -42,20 +42,28 @@ async function git(cwd: string, args: string[]): Promise<string | undefined> {
   );
 }
 
+export function deployedRevision(configurationRevision: string | undefined): { rev?: string; dirty: boolean } {
+  const dirty = configurationRevision?.endsWith("-dirty") ?? false;
+  const rev = configurationRevision?.replace(/-dirty$/, "");
+  return { rev: rev || undefined, dirty };
+}
+
+export function deploymentText(rev: string | undefined, dirty: boolean, ahead: string | undefined): string {
+  if (!rev) return "Deployed revision unknown.";
+  const short = rev.slice(0, 8);
+  const note = dirty ? " Deployed from a dirty tree: uncommitted changes are live, but not in git." : "";
+  if (ahead === undefined) return `Deployed: ${short}, not in this checkout.${note}`;
+  return (ahead === "0" ? `Deployed: ${short} (HEAD).` : `Not deployed: HEAD is ${ahead} commit(s) ahead of deployed ${short}.`) + note;
+}
+
 async function deployment(cwd: string): Promise<string | undefined> {
   if (!repoPath) return undefined;
   const common = await git(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
   if (common !== join(repoPath, ".git")) return undefined;
   const { stdout } = await run("nixos-version", ["--json"]).catch(() => ({ stdout: "{}" }));
-  const full = JSON.parse(stdout).configurationRevision as string | undefined;
-  const dirty = full?.endsWith("-dirty") ?? false;
-  const rev = full?.replace(/-dirty$/, "");
-  if (!rev) return "Deployed revision unknown.";
-  const short = rev.slice(0, 8);
-  const note = dirty ? " Deployed from a dirty tree: uncommitted changes are live, but not in git." : "";
-  const ahead = await git(cwd, ["rev-list", "--count", `${rev}..HEAD`]);
-  if (ahead === undefined) return `Deployed: ${short}, not in this checkout.${note}`;
-  return (ahead === "0" ? `Deployed: ${short} (HEAD).` : `Not deployed: HEAD is ${ahead} commit(s) ahead of deployed ${short}.`) + note;
+  const { rev, dirty } = deployedRevision(JSON.parse(stdout).configurationRevision);
+  const ahead = rev ? await git(cwd, ["rev-list", "--count", `${rev}..HEAD`]) : undefined;
+  return deploymentText(rev, dirty, ahead);
 }
 
 export default function (pi: ExtensionAPI) {

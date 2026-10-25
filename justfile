@@ -87,10 +87,20 @@ dev-send text:
 dev-key key:
     tmux send-keys -t {{session}} "{{key}}"
 
-# Set the version in package.json and commit it; CI tags and releases it after the push: just bump 0.2.0
-bump version:
+# Set a version and commit it; CI tags it after the push. Package: just bump 0.3.0. Extension: just bump 0.2.0 bash-jobs
+bump version extension="":
+    #!/usr/bin/env bash
+    set -euo pipefail
     test -z "$(git status --porcelain)" || { echo "bump: commit or stash your changes first" >&2; exit 1; }
-    jq --arg v "{{version}}" '.version = $v' package.json > package.json.tmp && mv package.json.tmp package.json
-    biome format --write package.json
-    git commit -q -m "release: v{{version}}" package.json
-    @echo "committed v{{version}}; push main and CI creates the tag and the release"
+    if [ -n "{{extension}}" ]; then
+      manifest="extensions/{{extension}}/package.json"
+      [ -f "$manifest" ] || { echo "bump: $manifest does not exist" >&2; exit 1; }
+      tag="{{extension}}-v{{version}}"
+    else
+      manifest=package.json
+      tag="v{{version}}"
+    fi
+    jq --arg v "{{version}}" '.version = $v' "$manifest" > "$manifest.tmp" && mv "$manifest.tmp" "$manifest"
+    biome format --write "$manifest"
+    git commit -q -m "release: $tag" "$manifest"
+    echo "committed $tag; push main and CI creates the tag"

@@ -12,6 +12,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Markdown, type MarkdownTheme } from "@earendil-works/pi-tui";
 import { hook, type Layer, unhook } from "./hook.ts";
+import { plainText, withLead } from "./lines.ts";
 import { uiTheme, whenSession } from "./theme.ts";
 import { globalState } from "./util.ts";
 
@@ -23,7 +24,6 @@ const STYLE_HELP: Record<Style, string> = {
   off: "Pi's own rendering",
 };
 const INDENT = "  ";
-const LINE_START = /^((?:\x1b\][^\x07]*\x07)*)((?:\x1b\[[0-9;]*m)*)( ?)/;
 const KEY = "messages";
 
 const PLAIN = Symbol.for("tidy-ui.messages.plain");
@@ -77,18 +77,8 @@ function header(sender: Sender, width: number, note = ""): string[] {
   return [` ${t.fg("dim", "── ")}${title}${t.fg("dim", ` ${"─".repeat(Math.max(0, width - name.length - 6))}`)}`];
 }
 
-function plainText(line: string): string {
-  return line.replace(/\x1b\][^\x07]*\x07/g, "").replace(/\x1b\[[0-9;]*m/g, "");
-}
-
 function renderBody(next: (width: number) => string[], width: number): string[] {
   return state().style === "row" ? next(width - INDENT.length) : next(width);
-}
-
-function withLead(line: string, lead: string): string {
-  return line.replace(LINE_START, (_all, osc: string, sgr: string, pad: string) =>
-    sgr && pad ? `${osc} ${lead.slice(0, -1)}${sgr}${pad}` : `${osc} ${lead}${sgr}`,
-  );
 }
 
 function decorate(lines: string[]): string[] {
