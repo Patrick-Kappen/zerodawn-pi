@@ -29,15 +29,12 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
   pi.registerTool({
     name: "bash",
     label: "bash",
-    description: `Run a bash command as a job in its own terminal (PTY) and wait for it. The result has the output, up to ${MAX_LINES} lines or ${MAX_BYTES} bytes (longer output: the tail and the path of the full log). With background: true the result returns at once with the job id; the output comes later as a message, or through jobs wait.`,
-    promptSnippet: "Run a bash command as a job and wait for it; background: true to keep working",
+    description: `Run a bash command and return its output (up to ${MAX_LINES} lines; more goes to a log). background: true returns the job id at once; the result comes later as a message, or through jobs wait.`,
+    promptSnippet: "Run a bash command and wait for it; background: true to keep working",
     promptGuidelines: [
-      `bash waits for the command and returns its output (up to ${MAX_LINES} lines or ${MAX_BYTES} bytes; more goes to a log you can read).`,
-      "Use background: true for a command that should run while you work: a server, a watcher, a long build. A message brings the result when it ends, or call jobs wait when you need it.",
-      "Independent commands: start them all in one message; they run in parallel as separate jobs.",
-      "When you start several jobs that belong together, give them the same group: one message reports them when the last one ends.",
-      "Never sleep or poll for a job. Use jobs wait.",
-      `A bash command stops after ${DEFAULT_LIMIT_S / 3600} hour. Add "${NO_TIME_LIMIT}" to the command only when it must run longer.`,
+      "Independent commands: put them in one message; they run in parallel.",
+      "background: true only for a server, a watcher or a long build. Get the result with jobs wait, or from the message. Never sleep or poll.",
+      `A command stops after ${DEFAULT_LIMIT_S / 3600} hour; add "${NO_TIME_LIMIT}" when it must run longer.`,
     ],
     parameters: Type.Object({
       command: Type.String({ description: "Bash command to execute" }),

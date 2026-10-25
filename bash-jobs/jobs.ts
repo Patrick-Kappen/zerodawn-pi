@@ -219,12 +219,8 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
   pi.registerTool({
     name: "jobs",
     label: "jobs",
-    description: `Background bash jobs: wait for jobs to end and get their results, list the jobs of this session, or kill a running job. wait blocks until the given jobs (default: all running) end, at most ${WAIT_MAX_S} seconds.`,
-    promptSnippet: "Wait for, list or kill bash background jobs",
-    promptGuidelines: [
-      "Need the result of a background job before you continue? Call jobs wait with its id (or no id for all running jobs). Do not sleep or poll.",
-      "Use jobs list only when the user asks for job status.",
-    ],
+    description: `wait: block until the given jobs (default: all running) end and return their results, at most ${WAIT_MAX_S} s. list: the jobs of this session. kill: stop a job.`,
+    promptSnippet: "Wait for, list or kill background jobs",
     parameters: Type.Object({
       action: StringEnum(["wait", "list", "kill"] as const),
       id: Type.Optional(Type.String({ description: "kill: the job id. wait: one id, or several separated by commas; default: all running jobs." })),
