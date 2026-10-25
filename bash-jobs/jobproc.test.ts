@@ -51,18 +51,18 @@ test("tailLimit keeps the last lines inside both limits", () => {
 });
 
 test("long output returns head, error lines, tail and the path of the clean output", async () => {
-  const r = await run("seq 1 3000 | sed '1500s/.*/error: thing 1500 broke/; 2000s/.*/FAIL case 2000/'");
+  const r = await run("seq 1 3000 | sed 's/$/ line of forty bytes of padding text ......../; 1500s/.*/error: thing 1500 broke/; 2000s/.*/FAIL case 2000/'");
   const text = resultText(r.log, "exit 0 (1s)");
   const lines = text.split("\n");
   assert.match(lines[0], /^exit 0 \(1s\) · 3000 lines, \d+ bytes · output: .*\.txt$/);
   assert.equal(lines[1], "first 20 lines:");
-  assert.equal(lines[2], "1");
-  assert.equal(lines[21], "20");
+  assert.match(lines[2], /^1 line of forty/);
+  assert.match(lines[21], /^20 line of forty/);
   assert.match(lines[22], /^… \d+ lines not shown · 2 of them look like errors \(line: text\):$/);
   assert.equal(lines[23], "  1500: error: thing 1500 broke");
   assert.equal(lines[24], "  2000: FAIL case 2000");
   assert.match(lines[25], /^last \d+ lines:$/);
-  assert.equal(lines[lines.length - 1], "3000");
+  assert.match(lines[lines.length - 1], /^3000 line of forty/);
   const txt = r.log.replace(/\.log$/, ".txt");
   assert.equal(readFileSync(txt, "utf8").split("\n")[1499], "error: thing 1500 broke");
 });
