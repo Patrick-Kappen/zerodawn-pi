@@ -5,7 +5,7 @@ import { Key } from "@earendil-works/pi-tui";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { callNumber, freeId, shorten, storeDir } from "../shared/store.ts";
 import { age } from "../shared/util.ts";
-import { DEFAULT_LIMIT_S, FOREGROUND_MS, MAX_BYTES, MAX_LINES, NO_TIME_LIMIT, STREAM_LINES, STREAM_MS, STREAM_TAIL_BYTES } from "./config.ts";
+import { DEFAULT_LIMIT_S, MAX_BYTES, MAX_LINES, NO_TIME_LIMIT, STREAM_LINES, STREAM_MS, STREAM_TAIL_BYTES } from "./config.ts";
 import { type Job, kill, limitText, type Meta, render, resultText, saveMeta, spawnJob, statsOf } from "./jobproc.ts";
 import type { Reports } from "./jobs.ts";
 import type { State } from "./state.ts";
@@ -30,12 +30,12 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
   pi.registerTool({
     name: "bash",
     label: "bash",
-    description: `Run a bash command as a job in its own terminal (PTY). A command that ends within ${FOREGROUND_MS / 1000} seconds returns its output in the result, up to ${MAX_LINES} lines or ${MAX_BYTES} bytes (longer output: the tail and the path of the full log). A command that runs longer, or with background: true, continues in the background: the result returns at once with the job id, and the output comes later as a message, or at once through jobs wait.`,
-    promptSnippet: "Run a bash command as a job; short ones return inline, long ones run in the background",
+    description: `Run a bash command as a job in its own terminal (PTY) and wait for it. The result has the output, up to ${MAX_LINES} lines or ${MAX_BYTES} bytes (longer output: the tail and the path of the full log). With background: true the result returns at once with the job id; the output comes later as a message, or through jobs wait.`,
+    promptSnippet: "Run a bash command as a job and wait for it; background: true to keep working",
     promptGuidelines: [
-      `bash returns the output inline when the command ends within ${FOREGROUND_MS / 1000} seconds. A longer command becomes a background job: a message brings the result when it ends, or call jobs wait when you need it before you continue.`,
-      "Use background: true for a command you know takes long: a build, a test suite, a server, a download.",
-      "Independent commands: start them all in one message; they run in parallel as separate jobs. Then do other work, or jobs wait for the ones you need.",
+      `bash waits for the command and returns its output (up to ${MAX_LINES} lines or ${MAX_BYTES} bytes; more goes to a log you can read).`,
+      "Use background: true for a command that should run while you work: a server, a watcher, a long build. A message brings the result when it ends, or call jobs wait when you need it.",
+      "Independent commands: start them all in one message; they run in parallel as separate jobs.",
       "When you start several jobs that belong together, give them the same group: one message reports them when the last one ends.",
       "Never sleep or poll for a job. Use jobs wait.",
       `A bash command stops after ${DEFAULT_LIMIT_S / 3600} hour. Add "${NO_TIME_LIMIT}" to the command only when it must run longer.`,
@@ -96,7 +96,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       signal?.addEventListener("abort", abort, { once: true });
       let toBackground!: () => void;
       const moved = new Promise<undefined>((r) => (toBackground = () => r(undefined)));
-      const timer = setTimeout(toBackground, params.background ? 0 : FOREGROUND_MS);
+      const timer = params.background ? setTimeout(toBackground, 0) : undefined;
       waiting.set(id, toBackground);
       ctx.ui.setStatus("bash-wait", ctx.ui.theme.fg("dim", "bash running · ctrl+shift+b: background"));
       const inline = await Promise.race([done, moved]);
