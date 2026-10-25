@@ -1,0 +1,6 @@
+{
+  "name": "core",
+  "version": "0.1.0",
+  "description": "`/ext`: enable or disable extensions, skills, prompts and themes",
+  "type": "module"
+}

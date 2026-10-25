@@ -28,6 +28,54 @@
       inherit (nixpkgs) lib;
       inherit (builtins.fromJSON (builtins.readFile ./package.json)) version;
       own = fileset: lib.fileset.difference fileset (lib.fileset.maybeMissing ./node_modules);
+      # The pinned npm packages from bun.lock as a fixed-output derivation, so tsc can run in the sandbox.
+      # After a change of bun.lock: just deps-hash.
+      bunDepsHash = "sha256-K7xZhVgmyC5uQKcmOOJ0U+oBL2kLyO0zVX8tg1krvaw=";
+      nodeModules =
+        pkgs:
+        pkgs.stdenvNoCC.mkDerivation {
+          name = "node-modules";
+          src = lib.fileset.toSource {
+            root = ./.;
+            fileset = lib.fileset.unions [
+              ./package.json
+              ./bun.lock
+            ];
+          };
+          nativeBuildInputs = [
+            pkgs.bun
+            pkgs.cacert
+          ];
+          dontBuild = true;
+          dontFixup = true;
+          installPhase = ''
+            export HOME=$TMPDIR BUN_INSTALL_CACHE_DIR=$TMPDIR/cache
+            bun install --frozen-lockfile --ignore-scripts --no-progress --no-summary
+            rm -rf node_modules/.cache node_modules/.bun-tag
+            cp -r node_modules $out
+          '';
+          outputHashMode = "recursive";
+          outputHashAlgo = "sha256";
+          outputHash = bunDepsHash;
+        };
+      allSources = lib.fileset.toSource {
+        root = ./.;
+        fileset = own (
+          lib.fileset.unions [
+            ./package.json
+            ./tsconfig.json
+            (lib.fileset.fileFilter (file: file.hasExt "ts") ./.)
+          ]
+        );
+      };
+      # The shared helpers alone: their own tests, plus the manifest.
+      sharedSources = lib.fileset.toSource {
+        root = ./.;
+        fileset = lib.fileset.unions [
+          ./package.json
+          (lib.fileset.fileFilter (file: file.hasExt "ts") ./shared)
+        ];
+      };
       # Every extension has a package.json with a version and at least one test; a missing one fails the evaluation.
       checkExtension =
         name:
@@ -61,6 +109,28 @@
             ) (./extensions + "/${name}"))
           ];
         };
+      # The job tests spawn bash and script in a PTY; the sandbox has /dev/pts.
+      runTests =
+        pkgs: name: src:
+        pkgs.runCommand "tests-${name}"
+          {
+            inherit src;
+            nativeBuildInputs = [
+              pkgs.bun
+              pkgs.bashInteractive
+              pkgs.util-linux
+              pkgs.coreutils
+              pkgs.gnused
+              pkgs.gnugrep
+            ];
+          }
+          ''
+            cp -r "$src" src
+            chmod -R u+w src
+            cd src
+            HOME="$TMPDIR" bun test
+            touch "$out"
+          '';
       # The pi package: manifest and sources, without tests. Pi loads it from settings.json "packages".
       package =
         pkgs:
@@ -84,7 +154,21 @@
         };
     in
     {
-      formatter = forAll ({ pkgs, ... }: pkgs.nixfmt);
+      # nix fmt: format every .nix file of the tree; bare nixfmt would wait on stdin.
+      formatter = forAll (
+        { pkgs, ... }:
+        pkgs.writeShellApplication {
+          name = "fmt-nix";
+          runtimeInputs = [
+            pkgs.nixfmt
+            pkgs.findutils
+          ];
+          text = ''
+            if [ $# -gt 0 ]; then exec nixfmt "$@"; fi
+            find . -name '*.nix' -not -path './node_modules/*' -not -path './.direnv/*' -print0 | xargs -0 nixfmt
+          '';
+        }
+      );
 
       packages = forAll (
         { pkgs, ... }: rec {
@@ -155,7 +239,7 @@
             nixosRepo = lib.mkOption {
               type = lib.types.nullOr lib.types.str;
               default = null;
-              description = "Checkout of the NixOS flake that built this system. system-state reports the deployed revision against it.";
+              description = "Checkout of the NixOS flake that built this system. systemstate reports the deployed revision against it.";
             };
             logCleanup = {
               enable = lib.mkOption {
@@ -219,6 +303,17 @@
               statix.enable = true;
               deadnix.enable = true;
               biome.enable = true;
+              shellcheck = {
+                enable = true;
+                files = "^scripts/.*\\.sh$";
+              };
+              commit-msg = {
+                enable = true;
+                name = "commit message: <extension|shared|area>: subject";
+                entry = "${pkgs.bash}/bin/bash scripts/check-commit-msg.sh";
+                stages = [ "commit-msg" ];
+                pass_filenames = true;
+              };
               gitleaks = {
                 enable = true;
                 name = "gitleaks";
@@ -228,31 +323,27 @@
             };
           };
 
+          types =
+            pkgs.runCommand "types"
+              {
+                src = allSources;
+                nativeBuildInputs = [ pkgs.typescript ];
+              }
+              ''
+                cp -r "$src" src
+                chmod -R u+w src
+                ln -s ${nodeModules pkgs} src/node_modules
+                cd src
+                tsc
+                touch "$out"
+              '';
+
+          tests-shared = runTests pkgs "shared" sharedSources;
         }
         // lib.listToAttrs (
           map (name: {
             name = "tests-${name}";
-            value =
-              # The job tests spawn bash and script in a PTY; the sandbox has /dev/pts.
-              pkgs.runCommand "zerodawn-pi-tests-${name}"
-                {
-                  src = testSources name;
-                  nativeBuildInputs = [
-                    pkgs.bun
-                    pkgs.bashInteractive
-                    pkgs.util-linux
-                    pkgs.coreutils
-                    pkgs.gnused
-                    pkgs.gnugrep
-                  ];
-                }
-                ''
-                  cp -r "$src" src
-                  chmod -R u+w src
-                  cd src
-                  HOME="$TMPDIR" bun test
-                  touch "$out"
-                '';
+            value = runTests pkgs name (testSources name);
           }) extensions
         )
       );
@@ -261,18 +352,8 @@
         { system, pkgs }:
         {
           default = pkgs.mkShell {
-            # The global git config sets core.hooksPath to the central hooks, and pre-commit refuses
-            # to install while any hooksPath is set; factory installs its hooks the same way.
-            # bun install fetches the pinned pi types from package.json, so tsc and the LSP
-            # see the same API as the installed pi.
-            shellHook = ''
-              GIT_CONFIG_GLOBAL=/dev/null bash -c ${
-                pkgs.lib.escapeShellArg self.checks.${system}.pre-commit.shellHook
-              }
-              if [ ! -d node_modules ] || [ bun.lock -nt node_modules/.bun-tag ] || [ package.json -nt node_modules/.bun-tag ]; then
-                bun install --frozen-lockfile && touch node_modules/.bun-tag
-              fi
-            '';
+            PRE_COMMIT_SHELL_HOOK = self.checks.${system}.pre-commit.shellHook;
+            shellHook = "source scripts/shell-hook.sh";
             packages = [
               pkgs.nodejs_24
               pkgs.bun
@@ -286,6 +367,7 @@
               pkgs.nixfmt
               pkgs.statix
               pkgs.deadnix
+              pkgs.shellcheck
               pkgs.util-linux
             ];
           };

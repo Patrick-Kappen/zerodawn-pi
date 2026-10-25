@@ -7,7 +7,7 @@ import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead } from "
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { config } from "../../shared/config.ts";
-import { format, type Match, plural } from "./format.ts";
+import { format, type Match, plural } from "./lib/format.ts";
 
 const astGrep = config().astGrep ?? "ast-grep";
 const maxBuffer = 64 * 1024 * 1024;

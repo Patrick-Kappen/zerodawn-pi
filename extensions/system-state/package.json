@@ -1,6 +1,0 @@
-{
-  "name": "system-state",
-  "version": "0.1.0",
-  "description": "active NixOS system and deployed revision in the system prompt",
-  "type": "module"
-}

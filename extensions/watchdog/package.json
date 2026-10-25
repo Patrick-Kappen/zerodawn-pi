@@ -1,0 +1,6 @@
+{
+  "name": "watchdog",
+  "version": "0.1.0",
+  "description": "aborts a run that stalls and continues from the last good point; `/unstick`",
+  "type": "module"
+}

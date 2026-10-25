@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { clip, format, type Match, plural } from "./format.ts";
+import { clip, format, type Match, plural } from "./lib/format.ts";
 
 const match = (file: string, line: number, text: string, extra: Partial<Match> = {}): Match => ({
   file,

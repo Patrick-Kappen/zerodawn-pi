@@ -1,0 +1,6 @@
+{
+  "name": "opencode",
+  "version": "0.1.0",
+  "description": "`opencode` tool: one task for an OpenCode agent",
+  "type": "module"
+}

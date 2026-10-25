@@ -1,6 +1,0 @@
-{
-  "name": "recipes",
-  "version": "0.1.0",
-  "description": "justfile and Makefile recipes in the system prompt; blocks a repeated test run",
-  "type": "module"
-}

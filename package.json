@@ -8,8 +8,7 @@
   ],
   "pi": {
     "extensions": [
-      "extensions/*/index.ts",
-      "stall-watchdog.ts"
+      "extensions/*/index.ts"
     ]
   },
   "peerDependencies": {

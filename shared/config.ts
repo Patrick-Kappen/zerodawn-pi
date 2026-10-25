@@ -7,31 +7,33 @@ export const CONFIG_FILE = fileURLToPath(new URL("../config.json", import.meta.u
 
 const isString = (v: unknown): v is string => typeof v === "string" && v.length > 0;
 
-function check(raw: unknown): Config {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(`${CONFIG_FILE} is not a JSON object.`);
+function check(raw: unknown, file: string): Config {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(`${file} is not a JSON object.`);
   const r = raw as Record<string, unknown>;
   for (const key of ["astGrep", "nixosRepo"] as const) {
-    if (r[key] !== undefined && !isString(r[key])) throw new Error(`${CONFIG_FILE}: "${key}" must be a non-empty string.`);
+    if (r[key] !== undefined && !isString(r[key])) throw new Error(`${file}: "${key}" must be a non-empty string.`);
   }
   return r as Config;
+}
+
+export function readConfig(file: string): Config {
+  let text: string;
+  try {
+    text = readFileSync(file, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    return {};
+  }
+  try {
+    return check(JSON.parse(text), file);
+  } catch (err) {
+    throw new Error(`zerodawn-pi: cannot read ${file}: ${(err as Error).message} See config.example.json.`, { cause: err });
+  }
 }
 
 let loaded: Config | undefined;
 
 export function config(): Config {
-  if (loaded) return loaded;
-  let text: string;
-  try {
-    text = readFileSync(CONFIG_FILE, "utf8");
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
-    loaded = {};
-    return loaded;
-  }
-  try {
-    loaded = check(JSON.parse(text));
-  } catch (err) {
-    throw new Error(`zerodawn-pi: cannot read ${CONFIG_FILE}: ${(err as Error).message} See config.example.json.`, { cause: err });
-  }
+  loaded ??= readConfig(CONFIG_FILE);
   return loaded;
 }

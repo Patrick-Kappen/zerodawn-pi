@@ -1,0 +1,6 @@
+{
+  "name": "files",
+  "version": "0.1.0",
+  "description": "`read`, `grep`, `edit`, `write` with shorter descriptions, an indent fix for `edit`, a write guard",
+  "type": "module"
+}
