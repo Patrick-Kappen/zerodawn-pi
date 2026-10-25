@@ -30,13 +30,14 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
   pi.registerTool({
     name: "bash",
     label: "bash",
-    description: `Run a bash command in its own terminal (PTY). The output returns in the result, up to ${MAX_LINES} lines or ${MAX_BYTES} bytes; longer output returns its tail and the path of the full log. A command that runs longer than ${FOREGROUND_MS / 1000} seconds, or with background: true, continues in the background; a message reports the result when it ends.`,
-    promptSnippet: "Run a bash command in a PTY; output inline, long jobs in the background",
+    description: `Run a bash command as a job in its own terminal (PTY). A command that ends within ${FOREGROUND_MS / 1000} seconds returns its output in the result, up to ${MAX_LINES} lines or ${MAX_BYTES} bytes (longer output: the tail and the path of the full log). A command that runs longer, or with background: true, continues in the background: the result returns at once with the job id, and the output comes later as a message, or at once through jobs wait.`,
+    promptSnippet: "Run a bash command as a job; short ones return inline, long ones run in the background",
     promptGuidelines: [
-      `bash returns output inline up to ${MAX_LINES} lines or ${MAX_BYTES} bytes. Longer output: the tail and a log path; use read or grep on the log for the rest.`,
-      `A command that runs longer than ${FOREGROUND_MS / 1000} seconds goes to the background by itself. Use background: true when you know it takes long.`,
+      `bash returns the output inline when the command ends within ${FOREGROUND_MS / 1000} seconds. A longer command becomes a background job: a message brings the result when it ends, or call jobs wait when you need it before you continue.`,
+      "Use background: true for a command you know takes long: a build, a test suite, a server, a download.",
+      "Independent commands: start them all in one message; they run in parallel as separate jobs. Then do other work, or jobs wait for the ones you need.",
       "When you start several jobs that belong together, give them the same group: one message reports them when the last one ends.",
-      "Do not wait for a background job: no sleep, no repeated jobs calls. End the turn or do other work; a message reports the result.",
+      "Never sleep or poll for a job. Use jobs wait.",
       `A bash command stops after ${DEFAULT_LIMIT_S / 3600} hour. Add "${NO_TIME_LIMIT}" to the command only when it must run longer.`,
     ],
     parameters: Type.Object({

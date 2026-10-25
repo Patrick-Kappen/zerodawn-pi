@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { Type } from "typebox";
 import { StringEnum } from "@earendil-works/pi-ai";
@@ -12,8 +12,8 @@ import { type Widget } from "./dashboard.ts";
 import { closeFollow, toggleFollow } from "./jobview.ts";
 
 const RESEND_MS = 20_000;
-const SHOW_ENDED_MS = 30 * 60_000;
-const SHOW_ENDED_MAX = 20;
+const LIST_MAX = 50;
+const WAIT_MAX_S = 600;
 
 export type JobReport = { jobs: string; items: { id: string; command: string; status: string; ok: boolean; log: string }[] };
 
@@ -25,14 +25,13 @@ export type Reports = {
 export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Reports {
   const { jobs } = s;
   const visible = () => {
-    for (const [id, j] of jobs) if (j.result && Date.now() - (j.endedAt ?? 0) > SHOW_ENDED_MS) jobs.delete(id);
     const running = [...jobs.values()].filter((j) => !j.result).sort((a, b) => b.start - a.start);
-    const ended = [...jobs.values()].filter((j) => j.result).sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0)).slice(0, SHOW_ENDED_MAX);
+    const ended = [...jobs.values()].filter((j) => j.result).sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0)).slice(0, LIST_MAX);
     return [...running, ...ended];
   };
   const list = () => {
     const shown = visible();
-    return shown.length ? shown.map(describe).join("\n") : "No running bash jobs, and none ended in the last 30 minutes.";
+    return shown.length ? shown.map(describe).join("\n") : "No bash jobs in this session.";
   };
   const killById = (id: string) => {
     const job = jobs.get(id);
@@ -98,12 +97,26 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
     groups.delete(group);
     deliver(items, triggerTurn);
   };
+  const waiters = new Map<string, (() => void)[]>();
+  const waitFor = (job: Job) =>
+    new Promise<void>((resolve) => {
+      if (job.result) return resolve();
+      waiters.set(job.id, [...(waiters.get(job.id) ?? []), resolve]);
+    });
   const report = (job: Job, m: Meta, text: string, triggerTurn: boolean) => {
     changes++;
     job.result = text;
     job.ok ??= /^exit 0\b/.test(text);
     job.endedAt = Date.now();
     widget.refresh();
+    const waiting = waiters.get(job.id);
+    if (waiting) {
+      waiters.delete(job.id);
+      saveMeta(job.meta, { ...m, reported: true });
+      for (const resolve of waiting) resolve();
+      if (job.group) releaseGroup(job.group, triggerTurn);
+      return;
+    }
     if (!job.group) return deliver([{ job, m, text }], triggerTurn);
     groups.set(job.group, [...(groups.get(job.group) ?? []), { job, m, text }]);
     releaseGroup(job.group, triggerTurn);
@@ -127,10 +140,10 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
       try {
         m = JSON.parse(readFileSync(metaPath, "utf8"));
       } catch (err: any) {
-        ctx.ui.notify(`tool-output: skipped the unreadable job file ${shorten(metaPath)}: ${err.message}`, "warning");
+        ctx.ui.notify(`bash-jobs: skipped the unreadable job file ${shorten(metaPath)}: ${err.message}`, "warning");
         continue;
       }
-      if (!m.bg || m.reported || jobs.has(m.id)) continue;
+      if (jobs.has(m.id)) continue;
       const job: Job = {
         id: m.id,
         command: m.command,
@@ -139,10 +152,17 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
         pid: m.pid,
         start: m.start,
         group: m.group,
-        bg: true,
+        bg: m.bg,
         stats: () => statsOf(m.log),
       };
       jobs.set(m.id, job);
+      if (!m.bg || m.reported) {
+        const code = existsSync(m.status) ? readFileSync(m.status, "utf8").trim() : undefined;
+        job.result = code === undefined ? "ended" : `exit ${code}`;
+        job.ok = code === "0";
+        job.endedAt = existsSync(m.status) ? statSync(m.status).mtimeMs : m.start;
+        continue;
+      }
       if (existsSync(m.status) || !alive(m.pid)) {
         report(job, m, summarizeFromDisk(m), false);
         continue;
@@ -170,7 +190,7 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
   const pick = async (ctx: any) => {
     if (s.follow) return closeFollow(s);
     const sorted = visible();
-    if (!sorted.length) return ctx.ui.notify("No running bash jobs, and none ended in the last 30 minutes.", "info");
+    if (!sorted.length) return ctx.ui.notify("No bash jobs in this session.", "info");
     if (sorted.length === 1) return toggleFollow(pi, s, sorted[0]);
     const label = (j: Job) => `${j.id} · ${ending(j) ?? "running"} · ${commandLine(j.command, 70)}`;
     const chosen = await ctx.ui.select("Bash jobs: pick one to follow in the chat", sorted.map(label));
@@ -199,17 +219,48 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
   pi.registerTool({
     name: "jobs",
     label: "jobs",
-    description: "List the bash jobs of this session with state, runtime, output size and log path, or kill a running job.",
-    promptSnippet: "List or kill bash background jobs",
-    promptGuidelines: ["Use jobs only when the user asks for job status or you must decide to kill a job. Do not poll it."],
+    description: `Background bash jobs: wait for jobs to end and get their results, list the jobs of this session, or kill a running job. wait blocks until the given jobs (default: all running) end, at most ${WAIT_MAX_S} seconds.`,
+    promptSnippet: "Wait for, list or kill bash background jobs",
+    promptGuidelines: [
+      "Need the result of a background job before you continue? Call jobs wait with its id (or no id for all running jobs). Do not sleep or poll.",
+      "Use jobs list only when the user asks for job status.",
+    ],
     parameters: Type.Object({
-      action: StringEnum(["list", "kill"] as const),
-      id: Type.Optional(Type.String({ description: "kill: the job id" })),
+      action: StringEnum(["wait", "list", "kill"] as const),
+      id: Type.Optional(Type.String({ description: "kill: the job id. wait: one id, or several separated by commas; default: all running jobs." })),
+      timeout: Type.Optional(Type.Number({ description: `wait: seconds to wait at most (default ${WAIT_MAX_S}).` })),
     }),
-    async execute(_toolCallId, params) {
+    async execute(_toolCallId, params, signal) {
       if (params.action === "kill") {
         if (!params.id) throw new Error("jobs kill: give the job id.");
         return { content: [{ type: "text", text: killById(params.id) }], details: {} };
+      }
+      if (params.action === "wait") {
+        const pending = new Set([...held.map((it) => it.job.id), ...[...groups.values()].flat().map((it) => it.job.id)]);
+        const ids = params.id ? params.id.split(",").map((x) => x.trim()) : [...jobs.values()].filter((j) => !j.result || pending.has(j.id)).map((j) => j.id);
+        const targets = ids.map((id) => {
+          const job = jobs.get(id);
+          if (!job) throw new Error(`jobs wait: no job ${id}. Known jobs: ${[...jobs.keys()].join(", ") || "none"}.`);
+          return job;
+        });
+        if (!targets.length) return { content: [{ type: "text", text: "No running bash job to wait for." }], details: {} };
+        const limit = Math.min(params.timeout ?? WAIT_MAX_S, WAIT_MAX_S) * 1000;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise<"timeout">((resolve) => (timer = setTimeout(() => resolve("timeout"), limit)));
+        const abort = new Promise<"abort">((resolve) => signal?.addEventListener("abort", () => resolve("abort"), { once: true }));
+        const outcome = await Promise.race([Promise.all(targets.map(waitFor)).then(() => "done" as const), timeout, abort]);
+        clearTimeout(timer);
+        for (let i = held.length - 1; i >= 0; i--) if (targets.includes(held[i].job)) held.splice(i, 1);
+        for (const [group, items] of groups) {
+          const rest = items.filter((it) => !targets.includes(it.job));
+          if (rest.length === items.length) continue;
+          groups.set(group, rest);
+          releaseGroup(group, false);
+        }
+        for (const j of targets) if (j.result) saveMeta(j.meta, { ...JSON.parse(readFileSync(j.meta, "utf8")), reported: true });
+        const lines = targets.map((j) => (j.result ? `- job ${j.id} (${commandLine(j.command, 80)}): ${j.result}` : `- job ${j.id} (${commandLine(j.command, 80)}): still running`));
+        const head = outcome === "done" ? `${targets.length === 1 ? "The job" : "All jobs"} ended.` : outcome === "timeout" ? `Waited ${limit / 1000}s; not every job ended.` : "Wait stopped.";
+        return { content: [{ type: "text", text: `${head}\n${lines.join("\n")}` }], details: { jobs: targets.map((j) => j.id) } };
       }
       if (hasBackgroundJob(s) && listedAt === changes)
         throw new Error("No background job changed since your last jobs call. Do not poll: end the turn or do other work. A message reports each result.");

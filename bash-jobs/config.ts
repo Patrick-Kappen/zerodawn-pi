@@ -1,4 +1,4 @@
-export const FOREGROUND_MS = 30_000;
+export const FOREGROUND_MS = 10_000;
 export const STREAM_MS = 250;
 export const STREAM_LINES = 40;
 export const STREAM_TAIL_BYTES = 64 * 1024;

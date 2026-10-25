@@ -31,6 +31,10 @@ test:
     sleep 3
     echo "41 passed"
 
+# Run a 20 s job
+medium:
+    for i in $(seq 1 20); do echo "tick $i"; sleep 1; done
+
 # Run a long job
 slow:
     for i in $(seq 1 60); do echo "tick $i"; sleep 1; done
