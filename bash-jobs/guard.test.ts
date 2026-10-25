@@ -1,5 +1,5 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { waitsOnly } from "./guard.ts";
 
 const waiting = ["sleep 30", "sleep 5; sleep 5", "sleep 10 && wait", "true"];

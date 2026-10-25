@@ -1,5 +1,5 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { prunedChars, selectEdits, stub } from "./select.ts";
 
 const big = "x".repeat(2000);
@@ -12,7 +12,10 @@ const result = (id: string, text = big, extra: Record<string, unknown> = {}) => 
 
 test("prunes big results older than the kept turns", () => {
   const branch = [user("u1"), result("r1"), user("u2"), result("r2"), user("u3"), result("r3")];
-  assert.deepEqual(selectEdits(branch, 2, 1500, 0).map((e) => e.targetId), ["r1"]);
+  assert.deepEqual(
+    selectEdits(branch, 2, 1500, 0).map((e) => e.targetId),
+    ["r1"],
+  );
 });
 
 test("waits until a batch is worth a cache break", () => {
@@ -28,7 +31,7 @@ test("skips small results and results that are already edited", () => {
 });
 
 test("the stub names the tool, the size, the first line and the log", () => {
-  const text = "exit 0 (3s)\n" + big;
+  const text = `exit 0 (3s)\n${big}`;
   const s = stub("bash", text, { log: "/tmp/x.log" }, false);
   assert.equal(s, `[pruned bash result: 2 lines, ${text.length} chars. First line: exit 0 (3s). Full output: /tmp/x.log]`);
   assert.match(stub("read", big, {}, true), /^\[pruned read error: 1 lines, 2000 chars\. First line: x+\. Run the tool again when you need it\.\]$/);

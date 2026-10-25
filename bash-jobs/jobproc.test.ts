@@ -1,9 +1,9 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { digest, errorLines, render, resultText, spawnJob, summarizeFromDisk, tailLimit } from "./jobproc.ts";
+import { test } from "node:test";
+import { digest, errorLines, exitStatus, render, resultText, spawnJob, summarizeFromDisk, tailLimit } from "./jobproc.ts";
 
 function run(command: string, limit = 10): Promise<{ code: number | null; sig: string | null; dir: string; log: string; status: string }> {
   const dir = mkdtempSync(join(tmpdir(), "bash-jobs-"));
@@ -31,7 +31,8 @@ test("a job runs in a pty, keeps colors and reports its exit code", async () => 
 test("the time limit kills the whole job", async () => {
   const r = await run("echo start; sleep 20; echo never", 1);
   assert.equal(r.sig, "SIGTERM");
-  assert.equal(existsSync(r.status), false);
+  assert.equal(readFileSync(r.status, "utf8").trim(), "timeout");
+  assert.match(exitStatus(r.status, 1) ?? "", /^killed at the time limit of 1s/);
   await new Promise((done) => setTimeout(done, 300));
   assert.deepEqual(render(r.log, 1 << 20).plain, ["start"]);
 });

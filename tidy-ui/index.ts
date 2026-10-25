@@ -7,10 +7,10 @@ import { registerViews } from "./views.ts";
 import { registerWorking } from "./working.ts";
 
 export default function (pi: ExtensionAPI): void {
-	registerTheme(pi);
-	registerCodeBlocks(pi);
-	registerViews(pi);
-	registerMessages(pi);
-	registerFooter(pi);
-	registerWorking(pi);
+  registerTheme(pi);
+  registerCodeBlocks(pi);
+  registerViews(pi);
+  registerMessages(pi);
+  registerFooter(pi);
+  registerWorking(pi);
 }

@@ -1,15 +1,15 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { Type } from "typebox";
-import { Key } from "@earendil-works/pi-tui";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Key } from "@earendil-works/pi-tui";
+import { Type } from "typebox";
 import { callNumber, freeId, shorten, storeDir } from "../shared/store.ts";
 import { age } from "../shared/util.ts";
 import { DEFAULT_LIMIT_S, MAX_BYTES, MAX_LINES, NO_TIME_LIMIT, STREAM_LINES, STREAM_MS, STREAM_TAIL_BYTES } from "./config.ts";
+import type { Widget } from "./dashboard.ts";
 import { type Job, kill, limitText, type Meta, render, resultText, saveMeta, spawnJob, statsOf } from "./jobproc.ts";
 import type { Reports } from "./jobs.ts";
 import type { State } from "./state.ts";
-import type { Widget } from "./dashboard.ts";
 
 export function registerBackgroundShortcut(pi: ExtensionAPI, { waiting }: State) {
   pi.registerShortcut(Key.ctrlShift("b"), {
@@ -54,9 +54,31 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       writeFileSync(`${base}.sh`, `${params.command}\n`);
       const limit = Math.round(params.timeout ?? (params.command.includes(NO_TIME_LIMIT) ? 0 : DEFAULT_LIMIT_S));
       const child = spawnJob({ commandFile: `${base}.sh`, status: `${base}.status`, limit, log, cwd: ctx.cwd });
-      const meta: Meta = { id, command: params.command, log, status: `${base}.status`, pid: child.pid, start: Date.now(), limit, bg: false, group: params.group, reported: false };
+      const meta: Meta = {
+        id,
+        command: params.command,
+        log,
+        status: `${base}.status`,
+        pid: child.pid,
+        start: Date.now(),
+        limit,
+        bg: false,
+        group: params.group,
+        reported: false,
+      };
       saveMeta(`${base}.json`, meta);
-      const job: Job = { id, command: params.command, log, meta: `${base}.json`, toolCallId, pid: child.pid, start: meta.start, bg: false, group: params.group, stats: () => statsOf(log) };
+      const job: Job = {
+        id,
+        command: params.command,
+        log,
+        meta: `${base}.json`,
+        toolCallId,
+        pid: child.pid,
+        start: meta.start,
+        bg: false,
+        group: params.group,
+        stats: () => statsOf(log),
+      };
       jobs.set(id, job);
       s.ui = ctx.ui;
       widget.refresh();
@@ -90,11 +112,10 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       signal?.addEventListener("abort", abort, { once: true });
       let toBackground!: () => void;
       const moved = new Promise<undefined>((r) => (toBackground = () => r(undefined)));
-      const timer = params.background ? setTimeout(toBackground, 0) : undefined;
       waiting.set(id, toBackground);
+      if (params.background) toBackground();
       ctx.ui.setStatus("bash-wait", ctx.ui.theme.fg("dim", "bash running · ctrl+shift+b: background"));
       const inline = await Promise.race([done, moved]);
-      clearTimeout(timer);
       clearInterval(stream);
       waiting.delete(id);
       if (waiting.size === 0) ctx.ui.setStatus("bash-wait", undefined);

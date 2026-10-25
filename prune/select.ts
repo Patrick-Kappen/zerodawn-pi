@@ -13,7 +13,10 @@ type Entry = {
 export type Edit = { targetId: string; replacement: { content: string } };
 
 function textOf(content: Content[] | undefined): string {
-  return (content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+  return (content ?? [])
+    .filter((c) => c.type === "text")
+    .map((c) => c.text ?? "")
+    .join("\n");
 }
 
 export function stub(toolName: string, text: string, details: Record<string, unknown> | undefined, isError: boolean | undefined): string {

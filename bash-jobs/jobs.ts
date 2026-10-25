@@ -1,15 +1,15 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { Type } from "typebox";
 import { StringEnum } from "@earendil-works/pi-ai";
-import { Key } from "@earendil-works/pi-tui";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { alive, describe, ending, type Job, kill, type Meta, saveMeta, statsOf, summarizeFromDisk } from "./jobproc.ts";
-import { hasBackgroundJob, type State } from "./state.ts";
+import { Key } from "@earendil-works/pi-tui";
+import { Type } from "typebox";
 import { shorten, storeDir } from "../shared/store.ts";
 import { commandLine } from "../shared/util.ts";
-import { type Widget } from "./dashboard.ts";
+import type { Widget } from "./dashboard.ts";
+import { alive, describe, ending, exitStatus, type Job, kill, type Meta, saveMeta, statsOf, summarizeFromDisk } from "./jobproc.ts";
 import { closeFollow, toggleFollow } from "./jobview.ts";
+import { hasBackgroundJob, type State } from "./state.ts";
 
 const RESEND_MS = 20_000;
 const LIST_MAX = 50;
@@ -26,7 +26,10 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
   const { jobs } = s;
   const visible = () => {
     const running = [...jobs.values()].filter((j) => !j.result).sort((a, b) => b.start - a.start);
-    const ended = [...jobs.values()].filter((j) => j.result).sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0)).slice(0, LIST_MAX);
+    const ended = [...jobs.values()]
+      .filter((j) => j.result)
+      .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))
+      .slice(0, LIST_MAX);
     return [...running, ...ended];
   };
   const list = () => {
@@ -57,7 +60,13 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
     const body = items.map((it) => `- job ${it.job.id} (${commandLine(it.job.command, 80)}): ${it.text}`).join("\n");
     const details: JobReport = {
       jobs: key,
-      items: items.map((it) => ({ id: it.job.id, command: it.job.command, status: it.text.split("\n")[0].split(" \u00b7 ")[0], ok: it.job.ok === true, log: it.job.log })),
+      items: items.map((it) => ({
+        id: it.job.id,
+        command: it.job.command,
+        status: it.text.split("\n")[0].split(" \u00b7 ")[0],
+        ok: it.job.ok === true,
+        log: it.job.log,
+      })),
     };
     try {
       pi.sendMessage({ customType: "bash-job", content: `${head}${decide}\n${body}`, display: true, details }, { triggerTurn });
@@ -157,9 +166,9 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
       };
       jobs.set(m.id, job);
       if (!m.bg || m.reported) {
-        const code = existsSync(m.status) ? readFileSync(m.status, "utf8").trim() : undefined;
-        job.result = code === undefined ? "ended" : `exit ${code}`;
-        job.ok = code === "0";
+        const status = exitStatus(m.status, m.limit);
+        job.result = status ?? "ended";
+        job.ok = status === "exit 0";
         job.endedAt = existsSync(m.status) ? statSync(m.status).mtimeMs : m.start;
         continue;
       }
@@ -229,7 +238,7 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
     async execute(_toolCallId, params, signal) {
       if (params.action === "kill") {
         if (!params.id) throw new Error("jobs kill: give the job id.");
-        return { content: [{ type: "text", text: killById(params.id) }], details: {} };
+        return { content: [{ type: "text", text: killById(params.id) }], details: { jobs: [params.id] } };
       }
       if (params.action === "wait") {
         const pending = new Set([...held.map((it) => it.job.id), ...[...groups.values()].flat().map((it) => it.job.id)]);
@@ -239,7 +248,7 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
           if (!job) throw new Error(`jobs wait: no job ${id}. Known jobs: ${[...jobs.keys()].join(", ") || "none"}.`);
           return job;
         });
-        if (!targets.length) return { content: [{ type: "text", text: "No running bash job to wait for." }], details: {} };
+        if (!targets.length) return { content: [{ type: "text", text: "No running bash job to wait for." }], details: { jobs: [] as string[] } };
         const limit = Math.min(params.timeout ?? WAIT_MAX_S, WAIT_MAX_S) * 1000;
         let timer: ReturnType<typeof setTimeout> | undefined;
         const timeout = new Promise<"timeout">((resolve) => (timer = setTimeout(() => resolve("timeout"), limit)));
@@ -254,14 +263,21 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
           releaseGroup(group, false);
         }
         for (const j of targets) if (j.result) saveMeta(j.meta, { ...JSON.parse(readFileSync(j.meta, "utf8")), reported: true });
-        const lines = targets.map((j) => (j.result ? `- job ${j.id} (${commandLine(j.command, 80)}): ${j.result}` : `- job ${j.id} (${commandLine(j.command, 80)}): still running`));
-        const head = outcome === "done" ? `${targets.length === 1 ? "The job" : "All jobs"} ended.` : outcome === "timeout" ? `Waited ${limit / 1000}s; not every job ended.` : "Wait stopped.";
+        const lines = targets.map((j) =>
+          j.result ? `- job ${j.id} (${commandLine(j.command, 80)}): ${j.result}` : `- job ${j.id} (${commandLine(j.command, 80)}): still running`,
+        );
+        const head =
+          outcome === "done"
+            ? `${targets.length === 1 ? "The job" : "All jobs"} ended.`
+            : outcome === "timeout"
+              ? `Waited ${limit / 1000}s; not every job ended.`
+              : "Wait stopped.";
         return { content: [{ type: "text", text: `${head}\n${lines.join("\n")}` }], details: { jobs: targets.map((j) => j.id) } };
       }
       if (hasBackgroundJob(s) && listedAt === changes)
         throw new Error("No background job changed since your last jobs call. Do not poll: end the turn or do other work. A message reports each result.");
       listedAt = changes;
-      return { content: [{ type: "text", text: list() }], details: {} };
+      return { content: [{ type: "text", text: list() }], details: { jobs: [] as string[] } };
     },
   });
 

@@ -1,7 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { homedir } from "node:os";
-import { age, commandLine } from "../shared/util.ts";
+import { age, argSummary, commandLine } from "../shared/util.ts";
 import { DASHBOARD_ROWS, STREAM_TAIL_BYTES, TAIL_ROWS } from "./config.ts";
 import { ICON_HEADER, STATUS, toolIcon } from "./icons.ts";
 import { ending, type Job, render } from "./jobproc.ts";
@@ -17,17 +16,6 @@ export type Widget = { refresh: () => void; stop: () => void };
 
 type Call = { id: string; parent?: string; tool: string; summary: string; start: number; end?: number; ok?: boolean; background?: boolean; error?: string };
 type Row = { text: string; job?: Job };
-
-const ARG_KEYS = ["command", "path", "pattern", "query", "url", "task", "code", "action"];
-
-export function argSummary(tool: string, args: unknown): string {
-  if (args === null || typeof args !== "object") return "";
-  const record = args as Record<string, unknown>;
-  const key = ARG_KEYS.find((k) => typeof record[k] === "string");
-  if (!key) return "";
-  const raw = commandLine(record[key] as string, SUMMARY_MAX).trim();
-  return raw.startsWith(`${homedir()}/`) ? `~${raw.slice(homedir().length)}` : raw;
-}
 
 function firstLine(result: unknown): string | undefined {
   const content = (result as { content?: { type: string; text?: string }[] } | undefined)?.content;
@@ -219,7 +207,13 @@ export function createDashboard(pi: ExtensionAPI, s: State): Widget {
     refresh();
   });
   pi.on("tool_execution_start", (event) => {
-    calls.set(event.toolCallId, { id: event.toolCallId, parent: event.parentToolCallId, tool: event.toolName, summary: argSummary(event.toolName, event.args), start: Date.now() });
+    calls.set(event.toolCallId, {
+      id: event.toolCallId,
+      parent: event.parentToolCallId,
+      tool: event.toolName,
+      summary: argSummary(event.args, SUMMARY_MAX),
+      start: Date.now(),
+    });
     refresh();
   });
   pi.on("tool_execution_end", (event) => {

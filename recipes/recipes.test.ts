@@ -1,5 +1,5 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { isTest, normalize, parseJust, parseMake, promptText, Tracker } from "./recipes.ts";
 
 const dump = JSON.stringify({

@@ -1,17 +1,11 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { stripQuoted } from "../shared/util.ts";
 import { hasBackgroundJob, type State } from "./state.ts";
 
 const WAIT = new Set(["sleep", "wait", "true", ":"]);
 
-function strip(cmd: string): string {
-  return cmd
-    .replace(/<<-?\s*(['"]?)(\w+)\1([^\n]*)\n[\s\S]*?\n\s*\2\s*(?=\n|$)/g, "<<H$3")
-    .replace(/'[^']*'/g, "Q")
-    .replace(/"(?:[^"\\]|\\.)*"/g, "Q");
-}
-
 export function waitsOnly(command: string): boolean {
-  const words = strip(command)
+  const words = stripQuoted(command)
     .split(/&&|\|\||;|\n/)
     .map((s) => s.trim().split(/\s+/)[0])
     .filter(Boolean);

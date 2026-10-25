@@ -12,6 +12,6 @@ export default function (pi: ExtensionAPI) {
     if (!edits.length) return;
     saved += prunedChars(branch, edits);
     if (ctx.hasUI) ctx.ui.setStatus("prune", ctx.ui.theme.fg("dim", `✂ ${Math.round(saved / 1024)} KB`));
-    return { entries: [...((event as { entries?: unknown[] }).entries ?? []), ...edits.map((e) => ({ type: "context_edit" as const, ...e }))] };
+    return { entries: [...event.entries, ...edits.map((e) => ({ type: "context_edit" as const, ...e }))] };
   });
 }

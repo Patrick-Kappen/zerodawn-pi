@@ -2,7 +2,19 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync, readSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { shorten } from "../shared/store.ts";
 import { age, commandLine } from "../shared/util.ts";
-import { DEFAULT_COLUMNS, DEFAULT_LIMIT_S, DEFAULT_ROWS, ERROR_BYTES, ERROR_LINES, HEAD_BYTES, HEAD_LINES, MAX_BYTES, MAX_LINES, NO_TIME_LIMIT, RESULT_TAIL_BYTES } from "./config.ts";
+import {
+  DEFAULT_COLUMNS,
+  DEFAULT_LIMIT_S,
+  DEFAULT_ROWS,
+  ERROR_BYTES,
+  ERROR_LINES,
+  HEAD_BYTES,
+  HEAD_LINES,
+  MAX_BYTES,
+  MAX_LINES,
+  NO_TIME_LIMIT,
+  RESULT_TAIL_BYTES,
+} from "./config.ts";
 import { Screen, stripScript } from "./screen.ts";
 
 export type Job = {
@@ -40,7 +52,7 @@ const WRAPPER = `
 SHELL="$BASH" script -q -e -f -E never -O "$4" -c "stty cols $5 rows $6 2>/dev/null; exec bash --norc '$1'" </dev/null >/dev/null 2>&1 &
 c=$!
 if [ "$3" -gt 0 ]; then
-  ( trap 'kill $s 2>/dev/null; exit 0' TERM; sleep "$3" & s=$!; wait $s; kill -TERM -- -$$ ) &
+  ( trap 'kill $s 2>/dev/null; exit 0' TERM; sleep "$3" & s=$!; wait $s; echo timeout > "$2"; kill -TERM -- -$$ ) &
   w=$!
 fi
 wait $c; code=$?
@@ -91,10 +103,32 @@ export function kill(pid?: number) {
   }
 }
 
+const CACHE_MAX = 8;
+
+function cached<T>(cache: Map<string, { size: number; mtime: number; value: T }>, log: string, size: number, mtime: number, make: () => T): T {
+  const hit = cache.get(log);
+  if (hit && hit.size === size && hit.mtime === mtime) return hit.value;
+  const value = make();
+  cache.delete(log);
+  cache.set(log, { size, mtime, value });
+  if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value as string);
+  return value;
+}
+
+const statsCache = new Map<string, { size: number; mtime: number; value: { lines: number; bytes: number } }>();
+
 export function statsOf(log: string): { lines: number; bytes: number } {
-  const bytes = existsSync(log) ? statSync(log).size : 0;
+  const st = statSync(log, { throwIfNoEntry: false });
+  if (!st) return { lines: 0, bytes: 0 };
+  const bytes = st.size;
   if (bytes > 1_000_000) return { lines: -1, bytes };
-  return { lines: bytes ? (readFileSync(log, "utf8").match(/\n/g) ?? []).length : 0, bytes };
+  return cached(statsCache, log, bytes, st.mtimeMs, () => ({ lines: bytes ? (readFileSync(log, "utf8").match(/\n/g) ?? []).length : 0, bytes }));
+}
+
+export function exitStatus(statusFile: string, limit: number): string | undefined {
+  if (!existsSync(statusFile)) return undefined;
+  const code = readFileSync(statusFile, "utf8").trim();
+  return code === "timeout" ? limitText(limit) : `exit ${code}`;
 }
 
 export function readTail(log: string, maxBytes: number): { text: string; cut: boolean } {
@@ -113,17 +147,23 @@ export function readTail(log: string, maxBytes: number): { text: string; cut: bo
   return { text, cut: from > 0 };
 }
 
+const renderCache = new Map<string, { size: number; mtime: number; value: Rendered }>();
+
 export function render(log: string, maxBytes: number): Rendered {
-  const { text, cut } = readTail(log, maxBytes);
-  const screen = new Screen();
-  screen.feed(stripScript(text).body);
-  const lines = screen.lines();
-  const plain = screen.plain();
-  if (plain.length && plain[plain.length - 1] === "") {
-    lines.pop();
-    plain.pop();
-  }
-  return { lines, plain, cut };
+  const st = statSync(log, { throwIfNoEntry: false });
+  if (!st) return { lines: [], plain: [], cut: false };
+  return cached(renderCache, `${log}\0${maxBytes}`, st.size, st.mtimeMs, () => {
+    const { text, cut } = readTail(log, maxBytes);
+    const screen = new Screen();
+    screen.feed(stripScript(text).body);
+    const lines = screen.lines();
+    const plain = screen.plain();
+    if (plain.length && plain[plain.length - 1] === "") {
+      lines.pop();
+      plain.pop();
+    }
+    return { lines, plain, cut };
+  });
 }
 
 export function tailLimit(lines: string[], maxLines: number, maxBytes: number): { kept: string[]; truncated: boolean } {
@@ -150,7 +190,8 @@ export function headLimit(lines: string[], maxLines: number, maxBytes: number): 
   return lines.slice(0, to);
 }
 
-export const ERROR_PATTERN = /\b(error|errors|fail|failed|failure|failures|fatal|panic|panicked|exception|traceback|denied|not found|cannot|unable|unexpected|invalid|refused|timed out|timeout)\b|✗|\bE\d{3,}\b|^\s*at\s+\S+\s+\(/i;
+export const ERROR_PATTERN =
+  /\b(error|errors|fail|failed|failure|failures|fatal|panic|panicked|exception|traceback|denied|not found|cannot|unable|unexpected|invalid|refused|timed out|timeout)\b|✗|\bE\d{3,}\b|^\s*at\s+\S+\s+\(/i;
 
 export function errorLines(lines: string[], from: number, to: number, maxLines: number, maxBytes: number): { n: number; text: string }[] {
   const out: { n: number; text: string }[] = [];
@@ -200,15 +241,13 @@ export function resultText(log: string, status: string): string {
 }
 
 export function summarizeFromDisk(m: Meta): string {
-  let code = existsSync(m.status) ? readFileSync(m.status, "utf8").trim() : undefined;
-  if (code === undefined) {
+  let status = exitStatus(m.status, m.limit);
+  if (status === undefined) {
     const footer = stripScript(readTail(m.log, 4096).text).exitCode;
-    if (footer !== undefined) code = String(footer);
+    if (footer !== undefined) status = `exit ${footer}`;
   }
-  const timedOut = code === undefined && m.limit > 0 && Date.now() >= m.start + m.limit * 1000;
-  const status =
-    code !== undefined ? `exit ${code}` : timedOut ? limitText(m.limit) : "ended, exit status unknown (pi stopped while it ran)";
-  return resultText(m.log, status);
+  const timedOut = status === undefined && m.limit > 0 && Date.now() >= m.start + m.limit * 1000;
+  return resultText(m.log, status ?? (timedOut ? limitText(m.limit) : "ended, exit status unknown (pi stopped while it ran)"));
 }
 
 export const ending = (job: Job) => (job.result ? job.result.split("\n")[0].split(" · ")[0] : undefined);

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Start pi with this extension in a detached tmux session, in a sandbox project.
 # Usage: dev/pi-test.sh [start|stop|screen|send <text>|key <tmux-key>]
+# PI_TEST_MODEL sets the model; PI_TEST_ARGS adds pi arguments, for example "-e ~/.pi/agent/extensions/x/index.ts".
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -42,7 +43,7 @@ EOF
   cat > README.md <<'EOF'
 # Sandbox
 
-Fixtures for the tool-output extension: big.txt (1000 lines), noise.txt (3000 lines),
+Fixtures for the zerodawn-pi extensions: big.txt (1000 lines), noise.txt (3000 lines),
 progress.sh (colored progress bar), justfile (test: 3 s, slow: 60 s).
 EOF
 }
@@ -57,7 +58,7 @@ case "${1:-start}" in
     tmux new-session -d -s "$session" -x 160 -y 45 -c "$sandbox"
     exts=""
     for index in "$root"/*/index.ts; do exts="$exts -e '$index'"; done
-    tmux send-keys -t "$session" -l -- "pi -ne -e builtin:codemode -e '$HOME/.pi/agent/extensions/claude-subscription/index.ts'$exts --model '$model'"
+    tmux send-keys -t "$session" -l -- "pi -ne -e builtin:codemode$exts --model '$model' ${PI_TEST_ARGS:-}"
     tmux send-keys -t "$session" Enter
     echo "started session $session in $sandbox; attach with: tmux attach -t $session"
     ;;

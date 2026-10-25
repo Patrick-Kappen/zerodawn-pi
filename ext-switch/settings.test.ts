@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Env, type Row, type Scope, applyToggle, findRow, loadRows, readSettings, settingsPath, toggle } from "./settings.ts";
+import { applyToggle, type Env, findRow, loadRows, type Row, readSettings, type Scope, settingsPath, toggle } from "./settings.ts";
 
 let root: string;
 let env: Env;
