@@ -7,6 +7,7 @@ Gives the agent the tool `run_tests`. It runs the tests for the files that chang
 - `scope: "changed"` (default): the tests for the changed, new and deleted files of `git status`.
 - `scope: "all"`: the recipe `test`, or else `bun test`.
 - `rerun: true`: run again when no file changed. Without it, the tool gives the earlier result.
+- `path`: the project directory, such as a git worktree. Default: the current directory.
 
 How it picks the tests for `changed`:
 
@@ -28,7 +29,7 @@ When the tests fail, the line starts with `red`, and the failures follow without
 
 ## Blocks
 
-- A test command in bash (`just test`, `bun test`, `pytest`, `cargo test`, `go test`, ...): use `run_tests`. `just check` and `nix flake check` are not blocked.
+- A test command in bash (`just test`, `bun test`, `pytest`, `cargo test`, `go test`, ...). In its place, `run_tests` runs for the changed files, in the directory of a leading `cd <dir> &&`. The reason of the block gives its result, and tells the agent to use `run_tests`. `just check` and `nix flake check` are not blocked.
 - A bash command that is the body of a recipe: run the recipe instead.
 
 ## Hint

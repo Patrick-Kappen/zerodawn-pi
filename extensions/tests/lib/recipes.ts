@@ -95,7 +95,6 @@ export class Tracker {
 
   check(command: string, recipes: Recipes | undefined): string | undefined {
     const norm = normalize(command);
-    if (isTest(norm)) return "Test commands are blocked in bash. Use the run_tests tool: it picks the tests for the changed files.";
     const same = recipes?.list.find((r) => r.body && normalize(r.body) === norm);
     if (same && recipes) return `This command is the recipe "${same.name}" in ${recipes.file}. Run "${recipes.tool} ${same.name}".`;
     return undefined;

@@ -3,6 +3,7 @@ import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { callOutFile, shorten } from "../../../shared/store.ts";
+import { absolutePath } from "../../../shared/util.ts";
 import { loadRecipes, type Recipes } from "./recipes.ts";
 import { counts, failures } from "./report.ts";
 import { parseStatus, type Read, selectTests } from "./select.ts";
@@ -54,7 +55,9 @@ function bunProject(cwd: string): boolean {
 }
 
 const noWay = (cwd: string, recipe: string) =>
-  new Error(`run_tests: no way to run the tests in ${cwd}: no recipe "${recipe}" and no package.json. Add a recipe "${recipe}" to the justfile or Makefile.`);
+  new Error(
+    `run_tests: no way to run the tests in ${cwd}: no recipe "${recipe}" and no package.json. Add a recipe "${recipe}" to the justfile or Makefile that runs the tests of the project, as its AGENTS.md or README describes them.`,
+  );
 
 export function plan(cwd: string, recipes: Recipes | undefined, scope: "changed" | "all", changed: string[]): Plan {
   const has = (name: string) => recipes?.list.some((r) => r.name === name);
@@ -106,7 +109,8 @@ function execute(argv: string[], cwd: string, signal: AbortSignal | undefined): 
 
 type Result = { content: { type: "text"; text: string }[]; details: Record<string, unknown>; isError: boolean };
 
-const noTest = (uncovered: string[]) => `No test for: ${uncovered.join(", ")}. Add a test file that imports each of them, then run run_tests again.`;
+const noTest = (uncovered: string[]) =>
+  `No test for: ${uncovered.join(", ")}. Add a test file that imports each of them, at the place and in the form that the AGENTS.md or README of the project gives, then run run_tests again.`;
 
 function fingerprint(cwd: string, scope: string, changed: string[]): string {
   const read = reader(cwd);
@@ -130,7 +134,14 @@ export const TOOL = {
   ],
 };
 
-export type Params = { scope?: "changed" | "all"; rerun?: boolean };
+export type Params = { scope?: "changed" | "all"; rerun?: boolean; path?: string };
+
+const LEADING_CD = /^\s*cd\s+("[^"]+"|'[^']+'|\S+)\s*(&&|;)/;
+
+/** The directory of a leading "cd <dir> &&" in a command, without quotes. */
+export function cdOf(command: string): string | undefined {
+  return command.match(LEADING_CD)?.[1].replace(/^["']|["']$/g, "");
+}
 
 /** The run_tests tool without its schema; keeps the last result to give it again when no file changed. */
 export class RunTests {
@@ -140,17 +151,28 @@ export class RunTests {
     this.last = undefined;
   }
 
+  /** Runs the tests for the changed files in place of a test command in bash, in the directory of its leading cd; the text is the reason of the block. */
+  async insteadOfBash(toolCallId: string, command: string, ctx: ExtensionContext): Promise<string> {
+    const head = "Test commands are blocked in bash. Use the run_tests tool. run_tests ran in place of your command:";
+    try {
+      return `${head}\n${(await this.execute(toolCallId, { path: cdOf(command) }, ctx.signal, ctx)).content[0].text}`;
+    } catch (err) {
+      return `${head}\n${(err as Error).message}`;
+    }
+  }
+
   async execute(toolCallId: string, params: Params, signal: AbortSignal | undefined, ctx: ExtensionContext): Promise<Result> {
     const scope = params.scope ?? "changed";
-    const changed = changedFiles(ctx.cwd);
-    const key = fingerprint(ctx.cwd, scope, changed);
+    const cwd = params.path ? absolutePath(params.path, ctx.cwd) : ctx.cwd;
+    const changed = changedFiles(cwd);
+    const key = fingerprint(cwd, scope, changed);
     if (this.last?.key === key && !params.rerun) {
       const [first, ...rest] = this.last.result.content[0].text.split("\n");
       const text = [`${first} · no file changed since the last run; same result`, ...rest].join("\n");
       return { ...this.last.result, content: [{ type: "text", text }] };
     }
 
-    const p = plan(ctx.cwd, loadRecipes(ctx.cwd), scope, changed);
+    const p = plan(cwd, loadRecipes(cwd), scope, changed);
     let result: Result;
     if ("nothing" in p) result = { content: [{ type: "text", text: p.nothing }], details: { changed }, isError: false };
     else if ("uncoveredOnly" in p)
@@ -160,7 +182,7 @@ export class RunTests {
         isError: true,
       };
     else {
-      const run = await execute(p.argv, ctx.cwd, signal);
+      const run = await execute(p.argv, cwd, signal);
       const log = callOutFile(ctx, toolCallId, "tests");
       writeFileSync(log, run.output);
       const ok = run.code === 0 && !run.timedOut && !p.uncovered.length;

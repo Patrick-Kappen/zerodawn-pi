@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 import type { Recipes } from "./recipes.ts";
-import { changedFiles, plan, RunTests } from "./run.ts";
+import { cdOf, changedFiles, plan, RunTests } from "./run.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "run-tests-"));
 const session = mkdtempSync(join(tmpdir(), "run-tests-session-"));
@@ -52,6 +52,19 @@ test("green: one line with the counts, the command and the log", async () => {
   assert.match(again.text, /^green: .* · no file changed since the last run; same result\n/);
 });
 
+test("cdOf: the directory of a leading cd", () => {
+  assert.equal(cdOf("cd ~/w/x && bun test"), "~/w/x");
+  assert.equal(cdOf('cd "/a b"; pytest'), "/a b");
+  assert.equal(cdOf("bun test && cd x"), undefined);
+});
+
+test("in place of a bash test command: the result after the reason of the block, in the directory of its cd", async () => {
+  assert.match(
+    await new RunTests().insteadOfBash("call-2", `cd ${dir} && bun test`, { ...ctx, cwd: tmpdir() }),
+    /^Test commands are blocked in bash\. Use the run_tests tool\. run_tests ran in place of your command:\ngreen: 1 pass, 0 fail · /,
+  );
+});
+
 test("red: only the failure; a new file without a test", async () => {
   write("a.ts", "export const a = 2;\n");
   write("b.ts", "export const b = 1;\n");
@@ -70,5 +83,8 @@ test("red without a run: only files without a test changed", async () => {
   write("b.ts", "export const b = 2;\n");
   const r = await call({});
   assert.equal(r.isError, true);
-  assert.equal(r.text, "red: 1 changed files without a test\nNo test for: b.ts. Add a test file that imports each of them, then run run_tests again.");
+  assert.equal(
+    r.text,
+    "red: 1 changed files without a test\nNo test for: b.ts. Add a test file that imports each of them, at the place and in the form that the AGENTS.md or README of the project gives, then run run_tests again.",
+  );
 });

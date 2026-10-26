@@ -40,11 +40,6 @@ test("normalize and isTest", () => {
   for (const c of ["just build", "just check", "nix flake check", "node x.ts", "grep test file", "nix build"]) assert.ok(!isTest(c), c);
 });
 
-test("a test command in bash is blocked, also when a recipe does it", () => {
-  assert.match(new Tracker().check("cd /p && node --experimental-strip-types --test a.test.ts", just)!, /Use the run_tests tool/);
-  assert.match(new Tracker().check("bun test extensions/x 2>&1 | tail", undefined)!, /Use the run_tests tool/);
-});
-
 test("a command that a recipe does is blocked", () => {
   assert.match(new Tracker().check("biome check .", recipe)!, /Run "just lint"/);
 });
