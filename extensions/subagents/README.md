@@ -6,6 +6,7 @@ Status: work in progress. The tool `subagent` has four actions:
 
 - `start` with `profile`, `task` and optional `base`: the supervisor creates a worktree (see "Worktrees") and starts a pi agent with that profile in a new window `sub-<first 4 characters of its id>`, with the worktree as its cwd. The tool waits and returns the final answer.
 - `answer` with `id` and `text`: sends `text` to the agent and waits for its next result, like `start`. The agent must have status `idle`, `question` or `blocked`.
+- `merge` with `ids` and optional `into`: see "Merge".
 - `discard` with `id`: removes the worktree and the branch of an agent. It refuses while the agent runs.
 - `status`: starts or finds the supervisor, connects, and shows the agents.
 
@@ -38,6 +39,36 @@ pi filters extension tools with `--tools` and `--no-tools`, so the main pi alway
 - `handoff` has the required fields `subject` (1 to 72 characters: the commit subject, in the form the repository wants) and `change` (`fix`, `feature` or `breaking`). The subagent extension commits, in the `handoff` tool of the subagent: when git shows changed files, it runs `git add -A` and `git commit` with the subject, the `changes` lines as body, and the trailer `Change: <change>`. A handoff at the token limit or after 3 red gates has the body line `Unfinished: <reason>` first. No changed files: no commit. The commit runs the repository hooks; `--no-verify` is never used. When git refuses the commit, the tool fails with the git output, the index is reset, and the model calls `handoff` again with a better subject. This counts as an invalid call: 2 invalid calls fail the agent. The result to the main agent has the line `commit: <short sha> <subject>` after the worktree and branch.
 - Cleanup: when an agent ends (result `idle`, `handoff` or `failed`) and its worktree has no changes and no new commit, the supervisor removes the worktree and the branch. Then `answer` for that agent fails: start a new agent. Every other end keeps the worktree and the branch; the result shows their paths. `discard` removes them (with `--force`).
 - The entries in `register.json` have `base` (commit hash), `worktree` and `branch`. The last two are absent after a removal.
+
+## Merge
+
+`subagent { action: "merge", ids, into? }` runs in the main pi. It does not wait for an agent.
+
+1. `into` is the branch that is checked out in the current directory. A detached HEAD without `into` is an error.
+2. The worktree that has `into` checked out must be clean, else the error names it. When no worktree has `into`, a temporary worktree `~/.worktrees/<repo>/merge-<8 random>` is made and removed at the end.
+3. Every id is checked first: the agent is in the register of this supervisor, does not run (`starting`, `running`) and has a commit after its base on `sub/<id8>`. Else the call fails before any merge.
+4. For each id, in order, `git merge --no-ff --no-edit sub/<id8>` runs in the target worktree. Hooks run. After a success the supervisor removes the worktree and the branch of that agent.
+5. The result lists the merged ids and the new HEAD of `into` (short hash and subject).
+
+Conflict flow: `git merge --abort` makes the target clean. The merge stops; the next ids are not merged. The supervisor starts an agent with the profile `merge` at once, on a new worktree from the HEAD of `into` after the merges that worked. Its task is to run `git merge sub/<id8>` and to resolve only the conflicts in the named files. The tool does not wait for it. The tool result is an error that names the merged ids, the conflict (id and files), the id of the merge agent and the ids not merged. When the merge agent ends, merge its id with `merge`, then the rest. The profile `merge` must exist; a missing file is an error that names the path, and the error also lists the merged and unmerged ids.
+
+### Cleanup
+
+After `merge` and at `session_start` of the main pi, the extension removes each worktree `~/.worktrees/<repo>/sub-*` whose branch is in the local ref `origin/main` (`git merge-base --is-ancestor`). It never runs `git fetch`; without the ref this check does nothing. It keeps a worktree when its agent runs (read from `/tmp/pi-sub-*/register.json`), when it has uncommitted changes, or when its HEAD is still the base of its agent. `session_start` reports the removed ones with a notification; `merge` adds them to its result. The register of a supervisor can list a worktree that this cleanup removed; start a new agent instead of an `answer`.
+
+### Example profile
+
+`~/.pi/agent/agents/merge.md` (write it yourself; the extension does not):
+
+```
+---
+description: Resolves merge conflicts and nothing else
+models: [anthropic/claude-haiku-4-5]
+tools: [read, edit, write, bash]
+extensions: [files, bash]
+---
+Resolve only the merge conflicts that the task names. Keep both changes where possible. Make no other change. Run the tests, then call done.
+```
 
 ## Design
 
@@ -130,7 +161,7 @@ The steps are in `TODO.md`, one at a time.
 
 - **Profiles:** `~/.pi/agent/agents/<name>.md` defines all that a subagent gets: models, tools, extensions, skills, MCP, system prompt, extra checks. Repositories hold no profiles. Later, nullspace delivers the same files through its layer kind `agents/`.
 - **Model ladder:** a profile lists models in order, for example a free model, then IBM, then Haiku, then Sonnet. The tool takes the first available one. Later, quota decide too.
-- **Isolation:** each subagent has its own worktree (see "Worktrees"), later in a jail. The merge into a target branch is a later step.
+- **Isolation:** each subagent has its own worktree (see "Worktrees"), later in a jail. See "Merge".
 - **Retries:** max tries, and an agent reset with a handoff.
 - **UI:** last.
 
