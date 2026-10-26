@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.11.0 — 2026-10-26
+
+### shared 0.5.0
+
+- keep diagnostics and warningCount as released
+
+- grouped diagnostics, nix noise, word-only warnings
+
+### bash 0.5.0
+
+- just check-findings shows unhelpful check results
+
+- background true always returns the job id
+
+### tests 0.4.0
+
+- shared: keep diagnostics and warningCount as released
+
+- anomalies file, nixfmt check, results by call number
+
 ## 0.10.0 — 2026-10-26
 
 ### subagents 0.6.0

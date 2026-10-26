@@ -49,11 +49,11 @@ Jobs survive a pi restart: `session_start` reads the job files, reports jobs tha
 ## Changes
 
 <!-- changelog:start -->
-## 0.4.0 — 2026-10-26
+## 0.5.0 — 2026-10-26
 
-- guidelines say continue working while a job runs
-- guide a wait as one chained command, block a bare sleep
-- short messages, no prose in reports
+- just check-findings shows unhelpful check results
+
+- background true always returns the job id
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

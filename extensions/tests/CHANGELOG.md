@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 — 2026-10-26
+
+- shared: keep diagnostics and warningCount as released
+
+- anomalies file, nixfmt check, results by call number
+
 ## 0.3.1 — 2026-10-26
 
 - short check result: diagnostics only, deduplicated

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 — 2026-10-26
+
+- keep diagnostics and warningCount as released
+
+- grouped diagnostics, nix noise, word-only warnings
+
 ## 0.4.2 — 2026-10-26
 
 - diagnostics shows a missing command, no echoed option or summary
