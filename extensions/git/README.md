@@ -16,9 +16,9 @@
 ## Changes
 
 <!-- changelog:start -->
-## 0.2.0 — 2026-10-26
+## 0.3.0 — 2026-10-26
 
-- name output files of codemode calls without ENOENT
+- docs: AGENTS.md of each extension as rules, facts to README
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

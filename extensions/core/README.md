@@ -18,9 +18,9 @@ A name that exists more than once needs its origin: `name@user`, `name@project`,
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.1 — 2026-10-26
+## 0.2.0 — 2026-10-26
 
-- deps: take pi and its packages from llm-agents, not from npm
+- docs: AGENTS.md of each extension as rules, facts to README
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

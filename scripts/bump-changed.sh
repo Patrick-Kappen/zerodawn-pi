@@ -26,7 +26,7 @@ root="## $new — $today"
 for entry in "${bumped[@]}"; do
   read -r name _ _ to dir <<< "$entry"
   tag="$(git tag --list "$name-v*" --sort=-v:refname | head -n1)"
-  if [ -n "$tag" ]; then lines="$(git log --format='- %s' "$tag..HEAD" -- "$dir" | sed "s/^- $name: /- /")"; else lines="- First release."; fi
+  if [ -n "$tag" ]; then lines="$(git log --no-merges --format='- %s' "$tag..HEAD" -- "$dir" | sed "s/^- $name: /- /")"; else lines="- First release."; fi
   [ -f "$dir/CHANGELOG.md" ] || printf '# Changelog\n' > "$dir/CHANGELOG.md"
   prepend "$dir/CHANGELOG.md" "$(printf '## %s — %s\n\n%s' "$to" "$today" "$lines")"
   root="$(printf '%s\n\n### %s %s\n\n%s' "$root" "$name" "$to" "$lines")"

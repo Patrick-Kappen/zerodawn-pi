@@ -54,6 +54,8 @@ eslint: 0 warnings`;
 test("warningCount: warning lines and biome '!' lines; not '0 warnings' and not passed test names", () => {
   assert.equal(warningCount(lint), 2);
   assert.equal(warningCount("all good\nFound 0 warnings"), 0);
+  assert.equal(warningCount("biome check --error-on-warnings .\nnix flake check --option warn-dirty false"), 0);
+  assert.equal(warningCount("DeprecationWarning: x\nWARN y"), 2);
 });
 
 test("warnings: each warning line with two lines before it and its block after it", () => {

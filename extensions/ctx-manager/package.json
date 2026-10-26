@@ -1,6 +1,6 @@
 {
   "name": "ctx-manager",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "replaces old large tool results with one line",
   "type": "module"
 }

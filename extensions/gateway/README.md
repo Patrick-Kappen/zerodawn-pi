@@ -7,9 +7,9 @@ The gateway stores the id as the log group and removes the header before the req
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.1 — 2026-10-26
+## 0.2.0 — 2026-10-26
 
-- deps: take pi and its packages from llm-agents, not from npm
+- docs: AGENTS.md of each extension as rules, facts to README
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

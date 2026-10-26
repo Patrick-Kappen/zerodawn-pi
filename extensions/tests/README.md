@@ -56,9 +56,9 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.0 — 2026-10-25
+## 0.2.1 — 2026-10-26
 
-- First release.
+- an option such as --error-on-warnings is not a warning
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

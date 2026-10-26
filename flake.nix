@@ -87,6 +87,8 @@
           throw "extensions/${name}/package.json is missing; add it with name, version and description"
         else if !((builtins.fromJSON (builtins.readFile manifest)) ? version) then
           throw "extensions/${name}/package.json has no version"
+        else if (builtins.fromJSON (builtins.readFile manifest)).version == "0.0.0" then
+          throw "extensions/${name}/package.json has version 0.0.0; a new extension starts at 0.1.0"
         else if tests == [ ] then
           throw "extensions/${name} has no *.test.ts; add a test"
         else
