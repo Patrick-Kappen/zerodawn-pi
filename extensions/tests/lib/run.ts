@@ -65,7 +65,7 @@ export const TOOL = {
   promptGuidelines: [
     "Run tests only with run_tests. A test command in bash runs run_tests in its place.",
     "A check command in bash (lint, types, just check) gives a short result. A warning is an error: fix it.",
-    `A run longer than ${INLINE_MS / 1000} s continues in the background. Continue with other work; a message reports the result.`,
+    `A run longer than ${INLINE_MS / 1000} s continues in the background. Continue with other work, or end the turn when nothing else is left; a message reports the result and starts your next turn.`,
     "Add or change a test for each new behaviour or bug fix, then run run_tests.",
     "run_tests gives the earlier result when no file changed. Set rerun only for a flaky test.",
   ],
@@ -80,7 +80,8 @@ export function cdOf(command: string): string | undefined {
   return command.match(LEADING_CD)?.[1].replace(/^["']|["']$/g, "");
 }
 
-const LATER = "Continue with other work. A message gives the result. It is not a bash job: jobs wait does not see it.";
+const LATER =
+  "Continue with other work, or end the turn when nothing else is left. A message gives the result and starts your next turn. It is not a bash job: jobs wait does not see it.";
 const TEST_HEAD = "Test commands in bash run through run_tests. Use run_tests next time. Result:";
 const CHECK_HEAD = "Check commands in bash give a short result. Do not run the same check in another form. Result:";
 

@@ -242,7 +242,7 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
   pi.registerTool({
     name: "jobs",
     label: "jobs",
-    description: `wait: block until the given jobs (default: all running) end and return their results, at most ${WAIT_MAX_S} s. list: the jobs of this session. kill: stop a job.`,
+    description: `wait: block until the given jobs (default: all running) end and return their results; the user cannot chat while you wait, so only for a short job whose result the next step needs, at most ${WAIT_MAX_S} s. list: the jobs of this session. kill: stop a job.`,
     promptSnippet: "Wait for, list or kill background jobs",
     parameters: Type.Object({
       action: StringEnum(["wait", "list", "kill"] as const),
