@@ -1,6 +1,6 @@
 {
   "name": "gateway",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "sends the session id to agentgateway, so its logs group requests by session",
   "type": "module"
 }
