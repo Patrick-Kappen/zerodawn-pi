@@ -23,9 +23,9 @@ Tests: `util.test.ts`, `store.test.ts`, `config.test.ts`.
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.0 — 2026-10-25
+## 0.2.0 — 2026-10-26
 
-- First release.
+- file ids for codemode tool calls
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
