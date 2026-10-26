@@ -47,8 +47,14 @@ export function createLifecycle(options: LifecycleOptions) {
     arm();
   }
 
+  function agentsChanged(): void {
+    if (mains > 0 || options.agentsRunning()) return;
+    disarm();
+    options.shutdown();
+  }
+
   // A main pi that crashes before its hello must not leave the supervisor running.
   arm();
 
-  return { mainOpened, mainClosed, isMainConnected: () => mains > 0 };
+  return { mainOpened, mainClosed, agentsChanged, isMainConnected: () => mains > 0 };
 }

@@ -92,3 +92,27 @@ test("the first main hello cancels the start timer", () => {
 test("a close without an open fails loud", () => {
   assert.throws(() => setup(false).lifecycle.mainClosed(), /never opened/);
 });
+
+test("the last running agent ending after main is gone shuts down at once", () => {
+  let running = true;
+  const clock = fakeClock();
+  let shutdowns = 0;
+  const lifecycle = createLifecycle({ timers: clock.timers, graceMs: 500, agentsRunning: () => running, shutdown: () => shutdowns++ });
+  lifecycle.mainOpened();
+  lifecycle.mainClosed();
+  assert.equal(shutdowns, 0);
+  assert.equal(clock.pending.size, 1);
+  lifecycle.agentsChanged();
+  assert.equal(shutdowns, 0);
+  running = false;
+  lifecycle.agentsChanged();
+  assert.equal(shutdowns, 1);
+  assert.equal(clock.pending.size, 0);
+});
+
+test("an agent change with a main connected does not shut down", () => {
+  const { lifecycle, shutdowns } = setup(false);
+  lifecycle.mainOpened();
+  lifecycle.agentsChanged();
+  assert.equal(shutdowns(), 0);
+});

@@ -2,7 +2,12 @@
 
 Delegate tasks to pi agents. Each agent runs as a normal interactive pi in a window of a detached tmux session.
 
-Status: work in progress. The tool `subagent` has one action, `status`: it starts or finds the supervisor, connects, and shows the status. No agent starts yet.
+Status: work in progress. The tool `subagent` has two actions:
+
+- `start` with `task`: the supervisor starts a pi agent (`anthropic/claude-haiku-5-5:off`) in a new window `sub-<first 4 characters of its id>`. The tool waits and returns the final answer.
+- `status`: starts or finds the supervisor, connects, and shows the agents.
+
+The result that the model sees is small: agent id, status, final text (cut at 8000 characters) and one line with tokens and cost. The last 20 events (200 characters each) go to `details` only.
 
 ## Design
 
@@ -13,13 +18,16 @@ Status: work in progress. The tool `subagent` has one action, `status`: it start
   - It sends their events to the main pi, so the tool calls show in the UI.
   - It shows an overview of all agents in window 0.
 - The main pi and the subagents are clients. They connect to one Unix socket of the supervisor. The tmux option `@pi-sub-socket` on the session holds its path.
-- Each subagent has a real pi session (`--session-id`, `--session-dir`), so the tool can resume it later.
+- Each subagent has a real pi session (`--session-id`, `--session-dir`), so the tool can resume it later. The id is a UUID.
+- The subagent loads this extension too. `PI_SUBAGENT_SOCKET` and `PI_SUBAGENT_ID` make it a client of the supervisor: it runs the task it gets and sends tool, message and settle events.
+- Agent status: `starting`, `running`, `idle`, `failed`. An agent that does not connect within 30 s, or whose window is gone without a result, is `failed`. The supervisor checks the windows every 2 s.
 - Runtime files go to `/tmp/pi-sub-<id>/`: the register of the subagents (id, role, window, status) and their pi sessions. A reboot removes them.
 
 ## Lifecycle
 
-- When the main pi stops, the running subagents finish their task. Then the supervisor closes the session.
+- When the main pi stops, the running subagents finish their task. When the last one ends, the supervisor closes the session at once.
 - 2 hours after the main pi stops, the supervisor stops all subagents and closes the session. This also cleans up after a crash.
+- A stale `@pi-sub-socket` (the supervisor crashed) is found when the main pi connects. When the window `supervisor` is gone, the option is unset and a new supervisor starts in the same session. When the window exists, the tool fails and names the session.
 - When no main pi connects within 2 hours after the supervisor starts, the supervisor closes the session.
 
 ## UI (planned)

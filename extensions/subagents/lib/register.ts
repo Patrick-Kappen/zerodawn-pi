@@ -5,7 +5,7 @@ export interface AgentEntry {
   id: string;
   role: string;
   window: string;
-  status: "running" | "done" | "failed";
+  status: "starting" | "running" | "idle" | "failed";
 }
 
 export async function writeRegister(dir: string, agents: AgentEntry[]): Promise<void> {

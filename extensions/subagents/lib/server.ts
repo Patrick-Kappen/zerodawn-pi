@@ -1,23 +1,28 @@
-import { unlink } from "node:fs/promises";
-import { createConnection, createServer, type Server, type Socket } from "node:net";
+import { stat, unlink } from "node:fs/promises";
+import { createServer, type Server, type Socket } from "node:net";
 import { join } from "node:path";
+import { createAgents } from "./agents.ts";
 import { createLifecycle, GRACE_MS, type Timers } from "./lifecycle.ts";
+import { answers } from "./probe.ts";
 import { formatServerMessage, parseClientLine, type ServerMessage } from "./protocol.ts";
-import { type AgentEntry, writeRegister } from "./register.ts";
+import { writeRegister } from "./register.ts";
+import type { Tmux as FullTmux } from "./tmux.ts";
 
-export interface Tmux {
-  setOption(session: string, option: string, value: string): Promise<void>;
-  killSession(session: string): Promise<void>;
-}
+export type Tmux = Pick<FullTmux, "setOption" | "killSession" | "openWindow" | "listWindows">;
 
 export interface SupervisorOptions {
   session: string;
   dir: string;
   id: string;
+  pi: string;
+  extension: string;
+  newId: () => string;
   runtimeDir: string | undefined;
   tmux: Tmux;
   timers: Timers;
   graceMs?: number;
+  helloTimeoutMs?: number;
+  pollMs?: number;
 }
 
 export function socketPath(runtimeDir: string | undefined, id: string): string {
@@ -25,22 +30,6 @@ export function socketPath(runtimeDir: string | undefined, id: string): string {
     throw new Error("supervisor: XDG_RUNTIME_DIR is not set. Log in with a systemd user session or set it to a user-owned directory.");
   }
   return join(runtimeDir, `pi-sub-${id}.sock`);
-}
-
-function answers(path: string): Promise<boolean> {
-  return new Promise((resolve, reject) => {
-    const probe = createConnection(path);
-    probe.once("connect", () => {
-      probe.destroy();
-      resolve(true);
-    });
-    probe.once("error", (error: NodeJS.ErrnoException) => {
-      if (error.code === "ECONNREFUSED") resolve(false);
-      else if (error.code === "ENOENT") resolve(false);
-      else
-        reject(new Error(`supervisor: could not probe socket "${path}": ${error.message}. Remove the file by hand when no supervisor runs.`, { cause: error }));
-    });
-  });
 }
 
 async function removeFile(path: string): Promise<void> {
@@ -61,12 +50,27 @@ async function freeSocket(path: string): Promise<void> {
   await removeFile(path);
 }
 
+async function checkExtension(path: string): Promise<void> {
+  try {
+    await stat(path);
+  } catch (cause) {
+    throw new Error(`supervisor: extension "${path}" is not readable. Give the absolute path of extensions/subagents/index.ts.`, { cause });
+  }
+}
+
+interface Connection {
+  role?: "main" | "sub";
+  id?: string;
+}
+
 export async function startSupervisor(options: SupervisorOptions) {
   const path = socketPath(options.runtimeDir, options.id);
-  const agents: AgentEntry[] = [];
   const clients = new Set<Socket>();
+  const mains = new Set<Socket>();
+  const subs = new Map<string, Socket>();
   let server: Server | undefined;
   let stopping: Promise<void> | undefined;
+  let writing: Promise<void> = Promise.resolve();
   let resolveDone: () => void = () => {};
   let rejectDone: (error: Error) => void = () => {};
   const done = new Promise<void>((resolve, reject) => {
@@ -76,9 +80,11 @@ export async function startSupervisor(options: SupervisorOptions) {
 
   function shutdown(): Promise<void> {
     stopping ??= (async () => {
+      agents.dispose();
       const closed = new Promise<void>((resolve) => (server as Server).close(() => resolve()));
       for (const client of clients) client.destroy();
       await closed;
+      await writing;
       await removeFile(path);
       await options.tmux.killSession(options.session);
     })();
@@ -88,7 +94,7 @@ export async function startSupervisor(options: SupervisorOptions) {
   const lifecycle = createLifecycle({
     timers: options.timers,
     graceMs: options.graceMs ?? GRACE_MS,
-    agentsRunning: () => agents.some((agent) => agent.status === "running"),
+    agentsRunning: () => agents.running(),
     shutdown: () => {
       shutdown().then(resolveDone, (cause) =>
         rejectDone(new Error("supervisor: shutdown failed. Remove the socket file and the tmux session by hand.", { cause })),
@@ -97,12 +103,84 @@ export async function startSupervisor(options: SupervisorOptions) {
   });
 
   function send(socket: Socket, message: ServerMessage): void {
-    socket.write(formatServerMessage(message));
+    if (!socket.destroyed) socket.write(formatServerMessage(message));
+  }
+
+  function persist(): void {
+    writing = writing.then(() => writeRegister(options.dir, agents.entries())).catch(rejectDone);
+  }
+
+  const agents = createAgents({
+    session: options.session,
+    dir: options.dir,
+    socket: path,
+    piCommand: options.pi,
+    extension: options.extension,
+    tmux: options.tmux,
+    timers: options.timers,
+    newId: options.newId,
+    sendToSub: (id, message) => {
+      const socket = subs.get(id);
+      if (socket === undefined) throw new Error(`supervisor: subagent ${id} has no connection. Run: tmux attach -t ${options.session}`);
+      send(socket, message);
+    },
+    sendToMains: (message) => {
+      for (const socket of mains) send(socket, message);
+    },
+    onChange: () => {
+      persist();
+      lifecycle.agentsChanged();
+    },
+    onError: (error) => rejectDone(error),
+    helloTimeoutMs: options.helloTimeoutMs,
+    pollMs: options.pollMs,
+  });
+
+  function handle(socket: Socket, connection: Connection, line: string): void {
+    const message = parseClientLine(line);
+    switch (message.type) {
+      case "hello": {
+        if (connection.role !== undefined) throw new Error("supervisor: this connection already said hello.");
+        if (message.role === "main") {
+          connection.role = "main";
+          mains.add(socket);
+          lifecycle.mainOpened();
+          return;
+        }
+        subs.set(message.id, socket);
+        try {
+          agents.hello(message.id);
+        } catch (error) {
+          subs.delete(message.id);
+          throw error;
+        }
+        connection.role = "sub";
+        connection.id = message.id;
+        return;
+      }
+      case "status":
+        send(socket, { type: "status", agents: agents.entries(), main: lifecycle.isMainConnected() ? "connected" : "gone" });
+        return;
+      case "start":
+        if (connection.role !== "main") throw new Error('supervisor: only a connection with hello role "main" can start a subagent.');
+        agents.start(message.task).then(
+          async (id) => {
+            await writing;
+            send(socket, { type: "started", id });
+          },
+          (error: Error) => send(socket, { type: "error", message: error.message }),
+        );
+        return;
+      case "event":
+        if (connection.role !== "sub" || connection.id === undefined) throw new Error('supervisor: only a connection with hello role "sub" can send events.');
+        agents.event(connection.id, message.event);
+        return;
+    }
   }
 
   function onConnection(socket: Socket): void {
     clients.add(socket);
-    let isMain = false;
+    const connection: Connection = {};
     let buffer = "";
     socket.setEncoding("utf8");
     socket.on("data", (chunk: string) => {
@@ -114,15 +192,7 @@ export async function startSupervisor(options: SupervisorOptions) {
         newline = buffer.indexOf("\n");
         if (line.trim() === "") continue;
         try {
-          const message = parseClientLine(line);
-          if (message.type === "hello") {
-            if (!isMain) {
-              isMain = true;
-              lifecycle.mainOpened();
-            }
-          } else {
-            send(socket, { type: "status", agents, main: lifecycle.isMainConnected() ? "connected" : "gone" });
-          }
+          handle(socket, connection, line);
         } catch (error) {
           send(socket, { type: "error", message: (error as Error).message });
         }
@@ -131,12 +201,18 @@ export async function startSupervisor(options: SupervisorOptions) {
     socket.on("error", () => socket.destroy());
     socket.on("close", () => {
       clients.delete(socket);
-      if (isMain && stopping === undefined) lifecycle.mainClosed();
+      if (connection.role === "sub" && connection.id !== undefined) subs.delete(connection.id);
+      if (connection.role === "main") {
+        mains.delete(socket);
+        if (stopping === undefined) lifecycle.mainClosed();
+      }
     });
   }
 
+  await checkExtension(options.extension);
   await freeSocket(path);
-  await writeRegister(options.dir, agents);
+  persist();
+  await writing;
   server = createServer(onConnection);
   await new Promise<void>((resolve, reject) => {
     (server as Server).once("error", reject);

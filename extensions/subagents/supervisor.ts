@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { parseArgs } from "./lib/args.ts";
 import { startSupervisor } from "./lib/server.ts";
 import { createTmux, type Exec } from "./lib/tmux.ts";
@@ -15,6 +16,7 @@ try {
   const args = parseArgs(process.argv.slice(2));
   const supervisor = await startSupervisor({
     ...args,
+    newId: randomUUID,
     runtimeDir: process.env.XDG_RUNTIME_DIR,
     tmux: createTmux(exec),
     timers: { setTimeout: (callback, ms) => setTimeout(callback, ms), clearTimeout: (handle) => clearTimeout(handle as NodeJS.Timeout) },

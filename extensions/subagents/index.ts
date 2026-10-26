@@ -4,12 +4,43 @@ import { Type } from "typebox";
 import { type Client, connectMain } from "./lib/client.ts";
 import { ensureSupervisor } from "./lib/ensure.ts";
 import type { Timers } from "./lib/lifecycle.ts";
+import { answers } from "./lib/probe.ts";
+import { shapeResult } from "./lib/result.ts";
+import { createSubHandlers, readSubEnv, type SubEnv } from "./lib/sub.ts";
+import { connectSub, type SubConnection } from "./lib/subclient.ts";
 import { createTmux, sessionName } from "./lib/tmux.ts";
 
 const timers: Timers = { setTimeout: (callback, ms) => setTimeout(callback, ms), clearTimeout: (handle) => clearTimeout(handle as NodeJS.Timeout) };
 const SUPERVISOR_PATH = fileURLToPath(new URL("./supervisor.ts", import.meta.url));
+const EXTENSION_PATH = fileURLToPath(import.meta.url);
+
+function registerSub(pi: ExtensionAPI, env: SubEnv): void {
+  let connection: SubConnection | undefined;
+  const connected = (): SubConnection => {
+    if (connection === undefined) throw new Error(`subagents: no connection to "${env.socket}". The session_start handler failed; read the error above.`);
+    return connection;
+  };
+  const handlers = createSubHandlers({
+    send: (message) => connected().send(message),
+    sendUserMessage: (text) => void pi.sendUserMessage(text),
+  });
+
+  pi.on("session_start", async (_event, ctx) => {
+    connection = await connectSub(env, handlers.onServerMessage, (error) => ctx.ui.notify(error.message, "error"));
+  });
+  pi.on("session_shutdown", () => connection?.close());
+  pi.on("tool_execution_start", (event) => handlers.toolStart(event));
+  pi.on("tool_execution_end", (event) => handlers.toolEnd(event));
+  pi.on("message_end", (event) => handlers.messageEnd(event.message));
+  pi.on("agent_settled", () => handlers.settled());
+}
 
 export default function (pi: ExtensionAPI): void {
+  const sub = readSubEnv(process.env);
+  if (sub !== undefined) {
+    registerSub(pi, sub);
+    return;
+  }
   const tmux = createTmux((command, args, options) => pi.exec(command, args, options));
   let client: Promise<Client> | undefined;
 
@@ -22,6 +53,9 @@ export default function (pi: ExtensionAPI): void {
       sessionId,
       supervisorPath: SUPERVISOR_PATH,
       execPath: process.execPath,
+      piCommand: "pi",
+      extensionPath: EXTENSION_PATH,
+      probe: answers,
       runtimeRoot: "/tmp",
     }).then(({ socket }) => connectMain(socket, timers));
     client = next;
@@ -47,11 +81,16 @@ export default function (pi: ExtensionAPI): void {
   pi.registerTool({
     name: "subagent",
     label: "subagent",
-    description: "Delegate tasks to pi agents in a tmux session. status: show the supervisor and its agents.",
+    description:
+      "Delegate tasks to pi agents in a tmux session. start: run the task in a new agent and return its final answer. status: show the supervisor and its agents.",
     promptSnippet: "Delegate tasks to pi agents in tmux",
-    parameters: Type.Object({ action: Type.Literal("status") }),
-    async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
+    parameters: Type.Union([
+      Type.Object({ action: Type.Literal("status") }),
+      Type.Object({ action: Type.Literal("start"), task: Type.String({ description: "The complete task. The agent knows nothing else." }) }),
+    ]),
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const connected = await connection(ctx.sessionManager.getSessionId());
+      if (params.action === "start") return shapeResult(await connected.start(params.task, signal));
       const status = await connected.status();
       return { content: [{ type: "text", text: JSON.stringify(status, null, 2) }], details: status };
     },

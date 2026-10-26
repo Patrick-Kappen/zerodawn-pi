@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import { readFile, rm } from "node:fs/promises";
 import { after, test } from "node:test";
 import type { ExecResult } from "@earendil-works/pi-coding-agent";
 import { createTmux, type Exec, sessionName } from "./tmux.ts";
@@ -35,6 +37,36 @@ test("openWindow adds a window to an existing session", async () => {
   const { exec, calls } = fake([{}, { stdout: "@4" }]);
   await createTmux(exec).openWindow("pi-sub-x", "scout", ["pi"]);
   assert.deepEqual(calls[1]?.slice(0, 5), ["tmux", "new-window", "-d", "-t", "=pi-sub-x:"]);
+});
+
+test("openWindow passes env as -e arguments before the command", async () => {
+  const { exec, calls } = fake([{}, { stdout: "@4" }]);
+  await createTmux(exec).openWindow("pi-sub-x", "sub-ab12", ["pi", "-e", "/x.ts"], { A: "1", B: "two words" });
+  assert.deepEqual(calls[1], [
+    "tmux",
+    "new-window",
+    "-d",
+    "-t",
+    "=pi-sub-x:",
+    "-P",
+    "-F",
+    "#{window_id}",
+    "-n",
+    "sub-ab12",
+    "-e",
+    "A=1",
+    "-e",
+    "B=two words",
+    "pi",
+    "-e",
+    "/x.ts",
+  ]);
+});
+
+test("unsetOption uses -u with an exact session target", async () => {
+  const { exec, calls } = fake([{}]);
+  await createTmux(exec).unsetOption("pi-sub-x", "@pi-sub-socket");
+  assert.deepEqual(calls[0], ["tmux", "set-option", "-u", "-t", "=pi-sub-x:", "@pi-sub-socket"]);
 });
 
 test("openWindow rejects a bad window name and an empty command", async () => {
@@ -89,6 +121,19 @@ test("real tmux: setOption stores the value and killSession removes the session"
   assert.equal(shown.stdout.trim(), "/run/x.sock");
   await tmux.killSession("pi-sub-opt");
   assert.equal(await tmux.hasSession("pi-sub-opt"), false);
+});
+
+test("real tmux: env reaches the command and unsetOption removes the option", async () => {
+  const tmux = createTmux(realExec, socket);
+  const out = `/tmp/pi-sub-env-${process.pid}`;
+  await tmux.openWindow("pi-sub-env", "one", ["sh", "-c", `printf %s "$PI_SUBAGENT_ID" > ${out}; sleep 30`], { PI_SUBAGENT_ID: "abc 1" });
+  await tmux.setOption("pi-sub-env", "@pi-sub-socket", "/run/x.sock");
+  assert.equal(await tmux.getOption("pi-sub-env", "@pi-sub-socket"), "/run/x.sock");
+  await tmux.unsetOption("pi-sub-env", "@pi-sub-socket");
+  assert.equal(await tmux.getOption("pi-sub-env", "@pi-sub-socket"), undefined);
+  for (let i = 0; i < 50 && !existsSync(out); i++) await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(await readFile(out, "utf8"), "abc 1");
+  await rm(out);
 });
 
 test("getOption returns undefined for an absent session and for an unset option", async () => {

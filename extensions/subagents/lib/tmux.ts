@@ -47,12 +47,12 @@ export function createTmux(exec: Exec, socket?: string) {
     throw new Error(`subagents: "tmux has-session -t =${session}" failed with exit code ${result.code}: ${result.stderr.trim()}`);
   }
 
-  async function openWindow(session: string, name: string, command: string[]): Promise<string> {
+  async function openWindow(session: string, name: string, command: string[], env: Record<string, string> = {}): Promise<string> {
     if (!WINDOW_NAME.test(name)) {
       throw new Error(`subagents: window name "${name}" is not valid. Use only A-Z, a-z, 0-9, "_" or "-".`);
     }
     if (command.length === 0) throw new Error(`subagents: no command given for window "${name}".`);
-    const format = ["-P", "-F", "#{window_id}", "-n", name];
+    const format = ["-P", "-F", "#{window_id}", "-n", name, ...Object.entries(env).flatMap(([key, value]) => ["-e", `${key}=${value}`])];
     const args = (await hasSession(session))
       ? ["new-window", "-d", "-t", `=${session}:`, ...format, ...command]
       : ["new-session", "-d", "-s", session, ...format, ...command];
@@ -75,6 +75,10 @@ export function createTmux(exec: Exec, socket?: string) {
     await check(["set-option", "-t", `=${session}:`, option, value]);
   }
 
+  async function unsetOption(session: string, option: string): Promise<void> {
+    await check(["set-option", "-u", "-t", `=${session}:`, option]);
+  }
+
   async function getOption(session: string, option: string): Promise<string | undefined> {
     if (!(await hasSession(session))) return undefined;
     const value = await check(["show-options", "-qv", "-t", `=${session}:`, option]);
@@ -85,7 +89,7 @@ export function createTmux(exec: Exec, socket?: string) {
     await check(["kill-session", "-t", `=${session}`]);
   }
 
-  return { hasSession, openWindow, listWindows, setOption, getOption, killSession };
+  return { hasSession, openWindow, listWindows, setOption, unsetOption, getOption, killSession };
 }
 
 export type Tmux = ReturnType<typeof createTmux>;

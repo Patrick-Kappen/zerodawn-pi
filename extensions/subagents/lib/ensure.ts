@@ -2,15 +2,19 @@ import type { Timers } from "./lifecycle.ts";
 import { sessionName, type Tmux } from "./tmux.ts";
 
 export const SOCKET_OPTION = "@pi-sub-socket";
+export const SUPERVISOR_WINDOW = "supervisor";
 export const POLL_MS = 50;
 export const START_TIMEOUT_MS = 5000;
 
 export interface EnsureOptions {
-  tmux: Pick<Tmux, "hasSession" | "openWindow" | "getOption">;
+  tmux: Pick<Tmux, "hasSession" | "openWindow" | "listWindows" | "getOption" | "unsetOption">;
+  probe: (socket: string) => Promise<boolean>;
   timers: Timers;
   sessionId: string;
   supervisorPath: string;
   execPath: string;
+  piCommand: string;
+  extensionPath: string;
   runtimeRoot: string;
   pollMs?: number;
   timeoutMs?: number;
@@ -23,16 +27,33 @@ function sleep(timers: Timers, ms: number): Promise<void> {
 export async function ensureSupervisor(options: EnsureOptions): Promise<{ session: string; socket: string }> {
   const session = sessionName(options.sessionId);
   const known = await options.tmux.getOption(session, SOCKET_OPTION);
-  if (known !== undefined) return { session, socket: known };
+  let start = false;
+  if (known !== undefined) {
+    if (await options.probe(known)) return { session, socket: known };
+    const windows = await options.tmux.listWindows(session);
+    if (windows.some((window) => window.name === SUPERVISOR_WINDOW)) {
+      throw new Error(
+        `subagents: ${SOCKET_OPTION} of "${session}" points to "${known}", which does not answer, but the window "${SUPERVISOR_WINDOW}" exists. Run "tmux attach -t ${session}" and read the error.`,
+      );
+    }
+    await options.tmux.unsetOption(session, SOCKET_OPTION);
+    start = true;
+  } else {
+    start = !(await options.tmux.hasSession(session));
+  }
 
-  if (!(await options.tmux.hasSession(session))) {
-    await options.tmux.openWindow(session, "supervisor", [
+  if (start) {
+    await options.tmux.openWindow(session, SUPERVISOR_WINDOW, [
       options.execPath,
       options.supervisorPath,
       "--session",
       session,
       "--dir",
       `${options.runtimeRoot}/${session}`,
+      "--pi",
+      options.piCommand,
+      "--extension",
+      options.extensionPath,
     ]);
   }
 
