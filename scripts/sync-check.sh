@@ -38,8 +38,8 @@ for part in "checks = forAll" "devShells = forAll"; do
   b="$(section "$other/flake.nix" "$part" '^      [)];' | sed "s/$other_name/REPO/g")"
   [ "$a" == "$b" ] || show "flake.nix ($part block)" "$a" "$b"
 done
-a="$(sed '/^# Start pi with all extensions/,$d' justfile | normalize /dev/stdin "$self_name")"
-b="$(sed '/^# Start pi with all extensions/,$d' "$other/justfile" | normalize /dev/stdin "$other_name")"
+a="$(sed '/^# Start pi with all extensions/,$d' justfile | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' | normalize /dev/stdin "$self_name")"
+b="$(sed '/^# Start pi with all extensions/,$d' "$other/justfile" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' | normalize /dev/stdin "$other_name")"
 [ "$a" == "$b" ] || show "justfile (without the dev recipes)" "$a" "$b"
 
 if [ ${#differ[@]} -gt 0 ]; then

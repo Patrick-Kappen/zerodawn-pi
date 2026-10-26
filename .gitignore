@@ -1,5 +1,5 @@
 .pre-commit-config.yaml
 .direnv/
-node_modules/
+node_modules
 config.json
 !AGENTS.md

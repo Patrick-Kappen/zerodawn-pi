@@ -18,7 +18,7 @@ The agent decides which commands to run; the guards here (blocked git commands, 
 ## Supply chain
 
 - Runtime: the extensions import only pi's own packages (`@earendil-works/pi-*`) and `typebox`, which pi ships. There is no install step and no other runtime dependency.
-- Development: the dev dependencies in `package.json` are pinned by version and by `bun.lock`; the Nix build pins them again with a content hash (`bunDepsHash`).
+- Development: there are no npm dev dependencies of our own. The types and tests use pi and its packages from the `llm-agents` flake input, pinned by `flake.lock`.
 - CI uses the Determinate Nix installer and the GitHub token with `contents: read`; the release job has `contents: write` only to push tags and create releases.
 - gitleaks runs on every commit.
 

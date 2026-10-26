@@ -1,8 +1,12 @@
 sibling := "zerodawn-pi-private"
 
-# Run the unit tests
-test:
+# Run the unit tests, after a check that they use the installed pi version
+test: pi-version
     bun test
+
+# Fail when the pi of flake.lock (used by tests and types) is not the installed pi
+pi-version:
+    scripts/pi-version.sh
 
 # Type-check all TypeScript
 types:
@@ -38,17 +42,9 @@ release-check:
 notes:
     scripts/notes.sh
 
-# Write the hash of the pinned npm packages into flake.nix; run after a change of bun.lock
-deps-hash:
-    scripts/deps-hash.sh
-
 # Fail when the repository behaviour (CI, scripts, flake checks, dev shell, justfile) differs from the sibling repository
 sync-check other=("../" + sibling):
     scripts/sync-check.sh {{other}}
-
-# Install the pinned pi types for tsc and the LSP
-install:
-    bun install --frozen-lockfile
 
 # Set a version and commit it; CI tags it after the push. Package: just bump 0.3.0. Extension: just bump 0.2.0 bash
 bump version extension="":
