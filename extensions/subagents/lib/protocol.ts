@@ -26,6 +26,7 @@ export interface AgentResult {
   handoff?: Handoff;
   reason?: string;
   gate?: GateInfo;
+  commit?: string;
   worktree?: string;
   branch?: string;
 }
@@ -39,7 +40,7 @@ export type ClientMessage =
   | { type: "answer"; id: string; text: string }
   | { type: "ask"; text: string }
   | { type: "blocker"; data: Blocker }
-  | { type: "handoff"; data: Handoff; reason?: string; gate?: GateInfo }
+  | { type: "handoff"; data: Handoff; reason?: string; gate?: GateInfo; commit?: string }
   | { type: "event"; event: SubEvent };
 
 export type ServerMessage =
@@ -102,6 +103,7 @@ function change(fields: Fields, type: string): Change {
 
 function parseHandoff(fields: Fields, type: string): Handoff {
   return {
+    subject: text(fields, "subject", type),
     summary: text(fields, "summary", type),
     change: change(fields, type),
     changes: objects(fields, "changes", type, ["file", "what"]) as Handoff["changes"],
@@ -204,6 +206,7 @@ export function parseClientLine(line: string): ClientMessage {
         data,
         ...(message.reason === undefined ? {} : { reason: text(message, "reason", "handoff") }),
         ...(message.gate === undefined ? {} : { gate: parseGate(object(message, "gate", "handoff"), "handoff.gate") }),
+        ...(message.commit === undefined ? {} : { commit: text(message, "commit", "handoff") }),
       };
     }
     case "event":
@@ -261,6 +264,7 @@ export function parseServerLine(line: string): ServerMessage {
         ...(message.handoff === undefined ? {} : { handoff: parseHandoff(object(message, "handoff", "result"), "result.handoff") }),
         ...(message.reason === undefined ? {} : { reason: text(message, "reason", "result") }),
         ...(message.gate === undefined ? {} : { gate: parseGate(object(message, "gate", "result"), "result.gate") }),
+        ...(message.commit === undefined ? {} : { commit: text(message, "commit", "result") }),
         ...(message.worktree === undefined ? {} : { worktree: text(message, "worktree", "result") }),
         ...(message.branch === undefined ? {} : { branch: text(message, "branch", "result") }),
       };

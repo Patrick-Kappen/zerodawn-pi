@@ -202,7 +202,9 @@ export async function startSupervisor(options: SupervisorOptions) {
         else if (message.type === "blocker") agents.pending(connection.id, "blocked", blockerText(message.data), message.data);
         else {
           const sub = connection.id;
-          agents.handoff(sub, message.data, message.reason, message.gate).catch((error: Error) => send(socket, { type: "error", message: error.message }));
+          agents
+            .handoff(sub, message.data, message.reason, message.gate, message.commit)
+            .catch((error: Error) => send(socket, { type: "error", message: error.message }));
         }
         return;
       case "event":

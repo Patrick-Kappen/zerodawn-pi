@@ -13,13 +13,16 @@ function shapeDetails(result: AgentResult) {
     ...(result.handoff === undefined ? {} : { handoff: result.handoff }),
     ...(result.reason === undefined ? {} : { reason: result.reason }),
     ...(result.gate === undefined ? {} : { gate: result.gate }),
+    ...(result.commit === undefined ? {} : { commit: result.commit }),
     ...(result.worktree === undefined ? {} : { worktree: result.worktree }),
     ...(result.branch === undefined ? {} : { branch: result.branch }),
   };
 }
 
 function treeText(result: AgentResult): string {
-  return result.worktree === undefined ? "" : `\nworktree: ${result.worktree}\nbranch: ${result.branch}`;
+  if (result.worktree === undefined) return "";
+  const commit = result.commit === undefined ? "" : `\ncommit: ${result.commit.slice(0, 7)} ${result.handoff?.subject ?? ""}`;
+  return `\nworktree: ${result.worktree}\nbranch: ${result.branch}${commit}`;
 }
 
 export function shapeResult(result: AgentResult) {

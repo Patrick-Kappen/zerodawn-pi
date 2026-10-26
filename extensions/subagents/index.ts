@@ -8,7 +8,7 @@ import { changedFiles, execute, plan, uncoveredOf } from "../../shared/testrun.t
 import { type Client, connectMain } from "./lib/client.ts";
 import { ensureSupervisor } from "./lib/ensure.ts";
 import { runGate } from "./lib/gate.ts";
-import { resolveBase } from "./lib/git.ts";
+import { commitAll, resolveBase } from "./lib/git.ts";
 import type { Timers } from "./lib/lifecycle.ts";
 import { answers } from "./lib/probe.ts";
 import { nodeFiles, resolveProfile } from "./lib/resolve.ts";
@@ -43,6 +43,7 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
     getActiveTools: () => pi.getActiveTools(),
     setActiveTools: (names) => pi.setActiveTools(names),
     changed: () => changedFiles(cwd),
+    commit: (spec) => commitAll((command, args, options) => pi.exec(command, args, options), cwd, spec),
     gate: (sendUserMessage) =>
       runGate({
         checks: env.checks,
@@ -86,10 +87,11 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
   pi.registerTool({
     name: "handoff",
     label: "handoff",
-    description: "Report the result and hand the task over. The extension asks for it; do not call it before. After the call, stop.",
+    description:
+      "Report the result and hand the task over. The extension asks for it; do not call it before. The extension commits your changes with your subject. After the call, stop.",
     parameters: handoffSchema,
     async execute(_toolCallId, params) {
-      return { content: [{ type: "text", text: handlers.handoff(params) }], details: {} };
+      return { content: [{ type: "text", text: await handlers.handoff(params) }], details: {} };
     },
   });
   pi.registerTool({
