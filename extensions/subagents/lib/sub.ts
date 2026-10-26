@@ -1,5 +1,5 @@
-import { forceTool } from "./force.ts";
-import type { Blocker, Done, Findings, GateInfo, Handoff } from "./format.ts";
+import { forceAnyTool, forceTool } from "./force.ts";
+import type { Blocker, GateInfo, Handoff } from "./format.ts";
 import type { GateResult } from "./gate.ts";
 import type { ClientMessage, ServerMessage } from "./protocol.ts";
 
@@ -57,8 +57,11 @@ function textOf(message: MessageLike): string {
 }
 
 export const HANDOFF_PROMPT = "You reached the token limit. Call the tool handoff now.";
-export const DONE_PROMPT = "The checks are green. Call the tool done now.";
+export const GREEN_HANDOFF_PROMPT = "The checks are green. Call the tool handoff now.";
 export const GATE_HANDOFF_PROMPT = `The done gate was red ${MAX_GATE_TRIES} times. Call the tool handoff now.`;
+export const CHOICE_PROMPT =
+  "You stopped. Call continue to keep working, done when the task is finished, ask for a question, or blocker when you cannot go on.";
+export const CHOICE_TOOLS = ["continue", "done", "ask", "blocker"];
 
 export interface SubHandlerOptions {
   send: (message: ClientMessage) => void;
@@ -71,16 +74,16 @@ export interface SubHandlerOptions {
   gate: (sendUserMessage: (text: string) => void) => Promise<GateResult>;
 }
 
-// off: no forced tool. waiting: aborted, the new run starts at the next settle. forced: the tool choice names the tool in forcedTool. done: sent or failed.
-type HandoffState = "off" | "waiting" | "forced" | "done";
+// off: no forced tool. choice: only the CHOICE_TOOLS, one is forced. waiting: aborted, the handoff run starts at the next settle. forced: the handoff is forced. done: handoff sent or agent failed.
+type State = "off" | "choice" | "waiting" | "forced" | "done";
 
 export function createSubHandlers(options: SubHandlerOptions) {
   let pending = false;
+  let doneCalled = false;
   let redGates = 0;
-  let state: HandoffState = "off";
+  let state: State = "off";
   let invalidCalls = 0;
   let gateReason: string | undefined;
-  let forcedTool = "handoff";
   let gateInfo: GateInfo | undefined;
   let savedTools: string[] | undefined;
 
@@ -88,31 +91,50 @@ export function createSubHandlers(options: SubHandlerOptions) {
     state = "done";
     options.send({ type: "event", event: { kind: "error", text } });
   };
-  const startForced = (tool: string, prompt: string) => {
-    forcedTool = tool;
+  const saveTools = () => {
+    savedTools ??= options.getActiveTools();
+  };
+  const restoreTools = () => {
+    if (savedTools === undefined) return;
+    options.setActiveTools(savedTools);
+    savedTools = undefined;
+  };
+  const startHandoff = (prompt: string) => {
+    saveTools();
+    options.setActiveTools(["handoff"]);
     state = "forced";
     options.sendUserMessage(prompt);
+  };
+  const leaveChoice = () => {
+    if (state !== "choice") return;
+    restoreTools();
+    state = "off";
   };
 
   return {
     onServerMessage(message: ServerMessage): void {
       if (message.type === "task") {
         redGates = 0;
-        if (state === "done" && savedTools !== undefined) {
-          options.setActiveTools(savedTools);
-          savedTools = undefined;
-          state = "off";
-          invalidCalls = 0;
-        }
+        pending = false;
+        doneCalled = false;
+        gateInfo = undefined;
+        gateReason = undefined;
+        invalidCalls = 0;
+        restoreTools();
+        state = "off";
         options.sendUserMessage(message.task);
       } else if (message.type === "handoff") {
         // A gate handoff may already run when the token limit arrives.
-        if (state !== "off") return;
+        if (state !== "off" && state !== "choice") return;
+        saveTools();
         state = "waiting";
         options.abort();
         options.setActiveTools(["handoff"]);
         // abort() ends the run later; a prompt during the run throws. Without a run, no settle comes.
-        if (options.isIdle()) startForced("handoff", HANDOFF_PROMPT);
+        if (options.isIdle()) {
+          state = "forced";
+          options.sendUserMessage(HANDOFF_PROMPT);
+        }
       } else if (message.type === "error") throw new Error(`subagents: the supervisor refused the request: ${message.message}`);
       else throw new Error(`subagents: the supervisor sent "${message.type}" to a subagent. Stop the supervisor and start it again.`);
     },
@@ -121,8 +143,8 @@ export function createSubHandlers(options: SubHandlerOptions) {
     },
     toolEnd(event: { toolName: string; isError: boolean }): void {
       options.send({ type: "event", event: { kind: "tool_end", name: event.toolName, isError: event.isError } });
-      if (state === "forced" && event.toolName === forcedTool && event.isError && ++invalidCalls >= MAX_INVALID_CALLS) {
-        fail(`${forcedTool}: the model sent ${MAX_INVALID_CALLS} invalid calls of the tool ${forcedTool}. Read the validation errors in the subagent window.`);
+      if (state === "forced" && event.toolName === "handoff" && event.isError && ++invalidCalls >= MAX_INVALID_CALLS) {
+        fail(`handoff: the model sent ${MAX_INVALID_CALLS} invalid calls of the tool handoff. Read the validation errors in the subagent window.`);
       }
     },
     messageEnd(message: MessageLike): void {
@@ -134,51 +156,56 @@ export function createSubHandlers(options: SubHandlerOptions) {
       });
     },
     ask(question: string): string {
+      leaveChoice();
       pending = true;
       options.send({ type: "ask", text: question });
       return "Your question went to the main agent. Stop now and wait for a new message with the answer.";
     },
     blocker(data: Blocker): string {
+      leaveChoice();
       pending = true;
       options.send({ type: "blocker", data });
       return "Your blocker went to the main agent. Stop now and wait for a new message.";
     },
+    continue(): string {
+      if (state !== "choice") throw new Error("continue: the tool is not active. Do not call it until the supervisor asks you to choose.");
+      leaveChoice();
+      return "Continue with the task.";
+    },
+    done(): string {
+      if (state !== "off" && state !== "choice") throw new Error("done: the tool is not active. Wait for a new message.");
+      leaveChoice();
+      doneCalled = true;
+      return "The checks run now. Stop and wait for the result.";
+    },
     handoff(data: Handoff): string {
       if (state !== "forced") throw new Error("handoff: the tool is not active. Do not call it until the supervisor asks for a handoff.");
-      options.send(gateReason === undefined ? { type: "handoff", data } : { type: "handoff", data, reason: gateReason });
-      state = "done";
-      return "Handoff sent. Stop.";
-    },
-    done(data: Done): string {
-      if (state !== "forced" || forcedTool !== "done" || gateInfo === undefined) {
-        throw new Error("done: the tool is not active. Do not call it until the checks are green.");
-      }
       const listed = new Set(data.changes.map((change) => change.file));
       const changed = new Set(options.changed());
       const extra = [...listed].filter((file) => !changed.has(file));
       const missing = [...changed].filter((file) => !listed.has(file));
       if (extra.length > 0 || missing.length > 0) {
         throw new Error(
-          `done: "changes" must list exactly the files that git shows as changed. Changed: ${[...changed].join(", ") || "none"}. Listed: ${[...listed].join(", ")}. Not changed: ${extra.join(", ") || "none"}. Missing: ${missing.join(", ") || "none"}. Call done again with the right list.`,
+          `handoff: "changes" must list exactly the files that git shows as changed. Changed: ${[...changed].join(", ") || "none"}. Listed: ${[...listed].join(", ") || "none"}. Not changed: ${extra.join(", ") || "none"}. Missing: ${missing.join(", ") || "none"}. Call handoff again with the right list.`,
         );
       }
-      options.send({ type: "done", data, gate: gateInfo });
-      state = "done";
-      return "Done sent. Stop.";
-    },
-    doneFindings(data: Findings): string {
-      if (state !== "forced" || forcedTool !== "done_findings" || gateInfo === undefined) {
-        throw new Error("done_findings: the tool is not active. Do not call it until the checks are green.");
+      if (changed.size === 0 && data.findings.length === 0) {
+        throw new Error('handoff: no file changed, so "findings" needs at least one entry with path:line. Call handoff again with the findings.');
       }
-      options.send({ type: "done", data, gate: gateInfo });
+      options.send({
+        type: "handoff",
+        data,
+        ...(gateReason === undefined ? {} : { reason: gateReason }),
+        ...(gateInfo === undefined ? {} : { gate: gateInfo }),
+      });
       state = "done";
-      return "Done sent. Stop.";
+      return "Handoff sent. Stop.";
     },
     // Returns a changed copy of the payload, or undefined when pi must send it as it is.
     beforeRequest(payload: unknown): unknown {
-      if (state !== "waiting" && state !== "forced") return undefined;
+      if (state !== "waiting" && state !== "forced" && state !== "choice") return undefined;
       try {
-        return forceTool(payload, forcedTool);
+        return state === "choice" ? forceAnyTool(payload, CHOICE_TOOLS) : forceTool(payload, "handoff");
       } catch (error) {
         fail((error as Error).message);
         return undefined;
@@ -187,48 +214,52 @@ export function createSubHandlers(options: SubHandlerOptions) {
     async settled(): Promise<void> {
       // The gate does not run on unfinished work; the handoff data is the result.
       if (state === "waiting") {
-        startForced("handoff", HANDOFF_PROMPT);
+        state = "forced";
+        options.sendUserMessage(HANDOFF_PROMPT);
         return;
       }
       if (state === "forced") {
-        fail(`${forcedTool}: the agent stopped without a call of the tool ${forcedTool}. Read the subagent window.`);
+        fail("handoff: the agent stopped without a call of the tool handoff. Read the subagent window.");
+        return;
+      }
+      if (state === "choice") {
+        fail("the agent stopped without a call of continue, done, ask or blocker. Read the subagent window.");
         return;
       }
       if (state === "done") return;
-      let result: GateResult | undefined;
-      if (!pending) {
-        let failures = "";
-        try {
-          result = await options.gate((text) => (failures = text));
-        } catch (error) {
-          // Without this the subagent never settles and the main tool waits forever.
-          options.send({ type: "event", event: { kind: "error", text: `done gate failed in the subagent: ${(error as Error).message}` } });
-          return;
-        }
-        options.send({ type: "event", event: { kind: "gate", ok: result.ok, text: shorten(result.reason) } });
-        if (!result.ok) {
-          redGates++;
-          if (redGates >= MAX_GATE_TRIES) {
-            gateReason = shorten(result.reason);
-            options.setActiveTools(["handoff"]);
-            startForced("handoff", GATE_HANDOFF_PROMPT);
-          } else {
-            options.sendUserMessage(failures);
-          }
-          return;
-        }
-      }
-      redGates = 0;
-      if (result?.ok) {
-        gateInfo = { ok: true, files: result.files, tests: result.tests };
-        savedTools = options.getActiveTools();
-        forcedTool = result.files.length > 0 ? "done" : "done_findings";
-        options.setActiveTools([forcedTool]);
-        startForced(forcedTool, DONE_PROMPT);
+      if (pending) {
+        pending = false;
+        options.send({ type: "event", event: { kind: "settled", text: "" } });
         return;
       }
-      pending = false;
-      options.send({ type: "event", event: { kind: "settled", text: "" } });
+      if (!doneCalled) {
+        saveTools();
+        options.setActiveTools(CHOICE_TOOLS);
+        state = "choice";
+        options.sendUserMessage(CHOICE_PROMPT);
+        return;
+      }
+      doneCalled = false;
+      let failures = "";
+      let result: GateResult;
+      try {
+        result = await options.gate((text) => (failures = text));
+      } catch (error) {
+        // Without this the subagent never settles and the main tool waits forever.
+        options.send({ type: "event", event: { kind: "error", text: `done gate failed in the subagent: ${(error as Error).message}` } });
+        return;
+      }
+      options.send({ type: "event", event: { kind: "gate", ok: result.ok, text: shorten(result.reason) } });
+      if (result.ok) {
+        redGates = 0;
+        gateInfo = { ok: true, files: result.files, tests: result.tests };
+        startHandoff(GREEN_HANDOFF_PROMPT);
+      } else if (++redGates >= MAX_GATE_TRIES) {
+        gateReason = shorten(result.reason);
+        startHandoff(GATE_HANDOFF_PROMPT);
+      } else {
+        options.sendUserMessage(failures);
+      }
     },
   };
 }

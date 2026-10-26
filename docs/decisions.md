@@ -2,7 +2,13 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 18. The subagent chooses `done`; one `handoff` is the only result (2026-10-27)
+
+Replaces 17. A forced `done` after a green gate made the model write the result at a moment it did not choose, and two tools (`done`, `done_findings`) split one result in two. Now the model says "the task is finished" with `done {}`, always active. Each settle without `done`, `ask` or `blocker` forces a choice (`continue`, `done`, `ask`, `blocker`) with "any tool" in the provider request (`forceAnyTool`); there is no count, the token limit ends a loop. `done` starts the gate. A green gate, the 3rd red gate and the token limit all force the same `handoff` schema. It has `findings`, so a task without changes needs no second tool, and a git check of `changes` and `findings` at call time keeps the data true. After a valid handoff nothing goes to the agent. The supervisor gives status `idle` for a green gate and `handoff` otherwise. The tools are restored at the next `answer`, which fixes a handoff after the token limit that left only `handoff` active.
+
 ## 17. Subagent `done` is enforced, with two tools (2026-10-27)
+
+Replaced by 18.
 
 A green gate no longer sends the last assistant text. The subagent extension forces the tool `done` the same way as `handoff`. A tool schema cannot have a root `anyOf` (the main tool `subagent` shows why: the model sent empty arguments). So there are two tools: `done` for changed files and `done_findings` for a scout. The gate picks the tool. `done` also checks `changes[].file` against `git` at call time, so the model cannot invent or skip a file. The extension, not the model, adds the gate data (files, test line).
 

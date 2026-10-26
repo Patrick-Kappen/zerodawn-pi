@@ -75,12 +75,12 @@ test("real supervisor with a fake pi: one small result reaches main, the session
   const client = await connectMain(path, timers);
   const result = await client.start("say hi", ["--no-tools"], []);
   assert.equal(result.status, "idle");
-  assert.equal(result.text, "answer to: say hi\na.ts:1 fact");
+  assert.equal(result.text, "answer to: say hi\na.ts:1 fact\ntests: not run: no changed files");
   assert.deepEqual(result.usage, { tokens: 7, cost: 0.01 });
   assert.equal(result.events.length, 3);
   const shaped = shapeResult(result);
   assert.equal(shaped.content.length, 1);
-  assert.equal(shaped.content[0].text, `agent ${result.id}\nstatus: idle\nanswer to: say hi\na.ts:1 fact\n7 tokens, $0.0100`);
+  assert.equal(shaped.content[0].text, `agent ${result.id}\nstatus: idle\nanswer to: say hi\na.ts:1 fact\ntests: not run: no changed files\n7 tokens, $0.0100`);
   const register = JSON.parse(await readFile(`/tmp/${session}/register.json`, "utf8"));
   assert.deepEqual(
     register.agents.map((agent: { id: string; status: string }) => [agent.id, agent.status]),
@@ -103,7 +103,7 @@ test("real supervisor with a fake pi: ask gives question, answer gives idle", { 
   await assert.rejects(client.answer("nope", "x"), /no subagent/);
   const answered = await client.answer(asked.id, "sqlite");
   assert.equal(answered.status, "idle");
-  assert.equal(answered.text, "answer to: sqlite\na.ts:1 fact");
+  assert.equal(answered.text, "answer to: sqlite\na.ts:1 fact\ntests: not run: no changed files");
   client.close();
   const tmux = createTmux(exec, socket);
   for (let i = 0; i < 100 && (await tmux.hasSession(session)); i++) await new Promise((resolve) => setTimeout(resolve, 50));
@@ -121,8 +121,9 @@ test("real supervisor with a fake pi: blocker and handoff data reach main", { ti
   assert.equal(shapeResult(blocked).content[0].text, `agent ${blocked.id}\nstatus: blocked\nno access\nfiles: x.ts, y.ts\ntried: a; b`);
   const handed = await client.start("HANDOFF", ["--no-tools"], []);
   assert.equal(handed.status, "handoff");
-  assert.deepEqual(handed.handoff, { done: ["a"], open: ["b"], next: "c", files: ["f.ts"], risks: [], tests: "green" });
-  assert.equal(handed.text, "done: a\nopen: b\nnext: c\nfiles: f.ts\nrisks: \ntests: green");
+  assert.equal(handed.handoff?.summary, "token limit");
+  assert.equal(handed.gate, undefined);
+  assert.equal(handed.text, "token limit\na.ts:1 fact\nopen: b\nnext: c");
   assert.deepEqual(shapeResult(handed).details.handoff, handed.handoff);
   client.close();
   const tmux = createTmux(exec, socket);
@@ -130,7 +131,7 @@ test("real supervisor with a fake pi: blocker and handoff data reach main", { ti
   assert.equal(await tmux.hasSession(session), false);
 });
 
-test("real supervisor with a fake pi: done data and gate reach main", { timeout: 30_000 }, async () => {
+test("real supervisor with a fake pi: handoff data and gate reach main", { timeout: 30_000 }, async () => {
   const id = randomUUID();
   sessionIds.push(id);
   const { session, socket: path } = await ensure(id, fakePi);
@@ -140,7 +141,7 @@ test("real supervisor with a fake pi: done data and gate reach main", { timeout:
   assert.equal(result.text, "It works.\na.ts: w\ntests: green: 2 pass, 0 fail; added: a.test.ts\ndecisions: d");
   assert.deepEqual(result.gate, { ok: true, files: ["a.ts", "a.test.ts"], tests: "green: 2 pass, 0 fail" });
   const shaped = shapeResult(result);
-  assert.deepEqual([shaped.details.done, shaped.details.gate], [result.done, result.gate]);
+  assert.deepEqual([shaped.details.handoff, shaped.details.gate], [result.handoff, result.gate]);
   client.close();
   const tmux = createTmux(exec, socket);
   for (let i = 0; i < 100 && (await tmux.hasSession(session)); i++) await new Promise((resolve) => setTimeout(resolve, 50));

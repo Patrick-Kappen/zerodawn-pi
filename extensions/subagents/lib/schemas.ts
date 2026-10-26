@@ -12,36 +12,25 @@ export const blockerSchema = Type.Object({
   tried: Type.Array(Type.String(), { minItems: 1, description: "What you tried to solve it. At least one entry." }),
 });
 
-export const handoffSchema = Type.Object({
-  done: Type.Array(Type.String(), { description: "What is done." }),
-  open: Type.Array(Type.String(), { description: "What is open." }),
-  next: Type.String({ minLength: 1, description: "The next step." }),
-  files: Type.Array(Type.String(), { description: "The files you changed." }),
-  risks: Type.Array(Type.String(), { description: "Known risks." }),
-  tests: Type.String({ minLength: 1, description: "The state of the tests." }),
-});
-
 export const MAX_SUMMARY = 200;
 
-const summary = Type.String({ minLength: 1, maxLength: MAX_SUMMARY, description: `What works now, in one sentence. Max ${MAX_SUMMARY} characters.` });
-
-export const doneSchema = Type.Object({
-  summary,
+export const handoffSchema = Type.Object({
+  summary: Type.String({ minLength: 1, maxLength: MAX_SUMMARY, description: `What works now, in one sentence. Max ${MAX_SUMMARY} characters.` }),
   changes: Type.Array(Type.Object({ file: Type.String({ minLength: 1 }), what: Type.String({ minLength: 1 }) }), {
-    minItems: 1,
-    description: "One entry for each changed file, as git shows it: the file and what changed in it.",
+    description: "One entry for each changed file, as git shows it: the file and what changed in it. Empty when no file changed.",
   }),
   tests: Type.Array(Type.Object({ file: Type.String({ minLength: 1 }), covers: Type.String({ minLength: 1 }) }), {
     description: "The test files that you added or changed and what each covers. An empty list is allowed.",
   }),
+  findings: Type.Array(Type.String({ minLength: 1 }), {
+    description: "One fact in each entry, with path:line where it applies. At least one when no file changed; else an empty list is allowed.",
+  }),
   decisions: Type.Array(Type.String(), { description: "Decisions that the task did not fix. An empty list is allowed." }),
   open: Type.Array(Type.String(), { description: "What is still open. An empty list is allowed." }),
+  next: Type.String({ description: "The next step. Empty when nothing is open." }),
+  risks: Type.Array(Type.String(), { description: "Known risks. An empty list is allowed." }),
 });
 
-export const doneFindingsSchema = Type.Object({
-  summary,
-  findings: Type.Array(Type.String({ minLength: 1 }), {
-    minItems: 1,
-    description: "One fact in each entry. Add path:line where it applies.",
-  }),
-});
+export const doneSchema = Type.Object({});
+
+export const continueSchema = Type.Object({});

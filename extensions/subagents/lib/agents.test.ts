@@ -71,9 +71,9 @@ function setup(options: { openFails?: boolean } = {}) {
 const ID = "abcdef12-0000-4000-8000-000000000000";
 const ARGS = ["--no-tools", "--no-mcp", "--model", "m/x:off", "--system-prompt", "You are a test."];
 const usage = { tokens: 10, cost: 0.5 };
-const SCOUT = { summary: "s", findings: ["a.ts:1 x"] };
+const SCOUT = { summary: "s", changes: [], tests: [], findings: ["a.ts:1 x"], decisions: [], open: [], next: "", risks: [] };
 const GATE = { ok: true as const, files: [], tests: "not run: no changed files" };
-const HANDOFF = { done: ["a", "b"], open: ["c"], next: "d", files: ["f.ts", "g.ts"], risks: ["r"], tests: "green" };
+const HANDOFF = { ...SCOUT, summary: "partly", findings: [], changes: [{ file: "f.ts", what: "w" }], open: ["c"], next: "d", risks: ["r"] };
 
 test("usage at the token limit asks for a handoff once; the handoff data gives status handoff", async () => {
   const { agents, toSub, toMains } = setup();
@@ -87,27 +87,27 @@ test("usage at the token limit asks for a handoff once; the handoff data gives s
   agents.event(ID, { kind: "message", text: "c", usage: { tokens: 5, cost: 1 } });
   assert.deepEqual(toSub.slice(1), [[ID, { type: "handoff" }]]);
   assert.equal(toMains.length, 0);
-  agents.handoff(ID, HANDOFF, undefined);
+  agents.handoff(ID, HANDOFF, undefined, undefined);
   assert.equal(agents.entries()[0]?.status, "handoff");
   const message = toMains[0];
   assert.ok(message?.type === "result");
   assert.equal(message.status, "handoff");
-  assert.equal(message.text, "done: a; b\nopen: c\nnext: d\nfiles: f.ts, g.ts\nrisks: r\ntests: green");
+  assert.equal(message.text, "partly\nf.ts: w\nopen: c\nnext: d\nrisks: r");
   assert.deepEqual(message.handoff, HANDOFF);
   assert.equal(message.reason, undefined);
   assert.throws(() => agents.answer(ID, "go on"), /status "handoff"/);
-  assert.throws(() => agents.handoff(ID, HANDOFF, undefined), /status "handoff" and cannot send a handoff/);
+  assert.throws(() => agents.handoff(ID, HANDOFF, undefined, undefined), /status "handoff" and cannot send a handoff/);
 });
 
-test("a handoff with a gate reason has the gate line first and the reason in the result", async () => {
+test("a handoff with a gate reason has the reason line and the reason in the result", async () => {
   const { agents, toMains } = setup();
   await agents.start("t", ARGS, []);
   agents.hello(ID);
-  agents.handoff(ID, HANDOFF, "tests red");
+  agents.handoff(ID, HANDOFF, "tests red", undefined);
   const message = toMains[0];
   assert.ok(message?.type === "result");
   assert.equal(message.status, "handoff");
-  assert.equal(message.text.split("\n")[0], "gate red 3 times: tests red");
+  assert.equal(message.text.split("\n")[2], "gate red: tests red");
   assert.equal(message.reason, "tests red");
 });
 
@@ -160,7 +160,7 @@ test("hello sends the task and sets running; settle sets idle and sends one resu
   agents.event(ID, { kind: "tool_start", name: "bash", args: "{}" });
   agents.event(ID, { kind: "message", text: "m", usage });
   agents.event(ID, { kind: "message", text: "n", usage });
-  agents.done(ID, SCOUT, GATE);
+  agents.handoff(ID, SCOUT, undefined, GATE);
   assert.equal(agents.entries()[0]?.status, "idle");
   assert.equal(agents.running(), false);
   assert.deepEqual(toMains, [
@@ -168,32 +168,32 @@ test("hello sends the task and sets running; settle sets idle and sends one resu
       type: "result",
       id: ID,
       status: "idle",
-      text: "s\na.ts:1 x",
+      text: "s\na.ts:1 x\ntests: not run: no changed files",
       usage: { tokens: 20, cost: 1 },
       events: ["tool bash {}", "message m", "message n"],
-      done: SCOUT,
+      handoff: SCOUT,
       gate: GATE,
     },
   ]);
 });
 
-test("done gives status idle with the done text, the data and the gate; a second done fails", async () => {
+test("a handoff with a gate gives status idle with the text, the data and the gate; a second handoff fails", async () => {
   const { agents, toMains } = setup();
   await agents.start("t", ARGS, []);
   agents.hello(ID);
-  const data = { summary: "s", changes: [{ file: "a.ts", what: "w" }], tests: [{ file: "a.test.ts", covers: "c" }], decisions: [], open: ["o"] };
+  const data = { ...SCOUT, changes: [{ file: "a.ts", what: "w" }], tests: [{ file: "a.test.ts", covers: "c" }], findings: [], open: ["o"] };
   const gate = { ok: true as const, files: ["a.ts", "a.test.ts"], tests: "green: 2 pass, 0 fail" };
   agents.pending(ID, "question", "q");
-  agents.done(ID, data, gate);
+  agents.handoff(ID, data, undefined, gate);
   const message = toMains[0];
   assert.ok(message?.type === "result");
   assert.equal(message.status, "idle");
   assert.equal(message.text, "s\na.ts: w\ntests: green: 2 pass, 0 fail; added: a.test.ts\nopen: o");
-  assert.deepEqual([message.done, message.gate], [data, gate]);
-  assert.throws(() => agents.done(ID, data, gate), /status "idle" and cannot send done/);
+  assert.deepEqual([message.handoff, message.gate, message.reason], [data, gate, undefined]);
+  assert.throws(() => agents.handoff(ID, data, undefined, gate), /status "idle" and cannot send a handoff/);
 });
 
-test("a settle without a done call, a question or a blocker fails the agent", async () => {
+test("a settle without a handoff, a question or a blocker fails the agent", async () => {
   const { agents, toMains } = setup();
   await agents.start("t", ARGS, []);
   agents.hello(ID);
@@ -201,7 +201,7 @@ test("a settle without a done call, a question or a blocker fails the agent", as
   const message = toMains[0];
   assert.ok(message?.type === "result");
   assert.equal(message.status, "failed");
-  assert.match(message.text, /settled without a done call/);
+  assert.match(message.text, /settled without a handoff/);
 });
 
 test("ask then settle gives status question with the text, then clears it", async () => {
@@ -218,8 +218,11 @@ test("ask then settle gives status question with the text, then clears it", asyn
     [["question", "which db?"]],
   );
   agents.answer(ID, "sqlite");
-  agents.done(ID, SCOUT, GATE);
-  assert.deepEqual(toMains.map((message) => message.type === "result" && [message.status, message.text]).at(-1), ["idle", "s\na.ts:1 x"]);
+  agents.handoff(ID, SCOUT, undefined, GATE);
+  assert.deepEqual(toMains.map((message) => message.type === "result" && [message.status, message.text]).at(-1), [
+    "idle",
+    "s\na.ts:1 x\ntests: not run: no changed files",
+  ]);
 });
 
 test("blocker then settle gives status blocked", async () => {
@@ -235,7 +238,7 @@ test("blocker then settle gives status blocked", async () => {
     [["blocked", "no access\nfiles: a\ntried: b", blocker]],
   );
   agents.answer(ID, "use the key");
-  agents.done(ID, SCOUT, GATE);
+  agents.handoff(ID, SCOUT, undefined, GATE);
   const last = toMains.at(-1);
   assert.ok(last?.type === "result");
   assert.equal(last.blocker, undefined);
@@ -257,7 +260,7 @@ test("answer sends the text as a task and sets running, from idle, question and 
   const { agents, toSub } = setup();
   await agents.start("t", ARGS, []);
   agents.hello(ID);
-  agents.done(ID, SCOUT, GATE);
+  agents.handoff(ID, SCOUT, undefined, GATE);
   agents.answer(ID, "more");
   assert.deepEqual(toSub.at(-1), [ID, { type: "task", task: "more" }]);
   assert.equal(agents.entries()[0]?.status, "running");
@@ -277,7 +280,7 @@ test("answer and pending errors: unknown id, wrong status, empty text", async ()
   assert.throws(() => agents.answer("nope", "x"), /no subagent/);
   assert.throws(() => agents.answer(ID, "  "), /non-empty/);
   assert.throws(() => agents.pending("nope", "question", "q"), /no subagent/);
-  agents.done(ID, SCOUT, GATE);
+  agents.handoff(ID, SCOUT, undefined, GATE);
   assert.throws(() => agents.pending(ID, "question", "q"), /status "idle"/);
 });
 
@@ -286,7 +289,7 @@ test("only the last 20 events are kept, each at most 200 characters", async () =
   await agents.start("t", ARGS, []);
   agents.hello(ID);
   for (let i = 0; i < 30; i++) agents.event(ID, { kind: "tool_start", name: `t${i}`, args: "a".repeat(500) });
-  agents.done(ID, SCOUT, GATE);
+  agents.handoff(ID, SCOUT, undefined, GATE);
   const result = toMains[0];
   assert.ok(result?.type === "result");
   assert.equal(result.events.length, MAX_EVENTS);
@@ -342,7 +345,7 @@ test("a settled agent whose window is gone stays idle", async () => {
   const { agents, clock, setWindows } = setup();
   await agents.start("t", ARGS, []);
   agents.hello(ID);
-  agents.done(ID, SCOUT, GATE);
+  agents.handoff(ID, SCOUT, undefined, GATE);
   setWindows([]);
   await clock.advance(10_000);
   assert.equal(agents.entries()[0]?.status, "idle");
@@ -357,7 +360,7 @@ test("late events of a failed agent are ignored; a second settle does not send a
   const second = setup();
   await second.agents.start("t", ARGS, []);
   second.agents.hello(ID);
-  second.agents.done(ID, SCOUT, GATE);
+  second.agents.handoff(ID, SCOUT, undefined, GATE);
   second.agents.event(ID, { kind: "settled", text: "b" });
   assert.equal(second.toMains.length, 1);
 });

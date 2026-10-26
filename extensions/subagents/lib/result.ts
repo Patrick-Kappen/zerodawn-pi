@@ -12,7 +12,6 @@ function shapeDetails(result: AgentResult) {
     ...(result.blocker === undefined ? {} : { blocker: result.blocker }),
     ...(result.handoff === undefined ? {} : { handoff: result.handoff }),
     ...(result.reason === undefined ? {} : { reason: result.reason }),
-    ...(result.done === undefined ? {} : { done: result.done }),
     ...(result.gate === undefined ? {} : { gate: result.gate }),
   };
 }

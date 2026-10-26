@@ -11,11 +11,11 @@ test("the content has only id, status, text and one usage line", () => {
   assert.doesNotMatch(shaped.content[0]?.text ?? "", /tool bash/);
 });
 
-test("details carry done and gate", () => {
+test("details carry handoff and gate", () => {
   const gate = { ok: true as const, files: [], tests: "t" };
-  const done = { summary: "s", findings: ["a.ts:1 x"] };
-  const shaped = shapeResult({ ...base, done, gate });
-  assert.deepEqual([shaped.details.done, shaped.details.gate], [done, gate]);
+  const handoff = { summary: "s", changes: [], tests: [], findings: ["a.ts:1 x"], decisions: [], open: [], next: "", risks: [] };
+  const shaped = shapeResult({ ...base, handoff, gate });
+  assert.deepEqual([shaped.details.handoff, shaped.details.gate], [handoff, gate]);
 });
 
 test("details keep at most 20 events of at most 200 characters", () => {

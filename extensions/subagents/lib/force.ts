@@ -21,26 +21,50 @@ function addedTools(payload: Payload): unknown[] {
   );
 }
 
-export function forceTool(payload: unknown, name: string): Payload {
-  const keys = isObject(payload) ? Object.keys(payload).join(", ") : typeof payload;
-  const unknown = new Error(`${name}: cannot force a tool for this provider payload: ${keys}`);
-  if (!isObject(payload)) throw unknown;
+type Shape = "anthropic" | "chat" | "responses";
+
+function shapeOf(payload: Payload, names: string[]): Shape | undefined {
   const tools = [...(Array.isArray(payload.tools) ? payload.tools : []), ...addedTools(payload)].filter(isObject);
+  const named = (name: unknown) => typeof name === "string" && names.includes(name);
+  if (tools.some((tool) => named(tool.name) && "input_schema" in tool)) return "anthropic";
+  if (tools.some((tool) => isObject(tool.function) && tool.type === "function" && named(tool.function.name))) return "chat";
+  if (tools.some((tool) => tool.type === "function" && named(tool.name) && !("function" in tool))) return "responses";
+  return undefined;
+}
+
+function unknownShape(label: string, payload: unknown): Error {
+  const keys = isObject(payload) ? Object.keys(payload).join(", ") : typeof payload;
+  return new Error(`${label}: cannot force a tool for this provider payload: ${keys}`);
+}
+
+// Anthropic rejects a forced tool together with extended thinking.
+function withoutThinking(copy: Payload): void {
+  const thinking = copy.thinking;
+  if (isObject(thinking) && thinking.type !== "disabled") delete copy.thinking;
+}
+
+export function forceTool(payload: unknown, name: string): Payload {
+  if (!isObject(payload)) throw unknownShape(name, payload);
+  const shape = shapeOf(payload, [name]);
   const copy: Payload = { ...payload };
-  if (tools.some((tool) => tool.name === name && "input_schema" in tool)) {
+  if (shape === "anthropic") {
     copy.tool_choice = { type: "tool", name };
-    // Anthropic rejects a forced tool together with extended thinking.
-    const thinking = copy.thinking;
-    if (isObject(thinking) && thinking.type !== "disabled") delete copy.thinking;
-    return copy;
-  }
-  if (tools.some((tool) => isObject(tool.function) && tool.type === "function" && tool.function.name === name)) {
-    copy.tool_choice = { type: "function", function: { name } };
-    return copy;
-  }
-  if (tools.some((tool) => tool.type === "function" && tool.name === name && !("function" in tool))) {
-    copy.tool_choice = { type: "function", name };
-    return copy;
-  }
-  throw unknown;
+    withoutThinking(copy);
+  } else if (shape === "chat") copy.tool_choice = { type: "function", function: { name } };
+  else if (shape === "responses") copy.tool_choice = { type: "function", name };
+  else throw unknownShape(name, payload);
+  return copy;
+}
+
+/** The model must call one tool, and may choose which. */
+export function forceAnyTool(payload: unknown, names: string[]): Payload {
+  if (!isObject(payload)) throw unknownShape(names.join("/"), payload);
+  const shape = shapeOf(payload, names);
+  const copy: Payload = { ...payload };
+  if (shape === "anthropic") {
+    copy.tool_choice = { type: "any" };
+    withoutThinking(copy);
+  } else if (shape === "chat" || shape === "responses") copy.tool_choice = "required";
+  else throw unknownShape(names.join("/"), payload);
+  return copy;
 }

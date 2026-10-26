@@ -12,14 +12,14 @@ import type { Timers } from "./lib/lifecycle.ts";
 import { answers } from "./lib/probe.ts";
 import { nodeFiles, resolveProfile } from "./lib/resolve.ts";
 import { shapeResult } from "./lib/result.ts";
-import { askSchema, blockerSchema, doneFindingsSchema, doneSchema, handoffSchema } from "./lib/schemas.ts";
+import { askSchema, blockerSchema, continueSchema, doneSchema, handoffSchema } from "./lib/schemas.ts";
 import { createSubHandlers, readSubEnv, type SubEnv } from "./lib/sub.ts";
 import { connectSub, type SubConnection } from "./lib/subclient.ts";
 import { createTmux, sessionName } from "./lib/tmux.ts";
 
 const timers: Timers = { setTimeout: (callback, ms) => setTimeout(callback, ms), clearTimeout: (handle) => clearTimeout(handle as NodeJS.Timeout) };
 const SUPERVISOR_PATH = fileURLToPath(new URL("./supervisor.ts", import.meta.url));
-const FORCED_TOOLS = ["handoff", "done", "done_findings"];
+const FORCED_TOOLS = ["handoff", "continue"];
 const EXTENSION_PATH = fileURLToPath(import.meta.url);
 
 function registerSub(pi: ExtensionAPI, env: SubEnv): void {
@@ -85,29 +85,28 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
   pi.registerTool({
     name: "handoff",
     label: "handoff",
-    description: "Hand the task over to a new agent. The supervisor asks for it; do not call it before. After the call, stop.",
+    description: "Report the result and hand the task over. The extension asks for it; do not call it before. After the call, stop.",
     parameters: handoffSchema,
     async execute(_toolCallId, params) {
       return { content: [{ type: "text", text: handlers.handoff(params) }], details: {} };
     },
   });
   pi.registerTool({
-    name: "done",
-    label: "done",
-    description: "Report the finished work. The extension asks for it when the checks are green; do not call it before. After the call, stop.",
-    parameters: doneSchema,
-    async execute(_toolCallId, params) {
-      return { content: [{ type: "text", text: handlers.done(params) }], details: {} };
+    name: "continue",
+    label: "continue",
+    description: "Keep working on the task. The extension asks you to choose when you stop; do not call it before.",
+    parameters: continueSchema,
+    async execute() {
+      return { content: [{ type: "text", text: handlers.continue() }], details: {} };
     },
   });
   pi.registerTool({
-    name: "done_findings",
-    label: "done_findings",
-    description:
-      "Report the findings of a task that changed no file. The extension asks for it when the checks are green; do not call it before. After the call, stop.",
-    parameters: doneFindingsSchema,
-    async execute(_toolCallId, params) {
-      return { content: [{ type: "text", text: handlers.doneFindings(params) }], details: {} };
+    name: "done",
+    label: "done",
+    description: "The task is finished. The checks run next. After the call, stop and wait.",
+    parameters: doneSchema,
+    async execute() {
+      return { content: [{ type: "text", text: handlers.done() }], details: {} };
     },
   });
   pi.on("before_provider_request", (event) => handlers.beforeRequest(event.payload));
