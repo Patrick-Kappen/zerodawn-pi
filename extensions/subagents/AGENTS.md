@@ -10,6 +10,7 @@ The `subagent` tool: the main agent gives a task to a pi agent that runs in tmux
 - The supervisor owns the subagents. The main pi and the subagents are clients only.
 - The same `index.ts` runs in the subagent. `PI_SUBAGENT_SOCKET` and `PI_SUBAGENT_ID` select that mode; setting only one fails. The subagent does not register the tool.
 - Small results: the tool result content has only id, status, final text, and one tokens/cost line. Never add events or tool calls to it. Events go to `details`, max 20 entries of 200 characters.
+- Every subagent has the tools `ask` and `blocker`, whatever the profile says. `lib/resolve.ts` always puts them in `--tools`, because pi filters extension tools with `--tools`. Never pass `--no-tools`.
 - Tests pass a wrapper of `lib/fixtures/fake-pi.ts` as `--pi`. Never start a real pi in a test.
 - A subagent starts with `-ne -ns -np -nc --no-themes` and loads only `-e` paths: this extension and `subagentExtensions` from `config.json`. The profile arguments follow: the main pi reads and resolves the profile (it has HOME), and the supervisor only gets `args` in the `start` message.
 - Runtime files go to `/tmp/pi-sub-<id>/` only. Nothing in the project or in `~/.pi`.

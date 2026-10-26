@@ -1,7 +1,9 @@
 One step at a time. Each step is its own PR.
 
 1. Profile format: agree on PROFILES.md and close its open questions.
-3. Done gate: when the subagent settles, the supervisor runs the repository tests and the `checks` of the profile.
+3b. Done gate: when the subagent settles, the supervisor runs the whole repository test set (like `run_tests` with scope all) and the `checks` of the profile.
+   - No tests: do not fail. Mark "no tests" to the main agent.
+   - The description of "done" is still open.
    - Green: the extension asks the subagent for a short, specific done description. Only that goes to the main agent (replaces the 8000 character final text).
    - Red: the failures go back to the same subagent.
 4. Model ladder: take the first available model of `models`; check availability.

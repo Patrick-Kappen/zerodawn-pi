@@ -8,10 +8,10 @@ A subagent gets its prompt, models, tools, extensions, skills and MCP from a pro
 ## 13. Every bash command becomes a background job after 15 s (2026-10-26)
 
 The `bash` tool waits at most `INLINE_WAIT_S` for a command. A command that ends in time returns its result. A longer one returns the job id, and a `bash-job` message reports the result. The agent does not choose. A result is the status with at most `INLINE_LINES` lines of output; more gives size and path. A failure adds every distinct line that looks like an error, or the last `TAIL_LINES` lines when none does. Reason: with `background` as an option, the agent used it in 3% of the calls and waited for everything else, and a third of the bash output in the context was file content from `cat`, `sed` and `grep`. The `ctx-manager` extension prunes `bash-job` messages like tool results, so a late result does not stay in the context forever.
+
 ## 12. A warning is an error; check commands run in place (2026-10-26)
 
 `run_tests` and the check commands in bash (`just check`, `just lint`, `nix flake check`, linters) are red when the output has a warning. A check command runs in place of bash, with the same short result as the tests. `just lint` runs biome with `--error-on-warnings`, and `nix flake check` runs with `warn-dirty false`: a dirty tree is the normal state during work, not a fault. A project without bun tests gets the tests for its changes from a recipe `test-changed *files`; this repository has one (`scripts/test-changed.sh`). Reason: a warning that passes stays, and the agent read the full output of every check.
-||||||| parent of 598a999 (subagents: document the profile proposal and the plan)
 
 ## 11. Tests run through the tool run_tests, not through bash (2026-10-26)
 

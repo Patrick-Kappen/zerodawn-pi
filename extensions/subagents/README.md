@@ -2,12 +2,15 @@
 
 Delegate tasks to pi agents. Each agent runs as a normal interactive pi in a window of a detached tmux session.
 
-Status: work in progress. The tool `subagent` has two actions:
+Status: work in progress. The tool `subagent` has three actions:
 
 - `start` with `profile` and `task`: the supervisor starts a pi agent with that profile in a new window `sub-<first 4 characters of its id>`. The tool waits and returns the final answer.
+- `answer` with `id` and `text`: sends `text` to the agent and waits for its next result, like `start`. The agent must have status `idle`, `question` or `blocked`.
 - `status`: starts or finds the supervisor, connects, and shows the agents.
 
 The result that the model sees is small: agent id, status, final text (cut at 8000 characters) and one line with tokens and cost. The last 20 events (200 characters each) go to `details` only.
+
+Every subagent has two fixed tools, whatever its profile says: `ask { question }` and `blocker { reason }`. Both send the text to the supervisor and tell the model to stop and wait for a new message. The model uses `blocker` only after it tried to solve the problem within its task limits. When the agent settles, the result has status `question` or `blocked` and that text, not the final text. On `question`, the main agent answers with `answer`. On `blocked`, it first tries to solve the problem within its own limits, then sends the solution with `answer`. pi filters extension tools with `--tools` and `--no-tools`, so the main pi always adds `ask,blocker` to the `--tools` list.
 
 ## Design
 
@@ -21,7 +24,7 @@ The result that the model sees is small: agent id, status, final text (cut at 80
 - The main pi and the subagents are clients. They connect to one Unix socket of the supervisor. The tmux option `@pi-sub-socket` on the session holds its path.
 - Each subagent has a real pi session (`--session-id`, `--session-dir`), so the tool can resume it later. The id is a UUID.
 - The subagent loads this extension too. `PI_SUBAGENT_SOCKET` and `PI_SUBAGENT_ID` make it a client of the supervisor: it runs the task it gets and sends tool, message and settle events.
-- Agent status: `starting`, `running`, `idle`, `failed`. An agent that does not connect within 30 s, or whose window is gone without a result, is `failed`. The supervisor checks the windows every 2 s.
+- Agent status: `starting`, `running`, `idle`, `question`, `blocked`, `failed`. `question` and `blocked` count as not running. An agent that does not connect within 30 s, or whose window is gone without a result, is `failed`. The supervisor checks the windows every 2 s.
 - Runtime files go to `/tmp/pi-sub-<id>/`: the register of the subagents (id, role, window, status) and their pi sessions. A reboot removes them.
 
 ## What a subagent loads

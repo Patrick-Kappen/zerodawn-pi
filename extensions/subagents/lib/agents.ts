@@ -1,5 +1,5 @@
 import type { Timers } from "./lifecycle.ts";
-import type { AgentResult, ServerMessage, SubEvent, Usage } from "./protocol.ts";
+import type { AgentResult, AgentStatus, ServerMessage, SubEvent, Usage } from "./protocol.ts";
 import type { AgentEntry } from "./register.ts";
 import type { Tmux } from "./tmux.ts";
 
@@ -32,6 +32,7 @@ interface AgentRecord {
   text: string;
   usage: Usage;
   helloTimer: unknown;
+  pending?: { kind: "question" | "blocked"; text: string };
 }
 
 function line(text: string): string {
@@ -60,6 +61,7 @@ export function createAgents(options: AgentsOptions) {
   let polling = false;
   let disposed = false;
 
+  // "question" and "blocked" are not active: the agent waits for the main agent.
   function active(record: AgentRecord): boolean {
     return record.entry.status === "starting" || record.entry.status === "running";
   }
@@ -71,14 +73,14 @@ export function createAgents(options: AgentsOptions) {
   function result(record: AgentRecord): AgentResult {
     return {
       id: record.entry.id,
-      status: record.entry.status === "failed" ? "failed" : "idle",
+      status: record.entry.status === "failed" || record.entry.status === "question" || record.entry.status === "blocked" ? record.entry.status : "idle",
       text: record.text,
       usage: record.usage,
       events: record.events,
     };
   }
 
-  function finish(record: AgentRecord, status: "idle" | "failed", text: string): void {
+  function finish(record: AgentRecord, status: AgentStatus, text: string): void {
     options.timers.clearTimeout(record.helloTimer);
     record.entry.status = status;
     record.text = text;
@@ -181,8 +183,32 @@ export function createAgents(options: AgentsOptions) {
     if (value.kind === "message") {
       record.usage = { tokens: record.usage.tokens + value.usage.tokens, cost: record.usage.cost + value.usage.cost };
     } else if (value.kind === "settled" && record.entry.status === "running") {
-      finish(record, "idle", value.text);
+      const pending = record.pending;
+      record.pending = undefined;
+      if (pending === undefined) finish(record, "idle", value.text);
+      else finish(record, pending.kind, pending.text);
     }
+  }
+
+  function pending(id: string, kind: "question" | "blocked", text: string): void {
+    const record = find(id);
+    if (record.entry.status !== "running") {
+      throw new Error(`supervisor: subagent ${id} has status "${record.entry.status}" and cannot send a ${kind === "question" ? "question" : "blocker"}.`);
+    }
+    record.pending = { kind, text };
+  }
+
+  function answer(id: string, text: string): void {
+    if (text.trim() === "") throw new Error('supervisor: an "answer" needs a non-empty text.');
+    const record = find(id);
+    const status = record.entry.status;
+    if (status !== "idle" && status !== "question" && status !== "blocked") {
+      throw new Error(`supervisor: subagent ${id} has status "${status}". Use "answer" only for status idle, question or blocked.`);
+    }
+    options.sendToSub(id, { type: "task", task: text });
+    record.entry.status = "running";
+    options.onChange();
+    schedulePoll();
   }
 
   function dispose(): void {
@@ -191,5 +217,5 @@ export function createAgents(options: AgentsOptions) {
     for (const record of records.values()) options.timers.clearTimeout(record.helloTimer);
   }
 
-  return { start, hello, event, running, dispose, entries: () => entries };
+  return { start, hello, event, pending, answer, running, dispose, entries: () => entries };
 }

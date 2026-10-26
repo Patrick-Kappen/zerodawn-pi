@@ -61,6 +61,16 @@ test("settled sends the full final text of the last assistant message", () => {
   assert.deepEqual(sent.at(-1), { type: "event", event: { kind: "settled", text: "" } });
 });
 
+test("ask and blocker send their text and tell the model to stop", () => {
+  const { sent, handlers } = setup();
+  assert.match(handlers.ask("which db?"), /Stop now and wait/);
+  assert.match(handlers.blocker("no access"), /Stop now and wait/);
+  assert.deepEqual(sent, [
+    { type: "ask", text: "which db?" },
+    { type: "blocker", text: "no access" },
+  ]);
+});
+
 test("shorten keeps short text", () => {
   assert.equal(shorten("abc"), "abc");
   assert.equal(shorten("abcdef", 4), "abc…");

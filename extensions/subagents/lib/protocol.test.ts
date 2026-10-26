@@ -19,6 +19,16 @@ test("parseClientLine accepts hello, status, start and events", () => {
   }
 });
 
+test("parseClientLine accepts answer, ask and blocker", () => {
+  assert.deepEqual(parseClientLine('{"type":"answer","id":"a","text":"t"}'), { type: "answer", id: "a", text: "t" });
+  assert.deepEqual(parseClientLine('{"type":"ask","text":"q"}'), { type: "ask", text: "q" });
+  assert.deepEqual(parseClientLine('{"type":"blocker","text":"r"}'), { type: "blocker", text: "r" });
+  assert.throws(() => parseClientLine('{"type":"answer","text":"t"}'), /field "id"/);
+  assert.throws(() => parseClientLine('{"type":"answer","id":"a"}'), /field "text"/);
+  assert.throws(() => parseClientLine('{"type":"ask"}'), /field "text"/);
+  assert.throws(() => parseClientLine('{"type":"blocker","text":1}'), /field "text"/);
+});
+
 test("parseClientLine rejects bad lines with a reason", () => {
   assert.throws(() => parseClientLine("nope"), /not valid JSON/);
   assert.throws(() => parseClientLine("[1]"), /not a JSON object/);
@@ -48,6 +58,10 @@ test("parseServerLine reads every server message and rejects the rest", () => {
   assert.deepEqual(parseServerLine('{"type":"task","task":"t"}'), { type: "task", task: "t" });
   const result = { type: "result" as const, id: "a", status: "idle" as const, text: "t", usage, events: ["e"] };
   assert.deepEqual(parseServerLine(formatServerMessage(result)), result);
+  for (const status of ["question", "blocked"] as const) {
+    const pending = { ...result, status };
+    assert.deepEqual(parseServerLine(formatServerMessage(pending)), pending);
+  }
   assert.throws(() => parseServerLine("nope"), /not valid JSON/);
   assert.throws(() => parseServerLine('{"type":"status","main":"x"}'), /unknown message/);
   assert.throws(() => parseServerLine('{"type":"result","id":"a","status":"x","text":"","usage":{},"events":[]}'), /unknown message/);
