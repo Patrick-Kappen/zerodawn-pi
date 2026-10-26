@@ -33,7 +33,8 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
     promptSnippet: "Run a bash command; short output back, long commands continue in the background",
     promptGuidelines: [
       "Use bash to run things, not to read: read for a file or an output path, grep for a search, git for a diff or log.",
-      "Put independent commands in one message with the same group; they report once. Keep working until the message comes. Never sleep or poll.",
+      "Put independent commands in one message with the same group; they report once. Keep working until the message comes.",
+      "Dependent steps: chain them in one command with &&. A wait for a condition is part of that command: timeout 30 bash -c 'until CHECK; do sleep 1; done' && NEXT. Never a separate sleep or a repeated check.",
       'jobs wait with id "3,4" returns several results together.',
       `A command stops after ${DEFAULT_LIMIT_S / 3600} hour; add "${NO_TIME_LIMIT}" when it must run longer.`,
     ],

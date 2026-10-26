@@ -15,7 +15,7 @@ Replaces pi's `bash` tool. Every command runs as a job without a terminal, like 
 
 ## Guard
 
-While a background job runs, a bash command that only waits (`sleep`, `wait`, `true`, `:`) is blocked.
+A bash command that only waits (`sleep`, `wait`, `true`, `:`) is blocked. The reason gives the chain form `timeout 30 bash -c 'until CHECK; do sleep 1; done' && NEXT`, or, while a job runs, says that a message reports it.
 
 ## Keys and commands
 
