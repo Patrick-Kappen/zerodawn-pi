@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExecOptions, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { config } from "../../shared/config.ts";
 import { loadRecipes } from "../../shared/recipes.ts";
@@ -8,8 +8,9 @@ import { changedFiles, execute, plan, uncoveredOf } from "../../shared/testrun.t
 import { type Client, connectMain } from "./lib/client.ts";
 import { ensureSupervisor } from "./lib/ensure.ts";
 import { runGate } from "./lib/gate.ts";
-import { commitAll, resolveBase } from "./lib/git.ts";
+import { commitAll, git, resolveBase } from "./lib/git.ts";
 import type { Timers } from "./lib/lifecycle.ts";
+import { cleanupAt, cleanupMerged, mergeBranches } from "./lib/merge.ts";
 import { answers } from "./lib/probe.ts";
 import { nodeFiles, resolveProfile } from "./lib/resolve.ts";
 import { shapeResult } from "./lib/result.ts";
@@ -127,6 +128,7 @@ export default function (pi: ExtensionAPI): void {
     return;
   }
   const tmux = createTmux((command, args, options) => pi.exec(command, args, options));
+  const execGit = (command: string, args: string[], options?: ExecOptions) => pi.exec(command, args, options);
   let client: Promise<Client> | undefined;
 
   async function connection(sessionId: string): Promise<Client> {
@@ -161,6 +163,8 @@ export default function (pi: ExtensionAPI): void {
   pi.on("session_start", async (_event, ctx) => {
     const name = sessionName(ctx.sessionManager.getSessionId());
     if (await tmux.hasSession(name)) ctx.ui.notify(`subagents: tmux session "${name}" runs. Watch it with "tmux attach -t ${name}".`, "info");
+    const removed = await cleanupAt({ exec: execGit, cwd: ctx.cwd, home: homedir(), runtimeRoot: "/tmp" });
+    if (removed.length > 0) ctx.ui.notify(`subagents: ${removed.join("\n")}`, "info");
   });
 
   pi.on("session_shutdown", async () => {
@@ -173,11 +177,11 @@ export default function (pi: ExtensionAPI): void {
     name: "subagent",
     label: "subagent",
     description:
-      "Delegate tasks to pi agents in a tmux session. start: run the task in a new agent in its own git worktree and return its final answer; base (optional) is a branch, a commit or a worktree path to start from, default the HEAD of the current directory. discard: remove the worktree and branch of an agent that does not run. answer: send text to an agent by id and wait for its next result. status: show the supervisor and its agents. A result has status idle, failed, question, blocked or handoff. On question, answer it with answer. On blocked, first try to solve the problem within your own limits, then send the solution with answer. On handoff, the agent reached its token limit: start a new agent with the handoff text in its task.",
+      "Delegate tasks to pi agents in a tmux session. start: run the task in a new agent in its own git worktree and return its final answer; base (optional) is a branch, a commit or a worktree path to start from, default the HEAD of the current directory. discard: remove the worktree and branch of an agent that does not run. merge: merge the branches of the agents in ids, in order, into the branch into (default the current branch) with a merge commit, and remove their worktrees; on a conflict the merge stops, nothing of that agent is merged, and an agent with the profile merge starts to resolve it. answer: send text to an agent by id and wait for its next result. status: show the supervisor and its agents. A result has status idle, failed, question, blocked or handoff. On question, answer it with answer. On blocked, first try to solve the problem within your own limits, then send the solution with answer. On handoff, the agent reached its token limit: start a new agent with the handoff text in its task.",
     promptSnippet: "Delegate tasks to pi agents in tmux",
     // One object at the root: a root anyOf made the model send empty arguments.
     parameters: Type.Object({
-      action: Type.Union([Type.Literal("start"), Type.Literal("answer"), Type.Literal("discard"), Type.Literal("status")]),
+      action: Type.Union([Type.Literal("start"), Type.Literal("answer"), Type.Literal("discard"), Type.Literal("merge"), Type.Literal("status")]),
       profile: Type.Optional(Type.String({ description: "Required for start. Name of a profile in ~/.pi/agent/agents/<name>.md." })),
       task: Type.Optional(Type.String({ description: "Required for start. The complete task. The agent knows nothing else." })),
       base: Type.Optional(
@@ -186,6 +190,8 @@ export default function (pi: ExtensionAPI): void {
         }),
       ),
       id: Type.Optional(Type.String({ description: "Required for answer and discard. The id of the agent." })),
+      ids: Type.Optional(Type.Array(Type.String(), { description: "Required for merge. The ids of the agents to merge, in order." })),
+      into: Type.Optional(Type.String({ description: "For merge. The target branch. Default: the branch checked out in the current directory." })),
       text: Type.Optional(Type.String({ description: "Required for answer. The answer for the agent." })),
     }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
@@ -200,6 +206,35 @@ export default function (pi: ExtensionAPI): void {
         const connected = await connection(ctx.sessionManager.getSessionId());
         const text = await connected.discard(params.id);
         return { content: [{ type: "text", text }], details: { id: params.id } };
+      }
+      if (params.action === "merge") {
+        if (params.ids === undefined || params.ids.length === 0) throw new Error('subagent: action "merge" needs "ids", a non-empty list of agent ids.');
+        const connected = await connection(ctx.sessionManager.getSessionId());
+        const home = homedir();
+        const deps = { exec: execGit, cwd: ctx.cwd, home, runtimeRoot: "/tmp" };
+        let text = await mergeBranches(
+          {
+            ...deps,
+            agents: async () => (await connected.status()).agents,
+            discard: (id) => connected.discard(id),
+            startMerge: async (task, source) => {
+              const { args, profile } = await resolveProfile(home, "merge", nodeFiles);
+              return connected.begin(task, args, profile.checks, source);
+            },
+          },
+          params.ids,
+          params.into,
+        );
+        try {
+          const repo = (await resolveBase(execGit, ctx.cwd)).repo;
+          // A branch that a merge agent merged is in the target too; it goes away with the merged ones.
+          const into = params.into ?? (await git(execGit, ["-C", ctx.cwd, "symbolic-ref", "--short", "HEAD"], "the branch of the main pi is not known"));
+          const removed = [...(await cleanupMerged(deps, repo, into)), ...(await cleanupMerged(deps, repo))];
+          if (removed.length > 0) text += `\n${removed.join("\n")}`;
+        } catch (error) {
+          text += `\ncleanup of merged worktrees failed: ${(error as Error).message}`;
+        }
+        return { content: [{ type: "text", text }], details: { ids: params.ids } };
       }
       if (params.action === "start" && (params.task === undefined || params.task.trim() === "")) {
         throw new Error('subagent: action "start" needs a non-empty "task".');

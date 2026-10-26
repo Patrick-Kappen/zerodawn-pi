@@ -40,7 +40,7 @@ export async function commitAll(exec: Exec, path: string, spec: CommitSpec): Pro
   return git(exec, ["-C", path, "rev-parse", "HEAD"], `could not read HEAD of "${path}"`);
 }
 
-async function git(exec: Exec, args: string[], what: string): Promise<string> {
+export async function git(exec: Exec, args: string[], what: string): Promise<string> {
   let result: Awaited<ReturnType<Exec>>;
   try {
     result = await exec("git", args);

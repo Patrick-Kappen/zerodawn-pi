@@ -14,6 +14,7 @@ export interface Status {
 export interface Client {
   status(): Promise<Status>;
   start(task: string, args: string[], checks: string[], source: Source, signal?: AbortSignal): Promise<AgentResult>;
+  begin(task: string, args: string[], checks: string[], source: Source): Promise<string>;
   discard(id: string): Promise<string>;
   answer(id: string, text: string, signal?: AbortSignal): Promise<AgentResult>;
   isOpen(): boolean;
@@ -104,6 +105,32 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
       return run({ type: "start", task, args, checks, repo: source.repo, sha: source.sha }, signal);
     }
 
+    // Starts an agent and returns its id at once; the result message is not awaited.
+    function begin(task: string, args: string[], checks: string[], source: Source): Promise<string> {
+      return new Promise<string>((resolve, reject) => {
+        if (!open) {
+          reject(new Error(`subagents: the connection to "${path}" is closed. Call the tool again to reconnect.`));
+          return;
+        }
+        const timer = timers.setTimeout(
+          () =>
+            reject(new Error(`subagents: the supervisor at "${path}" did not start the subagent within ${timeoutMs} ms. Read window 0 of the pi-sub session.`)),
+          timeoutMs,
+        );
+        starts.push({
+          resolve: (id) => {
+            timers.clearTimeout(timer);
+            resolve(id);
+          },
+          reject: (error) => {
+            timers.clearTimeout(timer);
+            reject(error);
+          },
+        });
+        write({ type: "start", task, args, checks, repo: source.repo, sha: source.sha });
+      });
+    }
+
     function answer(id: string, text: string, signal?: AbortSignal): Promise<AgentResult> {
       return run({ type: "answer", id, text }, signal);
     }
@@ -186,7 +213,7 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
       timers.clearTimeout(connectTimer);
       open = true;
       write({ type: "hello", role: "main" });
-      resolveConnect({ isOpen: () => open, close: () => socket.destroy(), status, start, discard, answer });
+      resolveConnect({ isOpen: () => open, close: () => socket.destroy(), status, start, begin, discard, answer });
     });
     socket.on("data", (chunk: string) => {
       buffer += chunk;
