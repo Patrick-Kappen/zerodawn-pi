@@ -2,7 +2,7 @@
 
 Registers the tool `run_tests`, blocks test commands in bash, puts justfile and Makefile recipes in the system prompt, and hints to add a long repeated command as a recipe. Needs `git`, and `just` in `PATH` for a justfile project; fails loud without them.
 
-- `lib/run.ts`: the tool without its schema (`RunTests`, `plan`, `changedFiles`). `index.ts` adds the TypeBox schema, because tests cannot load `typebox` or `pi-ai` at runtime.
+- `lib/run.ts`: the tool without its schema (`RunTests`, `plan`, `changedFiles`). `index.ts` registers it with the TypeBox schema.
 - `lib/select.ts`: picks the test files through the relative imports, and finds the changed files without a test.
 - `lib/report.ts`: makes the bun output short.
 
