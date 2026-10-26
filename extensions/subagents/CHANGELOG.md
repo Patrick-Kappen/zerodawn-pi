@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 — 2026-10-26
+
+- strict ask and blocker, enforced handoff tool
+
 ## 0.5.0 — 2026-10-26
 
 - read a tmux server that exits during a check as absent

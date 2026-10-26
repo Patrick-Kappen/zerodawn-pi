@@ -89,6 +89,12 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.10.0 — 2026-10-26
+
+### subagents 0.6.0
+
+- strict ask and blocker, enforced handoff tool
+
 ## 0.9.0 — 2026-10-26
 
 ### subagents 0.5.0
@@ -101,16 +107,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ### shared 0.4.2
 
 - diagnostics shows a missing command, no echoed option or summary
-
-## 0.8.1 — 2026-10-26
-
-### shared 0.4.1
-
-- tests: short check result: diagnostics only, deduplicated
-
-### tests 0.3.1
-
-- short check result: diagnostics only, deduplicated
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
