@@ -10,6 +10,9 @@ function shapeDetails(result: AgentResult) {
     status: result.status,
     usage: result.usage,
     events: result.events.slice(-MAX_DETAIL_EVENTS).map((event) => event.slice(0, MAX_DETAIL_LINE)),
+    ...(result.blocker === undefined ? {} : { blocker: result.blocker }),
+    ...(result.handoff === undefined ? {} : { handoff: result.handoff }),
+    ...(result.reason === undefined ? {} : { reason: result.reason }),
   };
 }
 

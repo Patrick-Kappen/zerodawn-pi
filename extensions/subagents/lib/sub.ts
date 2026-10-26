@@ -1,8 +1,11 @@
+import { forceTool } from "./force.ts";
+import type { Blocker, Handoff } from "./format.ts";
 import type { GateResult } from "./gate.ts";
 import type { ClientMessage, ServerMessage } from "./protocol.ts";
 
 export const MAX_FIELD = 200;
 export const MAX_GATE_TRIES = 3;
+export const MAX_INVALID_HANDOFFS = 2;
 
 export interface SubEnv {
   socket: string;
@@ -53,29 +56,51 @@ function textOf(message: MessageLike): string {
     .join("\n");
 }
 
-export const HANDOFF_PROMPT =
-  "Stop the task now: you reached the token limit. Do not call more tools. Write a handoff for the agent that continues: what is done, what is open, the next step, and the files you changed. Max 15 lines.";
+export const HANDOFF_PROMPT = "You reached the token limit. Call the tool handoff now.";
+export const GATE_HANDOFF_PROMPT = `The done gate was red ${MAX_GATE_TRIES} times. Call the tool handoff now.`;
 
 export interface SubHandlerOptions {
   send: (message: ClientMessage) => void;
   sendUserMessage: (text: string) => void;
-  steer: (text: string) => void;
+  abort: () => void;
+  isIdle: () => boolean;
+  setActiveTools: (names: string[]) => void;
   gate: (sendUserMessage: (text: string) => void) => Promise<GateResult>;
 }
+
+// off: no handoff. waiting: aborted, the new run starts at the next settle. forced: the tool choice names handoff. done: sent or failed.
+type HandoffState = "off" | "waiting" | "forced" | "done";
 
 export function createSubHandlers(options: SubHandlerOptions) {
   let lastText = "";
   let pending = false;
   let redGates = 0;
-  let handingOff = false;
+  let state: HandoffState = "off";
+  let invalidCalls = 0;
+  let gateReason: string | undefined;
+
+  const fail = (text: string) => {
+    state = "done";
+    options.send({ type: "event", event: { kind: "error", text } });
+  };
+  const startHandoff = (prompt: string) => {
+    state = "forced";
+    options.sendUserMessage(prompt);
+  };
+
   return {
     onServerMessage(message: ServerMessage): void {
       if (message.type === "task") {
         redGates = 0;
         options.sendUserMessage(message.task);
       } else if (message.type === "handoff") {
-        handingOff = true;
-        options.steer(HANDOFF_PROMPT);
+        // A gate handoff may already run when the token limit arrives.
+        if (state !== "off") return;
+        state = "waiting";
+        options.abort();
+        options.setActiveTools(["handoff"]);
+        // abort() ends the run later; a prompt during the run throws. Without a run, no settle comes.
+        if (options.isIdle()) startHandoff(HANDOFF_PROMPT);
       } else if (message.type === "error") throw new Error(`subagents: the supervisor refused the request: ${message.message}`);
       else throw new Error(`subagents: the supervisor sent "${message.type}" to a subagent. Stop the supervisor and start it again.`);
     },
@@ -84,6 +109,9 @@ export function createSubHandlers(options: SubHandlerOptions) {
     },
     toolEnd(event: { toolName: string; isError: boolean }): void {
       options.send({ type: "event", event: { kind: "tool_end", name: event.toolName, isError: event.isError } });
+      if (state === "forced" && event.toolName === "handoff" && event.isError && ++invalidCalls >= MAX_INVALID_HANDOFFS) {
+        fail(`handoff: the model sent ${MAX_INVALID_HANDOFFS} invalid calls of the tool handoff. Read the validation errors in the subagent window.`);
+      }
     },
     messageEnd(message: MessageLike): void {
       if (message.role !== "assistant") return;
@@ -99,20 +127,38 @@ export function createSubHandlers(options: SubHandlerOptions) {
       options.send({ type: "ask", text: question });
       return "Your question went to the main agent. Stop now and wait for a new message with the answer.";
     },
-    blocker(reason: string): string {
+    blocker(data: Blocker): string {
       pending = true;
-      options.send({ type: "blocker", text: reason });
+      options.send({ type: "blocker", data });
       return "Your blocker went to the main agent. Stop now and wait for a new message.";
     },
+    handoff(data: Handoff): string {
+      if (state !== "forced") throw new Error("handoff: the tool is not active. Do not call it until the supervisor asks for a handoff.");
+      options.send(gateReason === undefined ? { type: "handoff", data } : { type: "handoff", data, reason: gateReason });
+      state = "done";
+      return "Handoff sent. Stop.";
+    },
+    // Returns a changed copy of the payload, or undefined when pi must send it as it is.
+    beforeRequest(payload: unknown): unknown {
+      if (state !== "waiting" && state !== "forced") return undefined;
+      try {
+        return forceTool(payload, "handoff");
+      } catch (error) {
+        fail((error as Error).message);
+        return undefined;
+      }
+    },
     async settled(): Promise<void> {
-      // The handoff text is the result; the gate does not run on unfinished work.
-      if (handingOff) {
-        handingOff = false;
-        pending = false;
-        options.send({ type: "event", event: { kind: "settled", text: lastText } });
-        lastText = "";
+      // The gate does not run on unfinished work; the handoff data is the result.
+      if (state === "waiting") {
+        startHandoff(HANDOFF_PROMPT);
         return;
       }
+      if (state === "forced") {
+        fail("handoff: the agent stopped without a call of the tool handoff. Read the subagent window.");
+        return;
+      }
+      if (state === "done") return;
       if (!pending) {
         let result: { ok: boolean; reason: string };
         let failures = "";
@@ -127,7 +173,9 @@ export function createSubHandlers(options: SubHandlerOptions) {
         if (!result.ok) {
           redGates++;
           if (redGates >= MAX_GATE_TRIES) {
-            options.send({ type: "event", event: { kind: "error", text: shorten(`done gate red ${MAX_GATE_TRIES} times: ${result.reason}`) } });
+            gateReason = shorten(result.reason);
+            options.setActiveTools(["handoff"]);
+            startHandoff(GATE_HANDOFF_PROMPT);
           } else {
             options.sendUserMessage(failures);
           }

@@ -28,11 +28,17 @@ test("parseClientLine accepts hello, status, start and events", () => {
 test("parseClientLine accepts answer, ask and blocker", () => {
   assert.deepEqual(parseClientLine('{"type":"answer","id":"a","text":"t"}'), { type: "answer", id: "a", text: "t" });
   assert.deepEqual(parseClientLine('{"type":"ask","text":"q"}'), { type: "ask", text: "q" });
-  assert.deepEqual(parseClientLine('{"type":"blocker","text":"r"}'), { type: "blocker", text: "r" });
+  const blocker = { issue: "i", files: ["f"], tried: ["t"] };
+  assert.deepEqual(parseClientLine(formatClientMessage({ type: "blocker", data: blocker })), { type: "blocker", data: blocker });
+  const handoff = { done: ["d"], open: ["o"], next: "n", files: ["f"], risks: [], tests: "t" };
+  assert.deepEqual(parseClientLine(formatClientMessage({ type: "handoff", data: handoff })), { type: "handoff", data: handoff });
+  assert.deepEqual(parseClientLine(formatClientMessage({ type: "handoff", data: handoff, reason: "r" })), { type: "handoff", data: handoff, reason: "r" });
+  assert.throws(() => parseClientLine('{"type":"handoff","data":{"done":[]}}'), /field "open"/);
   assert.throws(() => parseClientLine('{"type":"answer","text":"t"}'), /field "id"/);
   assert.throws(() => parseClientLine('{"type":"answer","id":"a"}'), /field "text"/);
   assert.throws(() => parseClientLine('{"type":"ask"}'), /field "text"/);
-  assert.throws(() => parseClientLine('{"type":"blocker","text":1}'), /field "text"/);
+  assert.throws(() => parseClientLine('{"type":"blocker","data":{"issue":"i","files":"f","tried":[]}}'), /field "files".*list of strings/);
+  assert.throws(() => parseClientLine('{"type":"blocker","text":"r"}'), /field "data"/);
 });
 
 test("parseClientLine rejects bad lines with a reason", () => {
@@ -72,6 +78,14 @@ test("parseServerLine reads every server message and rejects the rest", () => {
     const pending = { ...result, status };
     assert.deepEqual(parseServerLine(formatServerMessage(pending)), pending);
   }
+  const full = {
+    ...result,
+    status: "handoff" as const,
+    blocker: { issue: "i", files: [], tried: ["t"] },
+    handoff: { done: [], open: [], next: "n", files: [], risks: [], tests: "t" },
+    reason: "r",
+  };
+  assert.deepEqual(parseServerLine(formatServerMessage(full)), full);
   assert.throws(() => parseServerLine("nope"), /not valid JSON/);
   assert.throws(() => parseServerLine('{"type":"status","main":"x"}'), /unknown message/);
   assert.throws(() => parseServerLine('{"type":"result","id":"a","status":"x","text":"","usage":{},"events":[]}'), /unknown message/);

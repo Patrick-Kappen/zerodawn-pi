@@ -2,6 +2,7 @@ import { stat, unlink } from "node:fs/promises";
 import { createServer, type Server, type Socket } from "node:net";
 import { join } from "node:path";
 import { createAgents } from "./agents.ts";
+import { blockerText } from "./format.ts";
 import { createLifecycle, GRACE_MS, type Timers } from "./lifecycle.ts";
 import { answers } from "./probe.ts";
 import { formatServerMessage, parseClientLine, type ServerMessage } from "./protocol.ts";
@@ -182,9 +183,12 @@ export async function startSupervisor(options: SupervisorOptions) {
         return;
       case "ask":
       case "blocker":
+      case "handoff":
         if (connection.role !== "sub" || connection.id === undefined)
           throw new Error(`supervisor: only a connection with hello role "sub" can send "${message.type}".`);
-        agents.pending(connection.id, message.type === "ask" ? "question" : "blocked", message.text);
+        if (message.type === "ask") agents.pending(connection.id, "question", message.text);
+        else if (message.type === "blocker") agents.pending(connection.id, "blocked", blockerText(message.data), message.data);
+        else agents.handoff(connection.id, message.data, message.reason);
         return;
       case "event":
         if (connection.role !== "sub" || connection.id === undefined) throw new Error('supervisor: only a connection with hello role "sub" can send events.');

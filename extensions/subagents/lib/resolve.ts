@@ -26,7 +26,7 @@ export interface Resolved {
   args: string[];
 }
 
-export const FIXED_TOOLS = ["ask", "blocker"];
+export const FIXED_TOOLS = ["ask", "blocker", "handoff"];
 const NAME = /^[a-z0-9][a-z0-9-]*$/;
 
 export function profilePath(home: string, name: string): string {
@@ -36,7 +36,7 @@ export function profilePath(home: string, name: string): string {
 
 export function buildArgs(profile: Profile, extensionPaths: string[], skillPaths: string[]): string[] {
   const args = [...extensionPaths.flatMap((path) => ["-e", path]), ...skillPaths.flatMap((path) => ["--skill", path])];
-  // --tools is an allowlist that also filters extension tools, and --no-tools disables them: ask and blocker must be named.
+  // --tools is an allowlist that also filters extension tools, and --no-tools disables them: ask, blocker and handoff must be named.
   args.push("--tools", [...profile.tools, ...FIXED_TOOLS].join(","));
   if (!profile.tools.some((tool) => tool.startsWith("mcp__"))) args.push("--no-mcp");
   args.push("--model", profile.models[0] as string, "--system-prompt", profile.prompt);

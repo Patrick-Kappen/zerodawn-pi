@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { config } from "../../shared/config.ts";
 import { loadRecipes } from "../../shared/recipes.ts";
@@ -12,6 +12,7 @@ import type { Timers } from "./lib/lifecycle.ts";
 import { answers } from "./lib/probe.ts";
 import { nodeFiles, resolveProfile } from "./lib/resolve.ts";
 import { shapeResult } from "./lib/result.ts";
+import { askSchema, blockerSchema, handoffSchema } from "./lib/schemas.ts";
 import { createSubHandlers, readSubEnv, type SubEnv } from "./lib/sub.ts";
 import { connectSub, type SubConnection } from "./lib/subclient.ts";
 import { createTmux, sessionName } from "./lib/tmux.ts";
@@ -23,6 +24,11 @@ const EXTENSION_PATH = fileURLToPath(import.meta.url);
 function registerSub(pi: ExtensionAPI, env: SubEnv): void {
   let connection: SubConnection | undefined;
   let cwd = process.cwd();
+  let context: ExtensionContext | undefined;
+  const running = (): ExtensionContext => {
+    if (context === undefined) throw new Error("subagents: no context yet. The session_start handler did not run.");
+    return context;
+  };
   const connected = (): SubConnection => {
     if (connection === undefined) throw new Error(`subagents: no connection to "${env.socket}". The session_start handler failed; read the error above.`);
     return connection;
@@ -30,7 +36,9 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
   const handlers = createSubHandlers({
     send: (message) => connected().send(message),
     sendUserMessage: (text) => void pi.sendUserMessage(text),
-    steer: (text) => void pi.sendUserMessage(text, { deliverAs: "steer" }),
+    abort: () => running().abort(),
+    isIdle: () => running().isIdle(),
+    setActiveTools: (names) => pi.setActiveTools(names),
     gate: (sendUserMessage) =>
       runGate({
         checks: env.checks,
@@ -48,13 +56,15 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
 
   pi.on("session_start", async (_event, ctx) => {
     cwd = ctx.cwd;
+    context = ctx;
+    pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "handoff"));
     connection = await connectSub(env, handlers.onServerMessage, (error) => ctx.ui.notify(error.message, "error"));
   });
   pi.registerTool({
     name: "ask",
     label: "ask",
     description: "Ask the main agent a question. Use it when you need an answer to go on. After the call, stop and wait for a new message.",
-    parameters: Type.Object({ question: Type.String({ description: "The question for the main agent." }) }),
+    parameters: askSchema,
     async execute(_toolCallId, params) {
       return { content: [{ type: "text", text: handlers.ask(params.question) }], details: {} };
     },
@@ -64,11 +74,21 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
     label: "blocker",
     description:
       "Report that you cannot go on within the limits of your task: missing access, information or a decision. Use it only after you tried to solve the problem within the task limits. After the call, stop and wait for a new message.",
-    parameters: Type.Object({ reason: Type.String({ description: "What blocks you and what you tried." }) }),
+    parameters: blockerSchema,
     async execute(_toolCallId, params) {
-      return { content: [{ type: "text", text: handlers.blocker(params.reason) }], details: {} };
+      return { content: [{ type: "text", text: handlers.blocker(params) }], details: {} };
     },
   });
+  pi.registerTool({
+    name: "handoff",
+    label: "handoff",
+    description: "Hand the task over to a new agent. The supervisor asks for it; do not call it before. After the call, stop.",
+    parameters: handoffSchema,
+    async execute(_toolCallId, params) {
+      return { content: [{ type: "text", text: handlers.handoff(params) }], details: {} };
+    },
+  });
+  pi.on("before_provider_request", (event) => handlers.beforeRequest(event.payload));
   pi.on("session_shutdown", () => connection?.close());
   pi.on("tool_execution_start", (event) => handlers.toolStart(event));
   pi.on("tool_execution_end", (event) => handlers.toolEnd(event));

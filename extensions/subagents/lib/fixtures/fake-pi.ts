@@ -14,7 +14,20 @@ socket.on("data", (chunk) => {
   for (let i = buffer.indexOf("\n"); i !== -1; i = buffer.indexOf("\n")) {
     const message = JSON.parse(buffer.slice(0, i));
     buffer = buffer.slice(i + 1);
+    if (message.type === "handoff") {
+      send({ type: "handoff", data: { done: ["a"], open: ["b"], next: "c", files: ["f.ts"], risks: [], tests: "green" } });
+      continue;
+    }
     if (message.type !== "task") continue;
+    if (message.task === "BLOCK") {
+      send({ type: "blocker", data: { issue: "no access", files: ["x.ts", "y.ts"], tried: ["a", "b"] } });
+      send({ type: "event", event: { kind: "settled", text: "blocked" } });
+      continue;
+    }
+    if (message.task === "HANDOFF") {
+      send({ type: "event", event: { kind: "message", text: "big", usage: { tokens: 100000, cost: 1 } } });
+      continue;
+    }
     if (message.task === "ASK") {
       send({ type: "ask", text: "which db?" });
       send({ type: "event", event: { kind: "settled", text: "asked" } });

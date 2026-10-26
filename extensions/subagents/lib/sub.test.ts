@@ -2,17 +2,21 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GateResult } from "./gate.ts";
 import type { ClientMessage } from "./protocol.ts";
-import { createSubHandlers, HANDOFF_PROMPT, readSubEnv, shorten } from "./sub.ts";
+import { createSubHandlers, GATE_HANDOFF_PROMPT, HANDOFF_PROMPT, readSubEnv, shorten } from "./sub.ts";
 
-function setup(result: GateResult | Error = { ok: true, reason: "tests and checks green" }) {
+const HANDOFF = { done: ["a"], open: ["b"], next: "c", files: ["f"], risks: [], tests: "green" };
+
+function setup(result: GateResult | Error = { ok: true, reason: "tests and checks green" }, idle = false) {
   const sent: ClientMessage[] = [];
   const user: string[] = [];
   let gates = 0;
-  const steers: string[] = [];
+  const calls: string[] = [];
   const handlers = createSubHandlers({
     send: (message) => sent.push(message),
     sendUserMessage: (text) => user.push(text),
-    steer: (text) => steers.push(text),
+    abort: () => calls.push("abort"),
+    isIdle: () => idle,
+    setActiveTools: (names) => calls.push(`tools ${names.join(",")}`),
     gate: async (send) => {
       gates++;
       if (result instanceof Error) throw result;
@@ -20,7 +24,7 @@ function setup(result: GateResult | Error = { ok: true, reason: "tests and check
       return result;
     },
   });
-  return { sent, user, handlers, gates: () => gates, steers };
+  return { sent, user, handlers, gates: () => gates, calls };
 }
 
 const usage = { totalTokens: 10, cost: { total: 0.02 } };
@@ -106,7 +110,7 @@ test("settled skips the gate after ask or blocker, once", async () => {
   await handlers.settled();
   assert.equal(gates(), 0);
   assert.deepEqual(sent.at(-1), { type: "event", event: { kind: "settled", text: "" } });
-  handlers.blocker("no access");
+  handlers.blocker({ issue: "no access", files: [], tried: ["x"] });
   await handlers.settled();
   assert.equal(gates(), 0);
   await handlers.settled();
@@ -116,25 +120,29 @@ test("settled skips the gate after ask or blocker, once", async () => {
 test("ask and blocker send their text and tell the model to stop", () => {
   const { sent, handlers } = setup();
   assert.match(handlers.ask("which db?"), /Stop now and wait/);
-  assert.match(handlers.blocker("no access"), /Stop now and wait/);
+  const blocker = { issue: "no access", files: ["a"], tried: ["x"] };
+  assert.match(handlers.blocker(blocker), /Stop now and wait/);
   assert.deepEqual(sent, [
     { type: "ask", text: "which db?" },
-    { type: "blocker", text: "no access" },
+    { type: "blocker", data: blocker },
   ]);
 });
 
-test("the third red gate sends an error event and no failure message", async () => {
-  const { sent, user, handlers } = setup({ ok: false, reason: "the repository tests are red" });
+test("the third red gate starts a forced handoff with the gate reason", async () => {
+  const { sent, user, calls, handlers } = setup({ ok: false, reason: "the repository tests are red" });
   await handlers.settled();
   await handlers.settled();
   assert.deepEqual(user, ["fix it", "fix it"]);
   sent.length = 0;
   await handlers.settled();
-  assert.deepEqual(user, ["fix it", "fix it"]);
-  assert.deepEqual(sent, [
-    { type: "event", event: { kind: "gate", ok: false, text: "the repository tests are red" } },
-    { type: "event", event: { kind: "error", text: "done gate red 3 times: the repository tests are red" } },
-  ]);
+  assert.deepEqual(user, ["fix it", "fix it", GATE_HANDOFF_PROMPT]);
+  assert.deepEqual(calls, ["tools handoff"]);
+  assert.deepEqual(sent, [{ type: "event", event: { kind: "gate", ok: false, text: "the repository tests are red" } }]);
+  assert.match(handlers.handoff(HANDOFF), /Handoff sent/);
+  assert.deepEqual(sent.at(-1), { type: "handoff", data: HANDOFF, reason: "the repository tests are red" });
+  sent.length = 0;
+  await handlers.settled();
+  assert.deepEqual(sent, []);
 });
 
 test("a new task resets the red gate count", async () => {
@@ -148,17 +156,66 @@ test("a new task resets the red gate count", async () => {
   assert.ok(!sent.some((message) => message.type === "event" && message.event.kind === "error"));
 });
 
-test("a handoff message steers the agent; the next settle sends the handoff without a gate", async () => {
-  const { handlers, gates, steers, sent } = setup();
+test("a handoff message aborts, sets only the tool handoff and sends the prompt at the next settle", async () => {
+  const { handlers, gates, calls, user, sent } = setup();
   handlers.onServerMessage({ type: "handoff" });
-  assert.deepEqual(steers, [HANDOFF_PROMPT]);
-  handlers.messageEnd({ role: "assistant", content: [{ type: "text", text: "done: a; open: b" }], usage });
+  assert.deepEqual(calls, ["abort", "tools handoff"]);
+  assert.deepEqual(user, []);
+  await handlers.settled();
+  assert.deepEqual(user, [HANDOFF_PROMPT]);
+  assert.equal(gates(), 0);
+  handlers.onServerMessage({ type: "handoff" });
+  assert.deepEqual(calls, ["abort", "tools handoff"]);
+  assert.match(handlers.handoff(HANDOFF), /Handoff sent\. Stop\./);
+  assert.deepEqual(sent, [{ type: "handoff", data: HANDOFF }]);
   await handlers.settled();
   assert.equal(gates(), 0);
-  assert.deepEqual(sent.at(-1), { type: "event", event: { kind: "settled", text: "done: a; open: b" } });
-  handlers.onServerMessage({ type: "task", task: "x" });
+  assert.equal(sent.length, 1);
+});
+
+test("a handoff message on an idle agent sends the prompt at once", () => {
+  const { handlers, user } = setup(undefined, true);
+  handlers.onServerMessage({ type: "handoff" });
+  assert.deepEqual(user, [HANDOFF_PROMPT]);
+});
+
+test("the tool handoff fails before a handoff is asked for", () => {
+  const { handlers } = setup();
+  assert.throws(() => handlers.handoff(HANDOFF), /not active/);
+});
+
+test("two invalid handoff calls send an error event", () => {
+  const { handlers, sent } = setup(undefined, true);
+  handlers.onServerMessage({ type: "handoff" });
+  handlers.toolEnd({ toolName: "handoff", isError: true });
+  assert.ok(!sent.some((message) => message.type === "event" && message.event.kind === "error"));
+  handlers.toolEnd({ toolName: "bash", isError: true });
+  handlers.toolEnd({ toolName: "handoff", isError: true });
+  const error = sent.at(-1);
+  assert.ok(error?.type === "event" && error.event.kind === "error");
+  assert.match(error.event.text, /2 invalid calls of the tool handoff/);
+});
+
+test("settled while a handoff is forced and no tool call came is an error event", async () => {
+  const { handlers, sent } = setup(undefined, true);
+  handlers.onServerMessage({ type: "handoff" });
   await handlers.settled();
-  assert.equal(gates(), 1);
+  const error = sent.at(-1);
+  assert.ok(error?.type === "event" && error.event.kind === "error");
+  assert.match(error.event.text, /without a call of the tool handoff/);
+});
+
+test("beforeRequest forces the tool only while a handoff runs; an unknown payload is an error event", () => {
+  const { handlers, sent } = setup(undefined, true);
+  const payload = { model: "m", tools: [{ name: "handoff", input_schema: {} }] };
+  assert.equal(handlers.beforeRequest(payload), undefined);
+  handlers.onServerMessage({ type: "handoff" });
+  assert.deepEqual(handlers.beforeRequest(payload), { ...payload, tool_choice: { type: "tool", name: "handoff" } });
+  assert.equal(handlers.beforeRequest({ model: "m" }), undefined);
+  assert.deepEqual(sent.at(-1), {
+    type: "event",
+    event: { kind: "error", text: "handoff: cannot force a tool for this provider payload: model" },
+  });
 });
 
 test("shorten keeps short text", () => {

@@ -1,3 +1,4 @@
+import type { Blocker, Handoff } from "./format.ts";
 import type { AgentEntry } from "./register.ts";
 
 export interface Usage {
@@ -21,6 +22,9 @@ export interface AgentResult {
   text: string;
   usage: Usage;
   events: string[];
+  blocker?: Blocker;
+  handoff?: Handoff;
+  reason?: string;
 }
 
 export type ClientMessage =
@@ -30,7 +34,8 @@ export type ClientMessage =
   | { type: "start"; task: string; args: string[]; checks: string[] }
   | { type: "answer"; id: string; text: string }
   | { type: "ask"; text: string }
-  | { type: "blocker"; text: string }
+  | { type: "blocker"; data: Blocker }
+  | { type: "handoff"; data: Handoff; reason?: string }
   | { type: "event"; event: SubEvent };
 
 export type ServerMessage =
@@ -60,6 +65,37 @@ function text(fields: Fields, key: string, type: string): string {
   const value = fields[key];
   if (typeof value !== "string") throw new Error(`protocol: field "${key}" of "${type}" must be a string. Fix the sender.`);
   return value;
+}
+
+function strings(fields: Fields, key: string, type: string): string[] {
+  const value = fields[key];
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) {
+    throw new Error(`protocol: field "${key}" of "${type}" must be a list of strings. Fix the sender.`);
+  }
+  return value as string[];
+}
+
+function object(fields: Fields, key: string, type: string): Fields {
+  const value = fields[key];
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`protocol: field "${key}" of "${type}" must be an object. Fix the sender.`);
+  }
+  return value as Fields;
+}
+
+function parseBlocker(fields: Fields, type: string): Blocker {
+  return { issue: text(fields, "issue", type), files: strings(fields, "files", type), tried: strings(fields, "tried", type) };
+}
+
+function parseHandoff(fields: Fields, type: string): Handoff {
+  return {
+    done: strings(fields, "done", type),
+    open: strings(fields, "open", type),
+    next: text(fields, "next", type),
+    files: strings(fields, "files", type),
+    risks: strings(fields, "risks", type),
+    tests: text(fields, "tests", type),
+  };
 }
 
 function number(fields: Fields, key: string, type: string): number {
@@ -122,11 +158,17 @@ export function parseClientLine(line: string): ClientMessage {
     case "ask":
       return { type: "ask", text: text(message, "text", "ask") };
     case "blocker":
-      return { type: "blocker", text: text(message, "text", "blocker") };
+      return { type: "blocker", data: parseBlocker(object(message, "data", "blocker"), "blocker") };
+    case "handoff": {
+      const data = parseHandoff(object(message, "data", "handoff"), "handoff");
+      return message.reason === undefined ? { type: "handoff", data } : { type: "handoff", data, reason: text(message, "reason", "handoff") };
+    }
     case "event":
       return { type: "event", event: parseEvent(message.event) };
   }
-  throw new Error(`protocol: unknown message type ${JSON.stringify(message.type)}. Use "hello", "status", "start", "answer", "ask", "blocker" or "event".`);
+  throw new Error(
+    `protocol: unknown message type ${JSON.stringify(message.type)}. Use "hello", "status", "start", "answer", "ask", "blocker", "handoff" or "event".`,
+  );
 }
 
 export function formatServerMessage(message: ServerMessage): string {
@@ -170,6 +212,9 @@ export function parseServerLine(line: string): ServerMessage {
         text: text(message, "text", "result"),
         usage: usage(message, "result"),
         events: message.events as string[],
+        ...(message.blocker === undefined ? {} : { blocker: parseBlocker(object(message, "blocker", "result"), "result.blocker") }),
+        ...(message.handoff === undefined ? {} : { handoff: parseHandoff(object(message, "handoff", "result"), "result.handoff") }),
+        ...(message.reason === undefined ? {} : { reason: text(message, "reason", "result") }),
       };
     }
   }
