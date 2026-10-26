@@ -1,18 +1,32 @@
+import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import { textOf } from "../../shared/util.ts";
 import { loadRecipes, promptText, type Recipes, Tracker } from "./lib/recipes.ts";
+import { RunTests, TOOL } from "./lib/run.ts";
 
 export default function (pi: ExtensionAPI) {
   let tracker = new Tracker();
   let recipes: Recipes | undefined;
   const hints = new Map<string, string>();
 
+  const runTests = new RunTests();
+
+  pi.registerTool({
+    ...TOOL,
+    parameters: Type.Object({
+      scope: Type.Optional(StringEnum(["changed", "all"] as const, { description: "changed (default): tests for the changed files. all: every test." })),
+      rerun: Type.Optional(Type.Boolean({ description: "Run again when no file changed, for a flaky test." })),
+    }),
+    execute: (toolCallId, params, signal, _onUpdate, ctx) => runTests.execute(toolCallId, params, signal, ctx),
+  });
+
   pi.on("session_start", () => {
     tracker = new Tracker();
+    runTests.reset();
   });
 
   pi.on("before_agent_start", (event, ctx) => {
-    tracker.turn();
     recipes = loadRecipes(ctx.cwd);
     if (recipes) event.systemPromptOptions.sections.project_recipes = promptText(recipes);
   });
@@ -27,13 +41,10 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("tool_result", (event) => {
-    if ((event.toolName === "edit" || event.toolName === "write") && !event.isError) tracker.changed();
     if (event.toolName !== "bash") return;
-    const text = textOf(event.content) ?? "";
-    const command = (event.input as any)?.command;
-    if (typeof command === "string") tracker.ended(command, text);
     const hint = hints.get(event.toolCallId);
     hints.delete(event.toolCallId);
-    return hint ? { content: [{ type: "text", text: `${text}\n${hint}` }] } : undefined;
+    if (!hint) return;
+    return { content: [{ type: "text", text: `${textOf(event.content) ?? ""}\n${hint}` }] };
   });
 }

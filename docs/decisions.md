@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 11. Tests run through the tool run_tests, not through bash (2026-10-26)
+
+The extension `tests` registers `run_tests` and blocks test commands in bash. The tool picks the tests for the changed files, fails for a changed code file without a test, and returns one line for green or only the failures for red. Reason: the agent ran tests in many forms around the old block of a repeated run, and got the full output in its context.
+
 ## 10. A subagent starts with nothing (2026-10-26)
 
 A subagent runs with `-ne -ns -np -nc --no-themes`. It loads only the subagents extension and the paths in `subagentExtensions` of `config.json`. Reason: later, agent files define prompt and tools, so the base must be empty. pi has no per-extension filter for packages in `settings.json`, so extensions are given explicitly with `-e`.
