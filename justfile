@@ -34,9 +34,9 @@ check: lint types test
 compat:
     scripts/compat.sh
 
-# Bump every extension that changed since its last tag, and the package: just bump-changed minor|patch|major
-bump-changed level="minor":
-    scripts/bump-changed.sh {{level}}
+# Bump every extension that changed since its last tag, and the package; the level comes from the "Change:" trailers
+bump-changed legacy="":
+    scripts/bump-changed.sh {{legacy}}
 
 # Fail when an extension changed since its last tag without a higher version; CI runs this on a release PR
 release-check:

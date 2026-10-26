@@ -1,10 +1,42 @@
 #!/usr/bin/env bash
 set -euo pipefail
-LEVEL="${1:-minor}"
+# The level of each component comes from the "Change:" trailers of its commits since its last tag:
+# breaking -> major (minor below 1.0), feature -> minor, fix -> patch.
+# LEGACY gives the change of commits without a trailer (made before the trailer rule); without it they fail.
+LEGACY="${1:-}"
 cd "$(dirname "$0")/.."
 test -z "$(git status --porcelain)" || { echo "bump-changed: commit or stash your changes first" >&2; exit 1; }
-case "${LEVEL}" in major|minor|patch) ;; *) echo "bump-changed: level must be major, minor or patch" >&2; exit 2;; esac
-next() { IFS=. read -r a b c <<< "$1"; case "${LEVEL}" in major) echo "$((a+1)).0.0";; minor) echo "$a.$((b+1)).0";; patch) echo "$a.$b.$((c+1))";; esac; }
+case "${LEGACY}" in ""|fix|feature|breaking) ;; *) echo "bump-changed: the argument is the change of commits without a trailer: fix, feature or breaking" >&2; exit 2;; esac
+rank() { case "$1" in fix) echo 1;; feature) echo 2;; breaking) echo 3;; esac; }
+# Highest change of the non-release commits in a range, optionally limited to a path.
+change_of() {
+  local range="$1" path="${2:-.}" best=fix sha change missing=()
+  while IFS= read -r sha; do
+    change="$(git log -1 --format=%B "$sha" | git interpret-trailers --parse | sed -n 's/^Change: //p')"
+    if [ -z "$change" ]; then
+      [[ "$(git log -1 --format=%s "$sha")" == release:* ]] && continue
+      [ -n "$LEGACY" ] || { missing+=("$(git log -1 --format='%h %s' "$sha")"); continue; }
+      change="$LEGACY"
+    fi
+    [ "$(rank "$change")" -gt "$(rank "$best")" ] && best="$change"
+  done < <(git rev-list --no-merges "$range" -- "$path")
+  if [ ${#missing[@]} -gt 0 ]; then
+    printf 'bump-changed: these commits have no "Change:" trailer:\n' >&2
+    printf '  %s\n' "${missing[@]}" >&2
+    printf 'Next: run again with the change of these commits: just bump-changed fix|feature|breaking\n' >&2
+    exit 1
+  fi
+  echo "$best"
+}
+next() {
+  local a b c
+  IFS=. read -r a b c <<< "$1"
+  case "$2" in
+    breaking) if [ "$a" -eq 0 ]; then echo "$a.$((b+1)).0"; else echo "$((a+1)).0.0"; fi ;;
+    feature) echo "$a.$((b+1)).0" ;;
+    fix) echo "$a.$b.$((c+1))" ;;
+  esac
+}
 bumped=()
 for manifest in shared/package.json extensions/*/package.json; do
   name="$(jq -r .name "$manifest")"; version="$(jq -r .version "$manifest")"
@@ -12,11 +44,23 @@ for manifest in shared/package.json extensions/*/package.json; do
   if [ -n "$tag" ] && git diff --quiet "$tag" -- "$(dirname "$manifest")"; then continue; fi
   if [ -n "$tag" ] && [ "$version" != "${tag#"$name-v"}" ]; then continue; fi
   # A component without a tag ships its current version as its first release; only a released one is bumped.
-  if [ -n "$tag" ]; then new="$(next "$version")"; else new="$version"; fi
-  jq --arg v "$new" '.version = $v' "$manifest" > "$manifest.tmp" && mv "$manifest.tmp" "$manifest"
+  if [ -n "$tag" ]; then
+    # A plain assignment, so that set -e stops the script when change_of fails.
+    change="$(change_of "$tag..HEAD" "$(dirname "$manifest")")"
+    new="$(next "$version" "$change")"
+  else new="$version"; fi
   bumped+=("$name $version -> $new $(dirname "$manifest")")
 done
-version="$(jq -r .version package.json)"; new="$(next "$version")"
+version="$(jq -r .version package.json)"
+last="$(git tag --list 'v*' --sort=-v:refname | head -n1)"
+[ -n "$last" ] || { echo "bump-changed: no package tag v* exists; tag the first release by hand" >&2; exit 1; }
+change="$(change_of "$last..HEAD")"
+new="$(next "$version" "$change")"
+# Write only after every level is known, so a failure leaves no half release.
+for entry in "${bumped[@]}"; do
+  read -r _ _ _ to dir <<< "$entry"
+  jq --arg v "$to" '.version = $v' "$dir/package.json" > "$dir/package.json.tmp" && mv "$dir/package.json.tmp" "$dir/package.json"
+done
 jq --arg v "$new" '.version = $v' package.json > package.json.tmp && mv package.json.tmp package.json
 biome format --write package.json shared/package.json extensions/*/package.json >/dev/null
 # Changelog sections from the commit subjects since the last tag; the "<name>: " prefix is dropped per extension.
@@ -26,7 +70,9 @@ root="## $new — $today"
 for entry in "${bumped[@]}"; do
   read -r name _ _ to dir <<< "$entry"
   tag="$(git tag --list "$name-v*" --sort=-v:refname | head -n1)"
-  if [ -n "$tag" ]; then lines="$(git log --no-merges --format='- %s' "$tag..HEAD" -- "$dir" | sed "s/^- $name: /- /")"; else lines="- First release."; fi
+  if [ -n "$tag" ]; then
+    lines="$(git log --no-merges --format='- %s%x09%(trailers:key=Change,valueonly)' "$tag..HEAD" -- "$dir" | sed "s/^- $name: /- /; s/\tbreaking$/ (breaking)/; s/\t.*$//")"
+  else lines="- First release."; fi
   [ -f "$dir/CHANGELOG.md" ] || printf '# Changelog\n' > "$dir/CHANGELOG.md"
   prepend "$dir/CHANGELOG.md" "$(printf '## %s — %s\n\n%s' "$to" "$today" "$lines")"
   root="$(printf '%s\n\n### %s %s\n\n%s' "$root" "$name" "$to" "$lines")"

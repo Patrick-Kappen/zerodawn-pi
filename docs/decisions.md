@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 15. The version level comes from a Change trailer per commit (2026-10-27)
+
+Every commit carries `Change: fix|feature|breaking`. `bump-changed` takes the highest change per component since its last tag: fix is patch, feature is minor, breaking is major (minor below 1.0, marked "(breaking)" in the changelog). Reason: a hand-picked level for the whole release gave a minor for each small fix. Commits from before the rule have no trailer; `bump-changed <change>` gives them a change on purpose, without it they fail. Releases happen for a deliverable or on request, not after every PR.
+
 ## 14. Subagent profiles live only in ~/.pi/agent/agents (2026-10-26)
 
 A subagent gets its prompt, models, tools, extensions, skills and MCP from a profile in `~/.pi/agent/agents/<name>.md`. Repositories hold no profiles. Reason: one place that the user controls, and the same files that nullspace will deliver later through its layer kind `agents/`. The format belongs to the `subagents` extension (`extensions/subagents/PROFILES.md`). Rejected: profiles in `.pi/agents/` of a repository, and the nullspace `presets/` format (fixed keys for the `/preset` mode of the main pi).
