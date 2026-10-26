@@ -125,8 +125,11 @@ export async function startSupervisor(options: SupervisorOptions) {
       if (socket === undefined) throw new Error(`supervisor: subagent ${id} has no connection. Run: tmux attach -t ${options.session}`);
       send(socket, message);
     },
+    // After the queued register write: a main that reads register.json after a result sees the same state.
     sendToMains: (message) => {
-      for (const socket of mains) send(socket, message);
+      writing = writing.then(() => {
+        for (const socket of mains) send(socket, message);
+      });
     },
     onChange: () => {
       persist();

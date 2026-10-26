@@ -9,7 +9,7 @@ export interface Window {
 
 const SESSION_ID = /^[A-Za-z0-9-]{8,}$/;
 const WINDOW_NAME = /^[A-Za-z0-9_-]+$/;
-const ABSENT = /can't find session|no server running|error connecting/;
+const ABSENT = /can't find session|no server running|error connecting|no current target/;
 
 export function sessionName(sessionId: string): string {
   if (!SESSION_ID.test(sessionId)) {

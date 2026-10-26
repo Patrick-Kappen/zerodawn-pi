@@ -83,8 +83,8 @@ export function createAgents(options: AgentsOptions) {
     options.timers.clearTimeout(record.helloTimer);
     record.entry.status = status;
     record.text = text;
-    options.sendToMains({ type: "result", ...result(record) });
     options.onChange();
+    options.sendToMains({ type: "result", ...result(record) });
   }
 
   function fail(record: AgentRecord, reason: string): void {
