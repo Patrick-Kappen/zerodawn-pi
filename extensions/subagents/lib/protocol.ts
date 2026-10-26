@@ -13,7 +13,7 @@ export type SubEvent =
   | { kind: "gate"; ok: boolean; text: string }
   | { kind: "error"; text: string };
 
-export type AgentStatus = "idle" | "failed" | "question" | "blocked";
+export type AgentStatus = "idle" | "failed" | "question" | "blocked" | "handoff";
 
 export interface AgentResult {
   id: string;
@@ -38,6 +38,7 @@ export type ServerMessage =
   | { type: "error"; message: string }
   | { type: "started"; id: string }
   | { type: "task"; task: string }
+  | { type: "handoff" }
   | ({ type: "result" } & AgentResult);
 
 type Fields = Record<string, unknown>;
@@ -145,13 +146,22 @@ export function parseServerLine(line: string): ServerMessage {
       return { type: "started", id: text(message, "id", "started") };
     case "task":
       return { type: "task", task: text(message, "task", "task") };
+    case "handoff":
+      return { type: "handoff" };
     case "status":
       if (Array.isArray(message.agents) && (message.main === "connected" || message.main === "gone")) {
         return { type: "status", agents: message.agents, main: message.main };
       }
       break;
     case "result": {
-      if (message.status !== "idle" && message.status !== "failed" && message.status !== "question" && message.status !== "blocked") break;
+      if (
+        message.status !== "idle" &&
+        message.status !== "failed" &&
+        message.status !== "question" &&
+        message.status !== "blocked" &&
+        message.status !== "handoff"
+      )
+        break;
       if (!Array.isArray(message.events) || message.events.some((event) => typeof event !== "string")) break;
       return {
         type: "result",

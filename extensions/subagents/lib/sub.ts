@@ -2,6 +2,7 @@ import type { GateResult } from "./gate.ts";
 import type { ClientMessage, ServerMessage } from "./protocol.ts";
 
 export const MAX_FIELD = 200;
+export const MAX_GATE_TRIES = 3;
 
 export interface SubEnv {
   socket: string;
@@ -52,19 +53,30 @@ function textOf(message: MessageLike): string {
     .join("\n");
 }
 
+export const HANDOFF_PROMPT =
+  "Stop the task now: you reached the token limit. Do not call more tools. Write a handoff for the agent that continues: what is done, what is open, the next step, and the files you changed. Max 15 lines.";
+
 export interface SubHandlerOptions {
   send: (message: ClientMessage) => void;
   sendUserMessage: (text: string) => void;
-  gate: () => Promise<GateResult>;
+  steer: (text: string) => void;
+  gate: (sendUserMessage: (text: string) => void) => Promise<GateResult>;
 }
 
 export function createSubHandlers(options: SubHandlerOptions) {
   let lastText = "";
   let pending = false;
+  let redGates = 0;
+  let handingOff = false;
   return {
     onServerMessage(message: ServerMessage): void {
-      if (message.type === "task") options.sendUserMessage(message.task);
-      else if (message.type === "error") throw new Error(`subagents: the supervisor refused the request: ${message.message}`);
+      if (message.type === "task") {
+        redGates = 0;
+        options.sendUserMessage(message.task);
+      } else if (message.type === "handoff") {
+        handingOff = true;
+        options.steer(HANDOFF_PROMPT);
+      } else if (message.type === "error") throw new Error(`subagents: the supervisor refused the request: ${message.message}`);
       else throw new Error(`subagents: the supervisor sent "${message.type}" to a subagent. Stop the supervisor and start it again.`);
     },
     toolStart(event: { toolName: string; args: unknown }): void {
@@ -93,18 +105,36 @@ export function createSubHandlers(options: SubHandlerOptions) {
       return "Your blocker went to the main agent. Stop now and wait for a new message.";
     },
     async settled(): Promise<void> {
+      // The handoff text is the result; the gate does not run on unfinished work.
+      if (handingOff) {
+        handingOff = false;
+        pending = false;
+        options.send({ type: "event", event: { kind: "settled", text: lastText } });
+        lastText = "";
+        return;
+      }
       if (!pending) {
         let result: { ok: boolean; reason: string };
+        let failures = "";
         try {
-          result = await options.gate();
+          result = await options.gate((text) => (failures = text));
         } catch (error) {
           // Without this the subagent never settles and the main tool waits forever.
           options.send({ type: "event", event: { kind: "error", text: `done gate failed in the subagent: ${(error as Error).message}` } });
           return;
         }
         options.send({ type: "event", event: { kind: "gate", ok: result.ok, text: shorten(result.reason) } });
-        if (!result.ok) return;
+        if (!result.ok) {
+          redGates++;
+          if (redGates >= MAX_GATE_TRIES) {
+            options.send({ type: "event", event: { kind: "error", text: shorten(`done gate red ${MAX_GATE_TRIES} times: ${result.reason}`) } });
+          } else {
+            options.sendUserMessage(failures);
+          }
+          return;
+        }
       }
+      redGates = 0;
       pending = false;
       options.send({ type: "event", event: { kind: "settled", text: lastText } });
       lastText = "";

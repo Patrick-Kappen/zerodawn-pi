@@ -30,7 +30,8 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
   const handlers = createSubHandlers({
     send: (message) => connected().send(message),
     sendUserMessage: (text) => void pi.sendUserMessage(text),
-    gate: () =>
+    steer: (text) => void pi.sendUserMessage(text, { deliverAs: "steer" }),
+    gate: (sendUserMessage) =>
       runGate({
         checks: env.checks,
         changed: () => changedFiles(cwd),
@@ -41,7 +42,7 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
           return all.run;
         },
         run: (argv) => execute(argv, cwd, undefined),
-        sendUserMessage: (text) => void pi.sendUserMessage(text),
+        sendUserMessage,
       }),
   });
 
@@ -128,7 +129,7 @@ export default function (pi: ExtensionAPI): void {
     name: "subagent",
     label: "subagent",
     description:
-      "Delegate tasks to pi agents in a tmux session. start: run the task in a new agent and return its final answer. answer: send text to an agent by id and wait for its next result. status: show the supervisor and its agents. A result has status idle, failed, question or blocked. On question, answer it with answer. On blocked, first try to solve the problem within your own limits, then send the solution with answer.",
+      "Delegate tasks to pi agents in a tmux session. start: run the task in a new agent and return its final answer. answer: send text to an agent by id and wait for its next result. status: show the supervisor and its agents. A result has status idle, failed, question, blocked or handoff. On question, answer it with answer. On blocked, first try to solve the problem within your own limits, then send the solution with answer. On handoff, the agent reached its token limit: start a new agent with the handoff text in its task.",
     promptSnippet: "Delegate tasks to pi agents in tmux",
     // One object at the root: a root anyOf made the model send empty arguments.
     parameters: Type.Object({
