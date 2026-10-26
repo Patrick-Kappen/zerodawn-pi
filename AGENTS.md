@@ -24,7 +24,7 @@ pi package with independent extensions in TypeScript. Nix flake with a Home Mana
 
 - This repository and zerodawn-pi-private share CI, `scripts/`, `justfile`, `flake.nix` checks, `biome.json` and `tsconfig.json`.
 - Change them in both, in one PR each. Run `just sync-check`.
-- Use the same branch name in both repositories. The pre-push hook and CI compare with the branch of that name.
+- The branch names do not need to match. The pre-push hook and CI pass when the sibling main, or a sibling branch ahead of main, has the same behaviour.
 - When CI fails on drift, find the cause. Do not copy one side over the other.
 
 ## Tests and checks
