@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0 — 2026-10-26
+
+### subagents 0.5.0
+
+- read a tmux server that exits during a check as absent
+- max 3 gate tries, handoff at 100k tokens
+
 ## 0.8.2 — 2026-10-26
 
 ### shared 0.4.2

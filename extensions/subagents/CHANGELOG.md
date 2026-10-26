@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.0 — 2026-10-26
+
+- read a tmux server that exits during a check as absent
+- max 3 gate tries, handoff at 100k tokens
+
 ## 0.4.0 — 2026-10-26
 
 - done gate runs the tests in the subagent

@@ -89,6 +89,13 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.9.0 — 2026-10-26
+
+### subagents 0.5.0
+
+- read a tmux server that exits during a check as absent
+- max 3 gate tries, handoff at 100k tokens
+
 ## 0.8.2 — 2026-10-26
 
 ### shared 0.4.2
@@ -104,20 +111,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ### tests 0.3.1
 
 - short check result: diagnostics only, deduplicated
-
-## 0.8.0 — 2026-10-26
-
-### shared 0.4.0
-
-- subagents: done gate runs the tests in the subagent
-
-### subagents 0.4.0
-
-- done gate runs the tests in the subagent
-
-### tests 0.3.0
-
-- subagents: done gate runs the tests in the subagent
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
