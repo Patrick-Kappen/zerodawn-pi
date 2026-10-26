@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { outFile, shorten } from "../../../shared/store.ts";
+import { callOutFile, shorten } from "../../../shared/store.ts";
 import { absolutePath } from "../../../shared/util.ts";
 
 const run = promisify(execFile);
@@ -148,7 +148,7 @@ export function registerGit(pi: ExtensionAPI) {
       }
       text = text.replace(/\n{3,}/g, "\n\n") || "(no output)";
       if (text.length <= INLINE_MAX) return { content: [{ type: "text", text }], details: {} };
-      const log = outFile(ctx, toolCallId, "git");
+      const log = callOutFile(ctx, toolCallId, "git");
       writeFileSync(log, text);
       const lines = text.split("\n").length;
       return {

@@ -49,10 +49,10 @@ export type Meta = {
 export type Rendered = { lines: string[]; plain: string[]; cut: boolean };
 
 const WRAPPER = `
-SHELL="$BASH" script -q -e -f -E never -O "$4" -c "stty cols $5 rows $6 2>/dev/null; exec bash --norc '$1'" </dev/null >/dev/null 2>&1 &
+env --default-signal=PIPE bash --norc "$1" </dev/null &
 c=$!
 if [ "$3" -gt 0 ]; then
-  ( trap 'kill $s 2>/dev/null; exit 0' TERM; sleep "$3" & s=$!; wait $s; echo timeout > "$2"; kill -TERM -- -$$ ) &
+  ( trap 'kill $s 2>/dev/null; exit 0' TERM; sleep "$3" & s=$!; wait $s; echo timeout > "$2"; kill -TERM -- -$$ ) <&- &
   w=$!
 fi
 wait $c; code=$?
@@ -61,20 +61,42 @@ echo $code > "$2"
 exit $code
 `;
 
+// No terminal and stdin from /dev/null: a pager, editor or prompt fails at once instead of waiting.
+const NON_INTERACTIVE = {
+  EDITOR: "false",
+  VISUAL: "false",
+  GIT_EDITOR: "false",
+  PAGER: "cat",
+  GIT_PAGER: "cat",
+  GIT_TERMINAL_PROMPT: "0",
+  DEBIAN_FRONTEND: "noninteractive",
+  npm_config_yes: "true",
+  PIP_NO_INPUT: "1",
+  PYTHONUNBUFFERED: "1",
+  FORCE_COLOR: "1",
+  CLICOLOR_FORCE: "1",
+};
+
 export function terminalSize(): { columns: number; rows: number } {
   return { columns: process.stdout.columns || DEFAULT_COLUMNS, rows: process.stdout.rows || DEFAULT_ROWS };
 }
 
 export function spawnJob(args: { commandFile: string; status: string; limit: number; log: string; cwd: string }): ChildProcess {
   const { columns, rows } = terminalSize();
-  return spawn("bash", ["-c", WRAPPER, "bash", args.commandFile, args.status, String(args.limit), args.log, String(columns), String(rows)], {
-    cwd: args.cwd,
-    stdio: "ignore",
-    detached: true,
-    env: { ...process.env, COLUMNS: String(columns), LINES: String(rows), TERM: process.env.TERM ?? "xterm-256color" },
-  });
+  const out = openSync(args.log, "a");
+  try {
+    return spawn("bash", ["-c", WRAPPER, "bash", args.commandFile, args.status, String(args.limit)], {
+      cwd: args.cwd,
+      stdio: ["ignore", out, out],
+      detached: true,
+      env: { ...process.env, ...NON_INTERACTIVE, COLUMNS: String(columns), LINES: String(rows) },
+    });
+  } finally {
+    closeSync(out);
+  }
 }
 
+// read, readv and splice: the calls that take bytes from fd 0.
 export const limitText = (limit: number) =>
   `killed at the time limit of ${limit}s${limit === DEFAULT_LIMIT_S ? `; add "${NO_TIME_LIMIT}" to the command to run longer` : ""}`;
 
