@@ -13,9 +13,38 @@ test("the content has only id, status, text and one usage line", () => {
 
 test("details carry handoff and gate", () => {
   const gate = { ok: true as const, files: [], tests: "t" };
-  const handoff = { summary: "s", change: "fix" as const, changes: [], tests: [], findings: ["a.ts:1 x"], decisions: [], open: [], next: "", risks: [] };
+  const handoff = {
+    subject: "scope: what",
+    summary: "s",
+    change: "fix" as const,
+    changes: [],
+    tests: [],
+    findings: ["a.ts:1 x"],
+    decisions: [],
+    open: [],
+    next: "",
+    risks: [],
+  };
   const shaped = shapeResult({ ...base, handoff, gate });
   assert.deepEqual([shaped.details.handoff, shaped.details.gate], [handoff, gate]);
+});
+
+test("a result with a worktree shows the short commit and its subject", () => {
+  const handoff = {
+    subject: "scope: what",
+    summary: "s",
+    change: "fix" as const,
+    changes: [],
+    tests: [],
+    findings: [],
+    decisions: [],
+    open: [],
+    next: "",
+    risks: [],
+  };
+  const shaped = shapeResult({ ...base, handoff, worktree: "/w", branch: "sub/a", commit: "0123456789abcdef" });
+  assert.match(shaped.content[0]?.text ?? "", /worktree: \/w\nbranch: sub\/a\ncommit: 0123456 scope: what\n/);
+  assert.equal(shaped.details.commit, "0123456789abcdef");
 });
 
 test("details keep at most 20 events of at most 200 characters", () => {

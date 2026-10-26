@@ -4,6 +4,7 @@ import { formatClientMessage, formatServerMessage, parseClientLine, parseServerL
 
 const usage = { tokens: 5, cost: 0.01 };
 const handoff = {
+  subject: "scope: what",
   summary: "s",
   change: "fix" as const,
   changes: [{ file: "a.ts", what: "w" }],
@@ -55,7 +56,7 @@ test("parseClientLine accepts answer, ask and blocker", () => {
   assert.deepEqual(parseClientLine(formatClientMessage({ type: "blocker", data: blocker })), { type: "blocker", data: blocker });
   assert.deepEqual(parseClientLine(formatClientMessage({ type: "handoff", data: handoff })), { type: "handoff", data: handoff });
   assert.deepEqual(parseClientLine(formatClientMessage({ type: "handoff", data: handoff, reason: "r" })), { type: "handoff", data: handoff, reason: "r" });
-  assert.throws(() => parseClientLine('{"type":"handoff","data":{"summary":"s","change":"fix"}}'), /field "changes"/);
+  assert.throws(() => parseClientLine('{"type":"handoff","data":{"subject":"s: x","summary":"s","change":"fix"}}'), /field "changes"/);
   assert.throws(() => parseClientLine('{"type":"answer","text":"t"}'), /field "id"/);
   assert.throws(() => parseClientLine('{"type":"answer","id":"a"}'), /field "text"/);
   assert.throws(() => parseClientLine('{"type":"ask"}'), /field "text"/);
@@ -65,8 +66,9 @@ test("parseClientLine accepts answer, ask and blocker", () => {
 
 test("parseClientLine and parseServerLine carry the handoff gate", () => {
   const gate = { ok: true as const, files: ["a.ts"], tests: "green: 1 pass" };
-  assert.deepEqual(parseClientLine(formatClientMessage({ type: "handoff", data: handoff, gate })), { type: "handoff", data: handoff, gate });
-  const result = { type: "result" as const, id: "a", status: "idle" as const, text: "t", usage, events: [], handoff, gate };
+  const commit = "a".repeat(40);
+  assert.deepEqual(parseClientLine(formatClientMessage({ type: "handoff", data: handoff, gate, commit })), { type: "handoff", data: handoff, gate, commit });
+  const result = { type: "result" as const, id: "a", status: "idle" as const, text: "t", usage, events: [], handoff, gate, commit };
   assert.deepEqual(parseServerLine(formatServerMessage(result)), result);
   assert.throws(() => parseClientLine(formatClientMessage({ type: "handoff", data: handoff, gate: { ...gate, ok: false } as never })), /field "ok"/);
   assert.throws(() => parseClientLine('{"type":"done","data":{},"gate":{}}'), /unknown message type "done"/);

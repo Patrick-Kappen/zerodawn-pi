@@ -201,10 +201,13 @@ test("real supervisor with a fake pi: worktree on the base, commit with trailer,
   const worktree = join(work, ".worktrees", "proj", `sub-${short}`);
   assert.equal(result.status, "idle");
   assert.deepEqual([result.worktree, result.branch], [worktree, `sub/${short}`]);
-  assert.match(shapeResult(result).content[0].text, new RegExp(`worktree: ${worktree}\nbranch: sub/${short}\n`));
+  assert.match(
+    shapeResult(result).content[0].text,
+    new RegExp(`worktree: ${worktree}\nbranch: sub/${short}\ncommit: ${(await git("rev-parse", `sub/${short}`)).slice(0, 7)} scope: wrote a file\n`),
+  );
   assert.equal((await readFile(join(worktree, "new.txt"), "utf8")).trim(), "hello");
   assert.equal(await git("rev-parse", `sub/${short}~1`), base.sha);
-  assert.equal(await git("log", "-1", "--format=%B", `sub/${short}`), `subagent ${short}: wrote a file\n\nnew.txt: new\n\nChange: feature`);
+  assert.equal(await git("log", "-1", "--format=%B", `sub/${short}`), "scope: wrote a file\n\nnew.txt: new\n\nChange: feature");
   const register = JSON.parse(await readFile(`/tmp/${session}/register.json`, "utf8"));
   assert.deepEqual([register.agents[0].worktree, register.agents[0].branch, register.agents[0].base], [worktree, `sub/${short}`, base.sha]);
   assert.equal(await client.discard(result.id), `removed worktree ${worktree} and branch sub/${short}`);

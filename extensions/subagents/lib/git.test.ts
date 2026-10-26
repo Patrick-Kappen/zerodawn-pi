@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { createGit, resolveBase } from "./git.ts";
+import { commitAll, createGit, resolveBase } from "./git.ts";
 import type { Exec } from "./tmux.ts";
 
 const exec: Exec = (command, args) =>
@@ -71,7 +71,7 @@ test("resolveBase: a bad base is an error that names it", async () => {
   await assert.rejects(resolveBase(exec, root), /not in a git repository/);
 });
 
-test("createGit: add, state, commit with trailer, remove", async () => {
+test("createGit: add, state, remove; commitAll: subject, body and trailer", async () => {
   const git = createGit(exec);
   const path = join(root, "wt", "sub-1");
   await git.addWorktree({ repo, sha: first, path, branch: "sub/1" });
@@ -80,7 +80,8 @@ test("createGit: add, state, commit with trailer, remove", async () => {
   assert.deepEqual(await git.state(path, first), { dirty: false, moved: false });
   await writeFile(join(path, "n.txt"), "n\n");
   assert.deepEqual(await git.state(path, first), { dirty: true, moved: false });
-  await git.commitAll(path, { subject: "subagent 1: did it", body: ["n.txt: new"], change: "feature" });
+  const sha = await commitAll(exec, path, { subject: "subagent 1: did it", body: ["n.txt: new"], change: "feature" });
+  assert.equal(sha, await sh(path, "rev-parse", "HEAD"));
   assert.deepEqual(await git.state(path, first), { dirty: false, moved: true });
   assert.equal(await sh(path, "log", "-1", "--format=%B"), "subagent 1: did it\n\nn.txt: new\n\nChange: feature");
   await git.removeWorktree(repo, path, "sub/1");
@@ -88,17 +89,26 @@ test("createGit: add, state, commit with trailer, remove", async () => {
   await assert.rejects(readFile(join(path, "n.txt")), /ENOENT/);
 });
 
-test("createGit: a bad worktree and a refused commit name the git error", async () => {
+test("createGit: a bad worktree names the git error", async () => {
   const git = createGit(exec);
   await assert.rejects(
     git.addWorktree({ repo, sha: "0".repeat(40), path: join(root, "x"), branch: "sub/x" }),
     /could not create the worktree .*invalid reference|not a valid/s,
   );
+});
+
+test("commitAll: a refused commit throws the git output and leaves a clean index; the next try commits", async () => {
+  const git = createGit(exec);
   const path = join(root, "wt", "sub-2");
   await git.addWorktree({ repo, sha: first, path, branch: "sub/2" });
-  await writeFile(join(repo, ".git", "hooks", "pre-commit"), "#!/bin/sh\necho hook says no >&2\nexit 1\n", { mode: 0o755 });
+  const hook = join(repo, ".git", "hooks", "commit-msg");
+  await writeFile(hook, '#!/bin/sh\ngrep -q "^scope: " "$1" || { echo hook says no >&2; exit 1; }\n', { mode: 0o755 });
   await writeFile(join(path, "n.txt"), "n\n");
-  await assert.rejects(git.commitAll(path, { subject: "s", body: [], change: "fix" }), /hook says no/);
-  await rm(join(repo, ".git", "hooks", "pre-commit"));
+  await assert.rejects(commitAll(exec, path, { subject: "bad", body: [], change: "fix" }), /was refused\. Call handoff again.*hook says no/s);
+  assert.equal(await sh(path, "diff", "--cached", "--name-only"), "");
+  assert.equal(await sh(path, "rev-parse", "HEAD"), first);
+  await commitAll(exec, path, { subject: "scope: good", body: [], change: "fix" });
+  assert.equal(await sh(path, "log", "-1", "--format=%s"), "scope: good");
+  await rm(hook);
   await git.removeWorktree(repo, path, "sub/2");
 });

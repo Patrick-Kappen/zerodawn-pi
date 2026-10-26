@@ -1,6 +1,6 @@
 import { basename, join } from "node:path";
 import { type Blocker, type GateInfo, type Handoff, handoffText } from "./format.ts";
-import { type Git, MAX_SUBJECT, type Source } from "./git.ts";
+import type { Git, Source } from "./git.ts";
 import type { Timers } from "./lifecycle.ts";
 import type { AgentResult, AgentStatus, ServerMessage, SubEvent, Usage } from "./protocol.ts";
 import type { AgentEntry } from "./register.ts";
@@ -40,7 +40,7 @@ interface AgentRecord {
   usage: Usage;
   helloTimer: unknown;
   pending?: { kind: "question" | "blocked"; text: string; blocker?: Blocker };
-  extra: Pick<AgentResult, "blocker" | "handoff" | "reason" | "gate">;
+  extra: Pick<AgentResult, "blocker" | "handoff" | "reason" | "gate" | "commit">;
   handingOff?: boolean;
   concluding?: boolean;
 }
@@ -119,14 +119,8 @@ export function createAgents(options: AgentsOptions) {
     return `removed worktree ${worktree} and branch ${branch}`;
   }
 
-  // The end of an agent: a worktree without changes goes away, one with changes gets the commit when there is one.
-  async function conclude(
-    record: AgentRecord,
-    status: AgentStatus,
-    text: string,
-    extra: AgentRecord["extra"] = {},
-    commit?: { subject: string; body: string[]; change: string },
-  ): Promise<void> {
+  // The end of an agent: a worktree without changes goes away.
+  async function conclude(record: AgentRecord, status: AgentStatus, text: string, extra: AgentRecord["extra"] = {}): Promise<void> {
     if (record.concluding) return;
     record.concluding = true;
     options.timers.clearTimeout(record.helloTimer);
@@ -135,7 +129,6 @@ export function createAgents(options: AgentsOptions) {
       if (worktree !== undefined) {
         const state = await options.git.state(worktree, record.entry.base);
         if (!state.dirty && !state.moved) await drop(record);
-        else if (state.dirty && commit !== undefined) await options.git.commitAll(worktree, commit);
       }
     } catch (cause) {
       finish(
@@ -274,25 +267,19 @@ export function createAgents(options: AgentsOptions) {
     }
   }
 
-  // The checks throw at once; the commit and the result follow.
-  function handoff(id: string, data: Handoff, reason: string | undefined, gate: GateInfo | undefined): Promise<void> {
+  // The checks throw at once; the result follows.
+  function handoff(id: string, data: Handoff, reason: string | undefined, gate: GateInfo | undefined, commit: string | undefined): Promise<void> {
     const record = find(id);
     if (record.entry.status !== "running" || record.concluding) {
       throw new Error(`supervisor: subagent ${id} has status "${record.entry.status}" and cannot send a handoff.`);
     }
     record.pending = undefined;
-    const subject = cut(`subagent ${id.slice(0, 8)}${gate === undefined ? " (unfinished)" : ""}: ${data.summary.replace(/\s+/g, " ")}`, MAX_SUBJECT);
-    return conclude(
-      record,
-      gate === undefined ? "handoff" : "idle",
-      handoffText(data, gate, reason),
-      {
-        handoff: data,
-        ...(reason === undefined ? {} : { reason }),
-        ...(gate === undefined ? {} : { gate }),
-      },
-      { subject, body: data.changes.map((change) => `${change.file}: ${change.what}`), change: data.change },
-    );
+    return conclude(record, gate === undefined ? "handoff" : "idle", handoffText(data, gate, reason), {
+      handoff: data,
+      ...(reason === undefined ? {} : { reason }),
+      ...(gate === undefined ? {} : { gate }),
+      ...(commit === undefined ? {} : { commit }),
+    });
   }
 
   async function discard(id: string): Promise<string> {

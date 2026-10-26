@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GateResult } from "./gate.ts";
+import type { CommitSpec } from "./git.ts";
 import type { ClientMessage } from "./protocol.ts";
 import { CHOICE_PROMPT, createSubHandlers, GATE_HANDOFF_PROMPT, GREEN_HANDOFF_PROMPT, HANDOFF_PROMPT, readSubEnv, shorten } from "./sub.ts";
 
 const GREEN: GateResult = { ok: true, reason: "tests and checks green", files: ["a.ts", "a.test.ts"], tests: "green: 3 pass, 0 fail" };
 const SCOUT_GREEN: GateResult = { ok: true, reason: "no changed files", files: [], tests: "not run: no changed files" };
 const HANDOFF = {
+  subject: "scope: what",
   summary: "It works.",
   change: "fix" as const,
   changes: [
@@ -28,6 +30,8 @@ function setup(result: GateResult | Error = GREEN, idle = false, changed = ["a.t
   const user: string[] = [];
   let gates = 0;
   const calls: string[] = [];
+  const commits: CommitSpec[] = [];
+  const refusals: string[] = [];
   const handlers = createSubHandlers({
     send: (message) => sent.push(message),
     sendUserMessage: (text) => user.push(text),
@@ -36,6 +40,12 @@ function setup(result: GateResult | Error = GREEN, idle = false, changed = ["a.t
     getActiveTools: () => ["read", "ask"],
     setActiveTools: (names) => calls.push(`tools ${names.join(",")}`),
     changed: () => changed,
+    commit: async (spec) => {
+      const refusal = refusals.shift();
+      if (refusal !== undefined) throw new Error(refusal);
+      commits.push(spec);
+      return "abc123";
+    },
     gate: async (send) => {
       gates++;
       if (result instanceof Error) throw result;
@@ -43,7 +53,7 @@ function setup(result: GateResult | Error = GREEN, idle = false, changed = ["a.t
       return result;
     },
   });
-  return { sent, user, handlers, gates: () => gates, calls };
+  return { sent, user, handlers, gates: () => gates, calls, commits, refusals };
 }
 
 const usage = { totalTokens: 10, cost: { total: 0.02 } };
@@ -159,8 +169,10 @@ test("a valid handoff after a green gate sends the gate data and nothing more go
   const { sent, user, calls, handlers } = setup();
   await stopAndDone(handlers);
   sent.length = 0;
-  assert.match(handlers.handoff(HANDOFF), /Handoff sent/);
-  assert.deepEqual(sent, [{ type: "handoff", data: HANDOFF, gate: { ok: true, files: ["a.ts", "a.test.ts"], tests: "green: 3 pass, 0 fail" } }]);
+  assert.match(await handlers.handoff(HANDOFF), /Handoff sent/);
+  assert.deepEqual(sent, [
+    { type: "handoff", data: HANDOFF, gate: { ok: true, files: ["a.ts", "a.test.ts"], tests: "green: 3 pass, 0 fail" }, commit: "abc123" },
+  ]);
   const users = user.length;
   const toolCalls = calls.length;
   await handlers.settled();
@@ -173,7 +185,7 @@ test("a valid handoff after a green gate sends the gate data and nothing more go
 test("a new task after the handoff restores the tools and resets the gate data", async () => {
   const { sent, user, calls, handlers, gates } = setup();
   await stopAndDone(handlers);
-  handlers.handoff(HANDOFF);
+  await handlers.handoff(HANDOFF);
   handlers.onServerMessage({ type: "task", task: "more" });
   assert.deepEqual(calls.slice(-1), ["tools read,ask"]);
   assert.equal(user.at(-1), "more");
@@ -181,35 +193,35 @@ test("a new task after the handoff restores the tools and resets the gate data",
   assert.equal(gates(), 2);
   assert.equal(user.at(-1), GREEN_HANDOFF_PROMPT);
   sent.length = 0;
-  handlers.handoff(HANDOFF);
+  await handlers.handoff(HANDOFF);
   assert.ok(sent[0]?.type === "handoff" && sent[0].gate !== undefined);
 });
 
 test("no changed files and nothing to test: green, and the handoff needs findings", async () => {
   const { sent, handlers } = setup(SCOUT_GREEN, false, []);
   await stopAndDone(handlers);
-  assert.throws(() => handlers.handoff({ ...FINDINGS, findings: [] }), /needs at least one entry/);
-  assert.match(handlers.handoff(FINDINGS), /Handoff sent/);
+  await assert.rejects(() => handlers.handoff({ ...FINDINGS, findings: [] }), /needs at least one entry/);
+  assert.match(await handlers.handoff(FINDINGS), /Handoff sent/);
   assert.deepEqual(sent.at(-1), { type: "handoff", data: FINDINGS, gate: { ok: true, files: [], tests: "not run: no changed files" } });
 });
 
 test("handoff checks changes against git: a missing file, an extra file, and an exact match", async () => {
   const missing = setup(GREEN, false, ["a.ts", "a.test.ts", "b.ts"]);
   await stopAndDone(missing.handlers);
-  assert.throws(
+  await assert.rejects(
     () => missing.handlers.handoff(HANDOFF),
     /Changed: a\.ts, a\.test\.ts, b\.ts\. Listed: a\.ts, a\.test\.ts\. Not changed: none\. Missing: b\.ts\./,
   );
   const extra = setup(GREEN, false, ["a.ts"]);
   await stopAndDone(extra.handlers);
-  assert.throws(() => extra.handlers.handoff(HANDOFF), /Not changed: a\.test\.ts\. Missing: none\./);
+  await assert.rejects(() => extra.handlers.handoff(HANDOFF), /Not changed: a\.test\.ts\. Missing: none\./);
   assert.ok(!extra.sent.some((message) => message.type === "handoff"));
   const none = setup(GREEN, false, []);
   await stopAndDone(none.handlers);
-  assert.throws(() => none.handlers.handoff(HANDOFF), /Changed: none\./);
+  await assert.rejects(() => none.handlers.handoff(HANDOFF), /Changed: none\./);
   const ok = setup(GREEN, false, ["a.test.ts", "a.ts"]);
   await stopAndDone(ok.handlers);
-  assert.match(ok.handlers.handoff(HANDOFF), /Handoff sent/);
+  assert.match(await ok.handlers.handoff(HANDOFF), /Handoff sent/);
 });
 
 test("settled with a red gate sends the gate event and the failures; the agent keeps running", async () => {
@@ -268,8 +280,8 @@ test("the third red gate starts a forced handoff with the gate reason", async ()
   assert.equal(user.at(-1), GATE_HANDOFF_PROMPT);
   assert.equal(calls.at(-1), "tools handoff");
   assert.deepEqual(sent, [{ type: "event", event: { kind: "gate", ok: false, text: "the repository tests are red" } }]);
-  assert.match(handlers.handoff(HANDOFF), /Handoff sent/);
-  assert.deepEqual(sent.at(-1), { type: "handoff", data: HANDOFF, reason: "the repository tests are red" });
+  assert.match(await handlers.handoff(HANDOFF), /Handoff sent/);
+  assert.deepEqual(sent.at(-1), { type: "handoff", data: HANDOFF, reason: "the repository tests are red", commit: "abc123" });
   sent.length = 0;
   await handlers.settled();
   assert.deepEqual(sent, []);
@@ -297,7 +309,7 @@ test("a handoff message aborts, sets only the tool handoff and sends the prompt 
   assert.equal(gates(), 0);
   handlers.onServerMessage({ type: "handoff" });
   assert.deepEqual(calls, ["abort", "tools handoff"]);
-  assert.match(handlers.handoff(FINDINGS), /Handoff sent\. Stop\./);
+  assert.match(await handlers.handoff(FINDINGS), /Handoff sent\. Stop\./);
   assert.deepEqual(sent, [{ type: "handoff", data: FINDINGS }]);
   await handlers.settled();
   assert.equal(gates(), 0);
@@ -319,9 +331,9 @@ test("a handoff message on an idle agent sends the prompt at once", () => {
   assert.deepEqual(user, [HANDOFF_PROMPT]);
 });
 
-test("the tool handoff fails before a handoff is asked for", () => {
+test("the tool handoff fails before a handoff is asked for", async () => {
   const { handlers } = setup();
-  assert.throws(() => handlers.handoff(HANDOFF), /not active/);
+  await assert.rejects(() => handlers.handoff(HANDOFF), /not active/);
 });
 
 test("done fails while a handoff is forced", () => {
@@ -373,4 +385,61 @@ test("a gate that throws sends an error event and no settled", async () => {
   const { sent, handlers } = setup(new Error("git status failed"));
   await stopAndDone(handlers);
   assert.deepEqual(sent, [{ type: "event", event: { kind: "error", text: "done gate failed in the subagent: git status failed" } }]);
+});
+
+test("handoff commits the changes with the subject, the change lines and the trailer data", async () => {
+  const { commits, sent, handlers } = setup();
+  await stopAndDone(handlers);
+  await handlers.handoff(HANDOFF);
+  assert.deepEqual(commits, [{ subject: "scope: what", body: ["a.ts: w", "a.test.ts: t"], change: "fix" }]);
+  assert.ok(
+    (() => {
+      const last = sent.at(-1);
+      return last?.type === "handoff" && "commit" in last ? last.commit : undefined;
+    })() === "abc123",
+  );
+});
+
+test("an unfinished handoff starts the body with the reason", async () => {
+  const token = setup(GREEN, true);
+  token.handlers.onServerMessage({ type: "handoff" });
+  await token.handlers.handoff(HANDOFF);
+  assert.equal(token.commits[0]?.body[0], "Unfinished: token limit");
+  const red = setup({ ok: false, reason: "the repository tests are red" });
+  await stopAndDone(red.handlers);
+  await stopAndDone(red.handlers);
+  await stopAndDone(red.handlers);
+  await red.handlers.handoff(HANDOFF);
+  assert.equal(red.commits[0]?.body[0], "Unfinished: the repository tests are red");
+});
+
+test("no changed files: no commit and no commit sha", async () => {
+  const { commits, sent, handlers } = setup(SCOUT_GREEN, false, []);
+  await stopAndDone(handlers);
+  await handlers.handoff(FINDINGS);
+  assert.deepEqual(commits, []);
+  assert.ok(
+    (() => {
+      const last = sent.at(-1);
+      return last?.type === "handoff" && "commit" in last ? last.commit : undefined;
+    })() === undefined,
+  );
+});
+
+test("a refused commit throws the git output, sends nothing and counts as an invalid call; the next try commits", async () => {
+  const { commits, sent, refusals, handlers } = setup(undefined, true);
+  handlers.onServerMessage({ type: "handoff" });
+  refusals.push("commit-msg hook: bad subject");
+  await assert.rejects(() => handlers.handoff(HANDOFF), /commit-msg hook: bad subject/);
+  assert.ok(!sent.some((message) => message.type === "handoff"));
+  handlers.toolEnd({ toolName: "handoff", isError: true });
+  assert.ok(!sent.some((message) => message.type === "event" && message.event.kind === "error"));
+  await handlers.handoff({ ...HANDOFF, subject: "fix: good" });
+  assert.equal(commits[0]?.subject, "fix: good");
+  assert.ok(
+    (() => {
+      const last = sent.at(-1);
+      return last?.type === "handoff" && "commit" in last ? last.commit : undefined;
+    })() === "abc123",
+  );
 });

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { validateToolArguments } from "@earendil-works/pi-ai";
 import { blockerText, handoffText } from "./format.ts";
+import { MAX_SUBJECT } from "./git.ts";
 import { askSchema, blockerSchema, continueSchema, doneSchema, handoffSchema, MAX_QUESTION, MAX_SUMMARY } from "./schemas.ts";
 
 function check(name: string, parameters: unknown, args: unknown) {
@@ -26,6 +27,7 @@ test("blocker: all fields required, issue not empty, tried has an entry", () => 
 });
 
 const OK_HANDOFF = {
+  subject: "scope: what",
   summary: "s",
   change: "fix" as const,
   changes: [{ file: "a.ts", what: "w" }],
@@ -46,6 +48,9 @@ test("handoff: all fields required; summary 1..200; next may be empty; the lists
   assert.equal(check("handoff", handoffSchema, { ...OK_HANDOFF, summary: "x".repeat(MAX_SUMMARY) })().summary.length, MAX_SUMMARY);
   assert.throws(check("handoff", handoffSchema, { ...OK_HANDOFF, summary: "x".repeat(MAX_SUMMARY + 1) }), /Validation failed/);
   assert.throws(check("handoff", handoffSchema, { ...OK_HANDOFF, summary: "" }), /Validation failed/);
+  assert.throws(check("handoff", handoffSchema, { ...OK_HANDOFF, subject: "" }), /Validation failed/);
+  assert.equal(check("handoff", handoffSchema, { ...OK_HANDOFF, subject: "x".repeat(MAX_SUBJECT) })().subject.length, MAX_SUBJECT);
+  assert.throws(check("handoff", handoffSchema, { ...OK_HANDOFF, subject: "x".repeat(MAX_SUBJECT + 1) }), /Validation failed/);
   assert.throws(check("handoff", handoffSchema, { ...OK_HANDOFF, changes: [{ file: "a.ts" }] }), /Validation failed/);
   assert.throws(check("handoff", handoffSchema, { ...OK_HANDOFF, tests: [{ file: "t.ts" }] }), /Validation failed/);
   assert.throws(check("handoff", handoffSchema, { ...OK_HANDOFF, findings: [""] }), /Validation failed/);

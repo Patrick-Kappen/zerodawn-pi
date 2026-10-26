@@ -1,6 +1,7 @@
 import { forceAnyTool, forceTool } from "./force.ts";
 import type { Blocker, GateInfo, Handoff } from "./format.ts";
 import type { GateResult } from "./gate.ts";
+import type { CommitSpec } from "./git.ts";
 import type { ClientMessage, ServerMessage } from "./protocol.ts";
 
 export const MAX_FIELD = 200;
@@ -71,6 +72,7 @@ export interface SubHandlerOptions {
   getActiveTools: () => string[];
   setActiveTools: (names: string[]) => void;
   changed: () => string[];
+  commit: (spec: CommitSpec) => Promise<string>;
   gate: (sendUserMessage: (text: string) => void) => Promise<GateResult>;
 }
 
@@ -178,7 +180,7 @@ export function createSubHandlers(options: SubHandlerOptions) {
       doneCalled = true;
       return "The checks run now. Stop and wait for the result.";
     },
-    handoff(data: Handoff): string {
+    async handoff(data: Handoff): Promise<string> {
       if (state !== "forced") throw new Error("handoff: the tool is not active. Do not call it until the supervisor asks for a handoff.");
       const listed = new Set(data.changes.map((change) => change.file));
       const changed = new Set(options.changed());
@@ -192,11 +194,21 @@ export function createSubHandlers(options: SubHandlerOptions) {
       if (changed.size === 0 && data.findings.length === 0) {
         throw new Error('handoff: no file changed, so "findings" needs at least one entry with path:line. Call handoff again with the findings.');
       }
+      const unfinished = gateInfo === undefined ? [`Unfinished: ${gateReason ?? "token limit"}`] : [];
+      const commit =
+        changed.size === 0
+          ? undefined
+          : await options.commit({
+              subject: data.subject,
+              body: [...unfinished, ...data.changes.map((change) => `${change.file}: ${change.what}`)],
+              change: data.change,
+            });
       options.send({
         type: "handoff",
         data,
         ...(gateReason === undefined ? {} : { reason: gateReason }),
         ...(gateInfo === undefined ? {} : { gate: gateInfo }),
+        ...(commit === undefined ? {} : { commit }),
       });
       state = "done";
       return "Handoff sent. Stop.";

@@ -23,6 +23,23 @@ export interface CommitSpec {
   change: string;
 }
 
+/** Runs in the subagent: commits all changes in its worktree. A refused commit leaves the index clean and throws. */
+export async function commitAll(exec: Exec, path: string, spec: CommitSpec): Promise<string> {
+  await git(exec, ["-C", path, "add", "-A"], `could not stage the changes in "${path}"`);
+  const paragraphs = [...(spec.body.length > 0 ? [spec.body.join("\n")] : []), `Change: ${spec.change}`];
+  try {
+    await git(
+      exec,
+      ["-C", path, "commit", "-m", spec.subject, ...paragraphs.flatMap((paragraph) => ["-m", paragraph])],
+      `the commit in "${path}" was refused. Call handoff again with a subject that obeys the commit rules of the repository`,
+    );
+  } catch (cause) {
+    await git(exec, ["-C", path, "reset", "-q"], `could not reset the index in "${path}" after the refused commit`);
+    throw cause;
+  }
+  return git(exec, ["-C", path, "rev-parse", "HEAD"], `could not read HEAD of "${path}"`);
+}
+
 async function git(exec: Exec, args: string[], what: string): Promise<string> {
   let result: Awaited<ReturnType<Exec>>;
   try {
@@ -73,22 +90,12 @@ export function createGit(exec: Exec) {
     return { dirty, moved: head !== base };
   }
 
-  async function commitAll(path: string, spec: CommitSpec): Promise<void> {
-    await git(exec, ["-C", path, "add", "-A"], `could not stage the changes in "${path}"`);
-    const paragraphs = [...(spec.body.length > 0 ? [spec.body.join("\n")] : []), `Change: ${spec.change}`];
-    await git(
-      exec,
-      ["-C", path, "commit", "-m", spec.subject, ...paragraphs.flatMap((paragraph) => ["-m", paragraph])],
-      `the commit in "${path}" failed. The repository hooks may have refused it`,
-    );
-  }
-
   async function removeWorktree(repo: string, path: string, branch: string): Promise<void> {
     await git(exec, ["-C", repo, "worktree", "remove", "--force", path], `could not remove the worktree "${path}"`);
     await git(exec, ["-C", repo, "branch", "-D", branch], `could not delete the branch "${branch}"`);
   }
 
-  return { addWorktree, state, commitAll, removeWorktree };
+  return { addWorktree, state, removeWorktree };
 }
 
 export type Git = ReturnType<typeof createGit>;

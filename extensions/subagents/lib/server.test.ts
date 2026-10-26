@@ -152,7 +152,7 @@ test("supervisor: start, sub hello, task, events, one result to main, immediate 
     const status = (await mainNext()) as { agents: { status: string }[] };
     assert.equal(status.agents[0]?.status, "running");
     sub.write(
-      '{"type":"handoff","data":{"summary":"s","change":"fix","changes":[],"tests":[],"findings":["a.ts:1 x"],"decisions":[],"open":[],"next":"","risks":[]},"gate":{"ok":true,"files":[],"tests":"none"}}\n',
+      '{"type":"handoff","data":{"subject":"scope: what","summary":"s","change":"fix","changes":[],"tests":[],"findings":["a.ts:1 x"],"decisions":[],"open":[],"next":"","risks":[]},"gate":{"ok":true,"files":[],"tests":"none"}}\n',
     );
     assert.deepEqual(await mainNext(), {
       type: "result",
@@ -161,7 +161,18 @@ test("supervisor: start, sub hello, task, events, one result to main, immediate 
       text: "s\na.ts:1 x\ntests: none",
       usage: { tokens: 3, cost: 0.1 },
       events: ["tool bash {}", "message m"],
-      handoff: { summary: "s", change: "fix", changes: [], tests: [], findings: ["a.ts:1 x"], decisions: [], open: [], next: "", risks: [] },
+      handoff: {
+        subject: "scope: what",
+        summary: "s",
+        change: "fix",
+        changes: [],
+        tests: [],
+        findings: ["a.ts:1 x"],
+        decisions: [],
+        open: [],
+        next: "",
+        risks: [],
+      },
       gate: { ok: true, files: [], tests: "none" },
     });
 
@@ -196,7 +207,7 @@ test("supervisor: main gone while an agent runs; the supervisor ends when the ag
       false,
     );
     sub.write(
-      '{"type":"handoff","data":{"summary":"s","change":"fix","changes":[],"tests":[],"findings":["a.ts:1 x"],"decisions":[],"open":[],"next":"","risks":[]},"gate":{"ok":true,"files":[],"tests":"none"}}\n',
+      '{"type":"handoff","data":{"subject":"scope: what","summary":"s","change":"fix","changes":[],"tests":[],"findings":["a.ts:1 x"],"decisions":[],"open":[],"next":"","risks":[]},"gate":{"ok":true,"files":[],"tests":"none"}}\n',
     );
     await supervisor.done;
     assert.deepEqual(calls.at(-1), ["kill", "pi-sub-abcd1234"]);

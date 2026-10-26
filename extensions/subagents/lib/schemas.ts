@@ -1,4 +1,5 @@
 import { Type } from "typebox";
+import { MAX_SUBJECT } from "./git.ts";
 
 export const MAX_QUESTION = 500;
 
@@ -15,6 +16,7 @@ export const blockerSchema = Type.Object({
 export const MAX_SUMMARY = 200;
 
 export const handoffSchema = Type.Object({
+  subject: Type.String({ minLength: 1, maxLength: MAX_SUBJECT, description: "The commit subject. Obey the commit rules of the repository." }),
   summary: Type.String({ minLength: 1, maxLength: MAX_SUMMARY, description: `What works now, in one sentence. Max ${MAX_SUMMARY} characters.` }),
   change: Type.Union([Type.Literal("fix"), Type.Literal("feature"), Type.Literal("breaking")], {
     description: "The kind of change for the commit trailer: fix (no new behaviour), feature (new behaviour, old use works), breaking (old use stops working).",

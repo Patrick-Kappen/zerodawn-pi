@@ -40,8 +40,6 @@ function fakeGit(dirty: boolean, log: string[]) {
   return {
     addWorktree: async (spec: { path: string; branch: string; sha: string }) => void log.push(`add ${spec.path} ${spec.branch} ${spec.sha}`),
     state: async () => ({ dirty, moved: false }),
-    commitAll: async (path: string, spec: { subject: string; body: string[]; change: string }) =>
-      void log.push(`commit ${path} ${spec.subject} | ${spec.body.join("/")} | ${spec.change}`),
     removeWorktree: async (_repo: string, path: string, branch: string) => void log.push(`remove ${path} ${branch}`),
   };
 }
@@ -87,7 +85,18 @@ function setup(options: { openFails?: boolean; dirty?: boolean } = {}) {
 const ID = "abcdef12-0000-4000-8000-000000000000";
 const ARGS = ["--no-tools", "--no-mcp", "--model", "m/x:off", "--system-prompt", "You are a test."];
 const usage = { tokens: 10, cost: 0.5 };
-const SCOUT = { summary: "s", change: "fix" as const, changes: [], tests: [], findings: ["a.ts:1 x"], decisions: [], open: [], next: "", risks: [] };
+const SCOUT = {
+  subject: "scope: what",
+  summary: "s",
+  change: "fix" as const,
+  changes: [],
+  tests: [],
+  findings: ["a.ts:1 x"],
+  decisions: [],
+  open: [],
+  next: "",
+  risks: [],
+};
 const GATE = { ok: true as const, files: [], tests: "not run: no changed files" };
 const HANDOFF = { ...SCOUT, summary: "partly", findings: [], changes: [{ file: "f.ts", what: "w" }], open: ["c"], next: "d", risks: ["r"] };
 
@@ -103,7 +112,7 @@ test("usage at the token limit asks for a handoff once; the handoff data gives s
   agents.event(ID, { kind: "message", text: "c", usage: { tokens: 5, cost: 1 } });
   assert.deepEqual(toSub.slice(1), [[ID, { type: "handoff" }]]);
   assert.equal(toMains.length, 0);
-  await agents.handoff(ID, HANDOFF, undefined, undefined);
+  await agents.handoff(ID, HANDOFF, undefined, undefined, undefined);
   assert.equal(agents.entries()[0]?.status, "handoff");
   const message = toMains[0];
   assert.ok(message?.type === "result");
@@ -112,14 +121,14 @@ test("usage at the token limit asks for a handoff once; the handoff data gives s
   assert.deepEqual(message.handoff, HANDOFF);
   assert.equal(message.reason, undefined);
   assert.throws(() => agents.answer(ID, "go on"), /status "handoff"/);
-  assert.throws(() => agents.handoff(ID, HANDOFF, undefined, undefined), /status "handoff" and cannot send a handoff/);
+  assert.throws(() => agents.handoff(ID, HANDOFF, undefined, undefined, undefined), /status "handoff" and cannot send a handoff/);
 });
 
 test("a handoff with a gate reason has the reason line and the reason in the result", async () => {
   const { agents, toMains } = setup();
   await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
-  await agents.handoff(ID, HANDOFF, "tests red", undefined);
+  await agents.handoff(ID, HANDOFF, "tests red", undefined, undefined);
   const message = toMains[0];
   assert.ok(message?.type === "result");
   assert.equal(message.status, "handoff");
@@ -178,7 +187,7 @@ test("hello sends the task and sets running; settle sets idle and sends one resu
   agents.event(ID, { kind: "tool_start", name: "bash", args: "{}" });
   agents.event(ID, { kind: "message", text: "m", usage });
   agents.event(ID, { kind: "message", text: "n", usage });
-  await agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE, undefined);
   assert.equal(agents.entries()[0]?.status, "idle");
   assert.equal(agents.running(), false);
   assert.deepEqual(toMains, [
@@ -202,13 +211,13 @@ test("a handoff with a gate gives status idle with the text, the data and the ga
   const data = { ...SCOUT, changes: [{ file: "a.ts", what: "w" }], tests: [{ file: "a.test.ts", covers: "c" }], findings: [], open: ["o"] };
   const gate = { ok: true as const, files: ["a.ts", "a.test.ts"], tests: "green: 2 pass, 0 fail" };
   agents.pending(ID, "question", "q");
-  await agents.handoff(ID, data, undefined, gate);
+  await agents.handoff(ID, data, undefined, gate, undefined);
   const message = toMains[0];
   assert.ok(message?.type === "result");
   assert.equal(message.status, "idle");
   assert.equal(message.text, "s\na.ts: w\ntests: green: 2 pass, 0 fail; added: a.test.ts\nopen: o");
   assert.deepEqual([message.handoff, message.gate, message.reason], [data, gate, undefined]);
-  assert.throws(() => agents.handoff(ID, data, undefined, gate), /status "idle" and cannot send a handoff/);
+  assert.throws(() => agents.handoff(ID, data, undefined, gate, undefined), /status "idle" and cannot send a handoff/);
 });
 
 test("a settle without a handoff, a question or a blocker fails the agent", async () => {
@@ -237,7 +246,7 @@ test("ask then settle gives status question with the text, then clears it", asyn
     [["question", "which db?"]],
   );
   agents.answer(ID, "sqlite");
-  await agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE, undefined);
   assert.deepEqual(toMains.map((message) => message.type === "result" && [message.status, message.text]).at(-1), [
     "idle",
     "s\na.ts:1 x\ntests: not run: no changed files",
@@ -257,7 +266,7 @@ test("blocker then settle gives status blocked", async () => {
     [["blocked", "no access\nfiles: a\ntried: b", blocker]],
   );
   agents.answer(ID, "use the key");
-  await agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE, undefined);
   const last = toMains.at(-1);
   assert.ok(last?.type === "result");
   assert.equal(last.blocker, undefined);
@@ -280,7 +289,7 @@ test("answer sends the text as a task and sets running, from idle, question and 
   const { agents, toSub } = setup({ dirty: true });
   await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
-  await agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE, undefined);
   agents.answer(ID, "more");
   assert.deepEqual(toSub.at(-1), [ID, { type: "task", task: "more" }]);
   assert.equal(agents.entries()[0]?.status, "running");
@@ -300,7 +309,7 @@ test("answer and pending errors: unknown id, wrong status, empty text", async ()
   assert.throws(() => agents.answer("nope", "x"), /no subagent/);
   assert.throws(() => agents.answer(ID, "  "), /non-empty/);
   assert.throws(() => agents.pending("nope", "question", "q"), /no subagent/);
-  await agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE, undefined);
   assert.throws(() => agents.pending(ID, "question", "q"), /status "idle"/);
 });
 
@@ -309,7 +318,7 @@ test("only the last 20 events are kept, each at most 200 characters", async () =
   await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
   for (let i = 0; i < 30; i++) agents.event(ID, { kind: "tool_start", name: `t${i}`, args: "a".repeat(500) });
-  await agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE, undefined);
   const result = toMains[0];
   assert.ok(result?.type === "result");
   assert.equal(result.events.length, MAX_EVENTS);
@@ -367,7 +376,7 @@ test("a settled agent whose window is gone stays idle", async () => {
   const { agents, clock, setWindows } = setup();
   await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
-  await agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE, undefined);
   setWindows([]);
   await clock.advance(10_000);
   assert.equal(agents.entries()[0]?.status, "idle");
@@ -382,7 +391,7 @@ test("late events of a failed agent are ignored; a second settle does not send a
   const second = setup();
   await second.agents.start("t", ARGS, [], SOURCE);
   second.agents.hello(ID);
-  await second.agents.handoff(ID, SCOUT, undefined, GATE);
+  await second.agents.handoff(ID, SCOUT, undefined, GATE, undefined);
   second.agents.event(ID, { kind: "settled", text: "b" });
   assert.equal(second.toMains.length, 1);
 });
@@ -473,69 +482,24 @@ test("a failed window start removes the worktree; a failed worktree start leaves
   assert.deepEqual(agents.entries(), []);
 });
 
-test("a green handoff with changes commits, keeps the worktree and reports it", async () => {
+test("a handoff with changes and a commit keeps the worktree and reports the commit; the supervisor does not commit", async () => {
   const { agents, gitLog, toMains } = setup({ dirty: true });
   await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
   const data = { ...SCOUT, change: "feature" as const, changes: [{ file: "a.ts", what: "w" }], findings: [] };
-  await agents.handoff(ID, data, undefined, { ok: true, files: ["a.ts"], tests: "green" });
-  assert.deepEqual(gitLog.slice(1), [`commit ${WORKTREE} subagent abcdef12: s | a.ts: w | feature`]);
+  await agents.handoff(ID, data, undefined, { ok: true, files: ["a.ts"], tests: "green" }, "c".repeat(40));
+  assert.deepEqual(gitLog.slice(1), []);
   const message = toMains[0];
   assert.ok(message?.type === "result");
-  assert.deepEqual([message.status, message.worktree, message.branch], ["idle", WORKTREE, "sub/abcdef12"]);
+  assert.deepEqual([message.status, message.worktree, message.branch, message.commit], ["idle", WORKTREE, "sub/abcdef12", "c".repeat(40)]);
   assert.equal(agents.entries()[0]?.worktree, WORKTREE);
-});
-
-test("an unfinished handoff commits with the unfinished subject, cut to 72 characters", async () => {
-  const { agents, gitLog, toMains } = setup({ dirty: true });
-  await agents.start("t", ARGS, [], SOURCE);
-  agents.hello(ID);
-  await agents.handoff(ID, { ...SCOUT, summary: "x".repeat(150) }, undefined, undefined);
-  const subject = gitLog[1]?.split(" | ")[0]?.replace(`commit ${WORKTREE} `, "") ?? "";
-  assert.equal(subject.length, 72);
-  assert.match(subject, /^subagent abcdef12 \(unfinished\): x+…$/);
-  assert.equal(toMains[0]?.type === "result" && toMains[0].status, "handoff");
-});
-
-test("a commit that the hooks refuse gives status failed and keeps the worktree", async () => {
-  const clock = fakeClock();
-  const toMains: ServerMessage[] = [];
-  const agents = createAgents({
-    session: "pi-sub-abcd1234",
-    dir: "/d",
-    socket: "/s",
-    piCommand: "pi",
-    home: "/h",
-    git: {
-      ...fakeGit(true, []),
-      commitAll: async () => {
-        throw new Error("hook lint failed");
-      },
-    },
-    extensions: ["/x"],
-    tmux: { openWindow: async () => "@1", listWindows: async () => [{ id: "@1", name: "x" }] },
-    timers: clock.timers,
-    newId: () => ID,
-    sendToSub: () => {},
-    sendToMains: (message) => toMains.push(message),
-    onChange: () => {},
-    onError: () => {},
-  });
-  await agents.start("t", ARGS, [], SOURCE);
-  agents.hello(ID);
-  await agents.handoff(ID, SCOUT, undefined, GATE);
-  const message = toMains[0];
-  assert.ok(message?.type === "result");
-  assert.equal(message.status, "failed");
-  assert.match(message.text, /hook lint failed/);
-  assert.equal(message.worktree, WORKTREE);
 });
 
 test("an agent without changes loses its worktree and branch at the end", async () => {
   const { agents, gitLog, toMains } = setup();
   await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
-  await agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE, undefined);
   assert.equal(gitLog.at(-1), `remove ${WORKTREE} sub/abcdef12`);
   const message = toMains[0];
   assert.ok(message?.type === "result");
@@ -549,7 +513,7 @@ test("discard refuses a running agent, removes the worktree of an ended one, and
   await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
   await assert.rejects(agents.discard(ID), /runs/);
-  await agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE, undefined);
   assert.equal(await agents.discard(ID), `removed worktree ${WORKTREE} and branch sub/abcdef12`);
   assert.equal(gitLog.at(-1), `remove ${WORKTREE} sub/abcdef12`);
   await assert.rejects(agents.discard(ID), /has no worktree/);
