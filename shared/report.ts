@@ -62,9 +62,9 @@ export function warnings(output: string): string {
   return cap(out);
 }
 
-const ERROR = /\berror\b|\bfail(ed|ure)?\b/i;
+const ERROR = /(?<![-\w])(error|fail(ed|ure)?)\b|not found|no such file|permission denied|\bcannot\b/i;
 const LOCATION = /\S+\.\w+(:\d+(:\d+)?|\(\d+,\d+\))/;
-const SUMMARY = /^\s*(Found|Checked) \d+ /;
+const SUMMARY = /^\s*((Found|Checked) \d+ |\S+ Some (warnings|errors) were emitted)/;
 const LAST = 20;
 
 /**
