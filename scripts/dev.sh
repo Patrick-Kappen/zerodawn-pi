@@ -32,11 +32,22 @@ printf '\n\e[1mdone\e[0m\n'
 printf 'step 1\nstep 2\n\e[1A\e[2Kstep 2 (fixed)\n'
 EOF
 chmod +x progress.sh
+# A real test: a gate or run_tests in the sandbox must see a red test as red.
+[ -f package.json ] || printf '{ "name": "sandbox", "type": "module" }\n' > package.json
+printf 'export const sum = (a: number, b: number): number => a + b;\n' > sum.ts
+cat > sum.test.ts <<'EOF'
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { sum } from "./sum.ts";
+
+test("sum adds two numbers", () => {
+  assert.equal(sum(2, 3), 5);
+});
+EOF
 cat > justfile <<'EOF'
 # Run the tests
 test:
-    sleep 3
-    echo "41 passed"
+    bun test
 
 # Run a 20 s job
 medium:
