@@ -17,4 +17,6 @@
 - Think of subagents / Agent profiles
 - Think of orchastration and orchastration of orchastration
 - Make nvimx open the file that the agent is editting preferably before the agent start changing stuff. I guess there are also tpyes of extensions that can help with that? https://github.com/aliou/nvim-pi
-- Extension for a quick branch off conversation like /btw
+- Extension for a quick branch off conversation like /btw.
+- A good CI/CD flow with agent it necesary
+- Really fix the bash calls

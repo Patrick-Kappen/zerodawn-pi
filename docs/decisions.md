@@ -22,6 +22,10 @@ A commit subject starts with the extension name (`bash: …`). The changelog per
 
 `bash`, `git`, `files`, `opencode`, `ast-grep` for tools; `core` (`/ext`), `ui`, `tests`, `ctx-manager`, `systemstate`, `watchdog`, `gateway` for behaviour. Tool and command names inside pi do not change with a directory name.
 
+## 6. bash jobs run without a terminal (2026-10-26)
+
+A job ran in a PTY under `script`. Programs saw a terminal and started pagers, editors and raw-mode prompts, which waited until the time limit. Now a job runs like in CI: stdout and stderr go to the log file, stdin is `/dev/null`, the job has its own session without a controlling terminal, and `NON_INTERACTIVE` in `jobproc.ts` sets the env that known tools obey. A pager, editor or prompt fails at once with a visible error. `env --default-signal=PIPE` undoes the ignored SIGPIPE that a Node child inherits, so `cmd | head` ends `cmd` instead of making it fail or spin. An open stdin with `jobs send` was tried and dropped: tools such as `rg` and `jq` read a stdin pipe instead of the working directory, and prompts that poll stdin are not detectable. Cost: tools that color only on a terminal print plain text.
+
 ## 5. A version per extension, one release unit (2026-10-25)
 
 Every extension has a `package.json` with a version and gets a tag `<name>-v<version>`. The deploy unit stays the repository commit: one flake input, one lock. Per-extension versions mark what changed and drive `just compat`, which tests each extension's last release against the current `shared/`. Mixing versions of extensions in one install is not supported; `shared/` must stay backward compatible.

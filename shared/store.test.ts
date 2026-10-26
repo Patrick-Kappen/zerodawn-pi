@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { callNumber, freeId, outFile, sessionDir, shorten, storeDir } from "./store.ts";
+import { callFileId, callNumber, callOutFile, freeId, outFile, sessionDir, shorten, storeDir } from "./store.ts";
 
 const ctx = (file: string | undefined, branch: unknown[] = []) => ({ sessionManager: { getSessionFile: () => file, getBranch: () => branch } }) as any;
 
@@ -38,6 +38,9 @@ test("callNumber is <user turn>.<assistant round>-C<call index>", () => {
   assert.equal(callNumber(c, "c"), "1.2-C2");
   assert.equal(callNumber(c, "d"), "2.1-C1");
   assert.equal(callNumber(c, "toolu_0123456789"), "x-23456789");
+  assert.equal(callFileId(c, "c"), "1.2-C2");
+  assert.equal(callFileId(c, "c/3"), "1.2-C2.3");
+  assert.equal(callFileId(c, "c/a b/../x"), "1.2-C2.a_b....x");
 });
 
 test("storeDir and outFile create <session>/out and <session>/jobs and number the files", () => {
@@ -51,6 +54,7 @@ test("storeDir and outFile create <session>/out and <session>/jobs and number th
     assert.equal(storeDir(c, "jobs"), join(root, "s", "jobs"));
     assert.ok(existsSync(join(root, "s", "jobs")));
     assert.equal(outFile(c, "a", "bash"), join(root, "s", "out", "1.1-C1.bash.log"));
+    assert.equal(callOutFile(c, "a/2", "git"), join(root, "s", "out", "1.1-C1.2.git.log"));
   } finally {
     rmSync(root, { recursive: true });
   }

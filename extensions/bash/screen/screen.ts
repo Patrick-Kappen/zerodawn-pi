@@ -72,6 +72,7 @@ export class Screen {
         return;
       case "\n":
         this.row++;
+        this.col = 0;
         while (this.buffer.length <= this.row) this.buffer.push([]);
         return;
       case "\b":

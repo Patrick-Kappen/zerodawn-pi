@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Key } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { callNumber, freeId, shorten, storeDir } from "../../../shared/store.ts";
+import { callFileId, freeId, shorten, storeDir } from "../../../shared/store.ts";
 import { age } from "../../../shared/util.ts";
 import { DEFAULT_LIMIT_S, MAX_BYTES, MAX_LINES, NO_TIME_LIMIT, STREAM_LINES, STREAM_MS, STREAM_TAIL_BYTES } from "../config.ts";
 import type { State } from "../state.ts";
@@ -48,7 +48,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const outDir = storeDir(ctx, "out");
       const jobsDir = storeDir(ctx, "jobs");
-      const id = freeId(callNumber(ctx, toolCallId), (i) => existsSync(join(outDir, `${i}.bash.log`)) || existsSync(join(jobsDir, `${i}.json`)));
+      const id = freeId(callFileId(ctx, toolCallId), (i) => existsSync(join(outDir, `${i}.bash.log`)) || existsSync(join(jobsDir, `${i}.json`)));
       const log = join(outDir, `${id}.bash.log`);
       const base = join(jobsDir, id);
       writeFileSync(`${base}.sh`, `${params.command}\n`);

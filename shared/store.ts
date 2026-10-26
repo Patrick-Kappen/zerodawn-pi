@@ -45,4 +45,17 @@ export function outFile(ctx: ExtensionContext, toolCallId: string, kind: string)
   return join(dir, `${id}.${kind}.log`);
 }
 
+// A codemode tool call has the id "<codemode call>/<n>"; only the codemode call is in the session.
+export function callFileId(ctx: ExtensionContext, toolCallId: string): string {
+  const [parent, ...rest] = toolCallId.split("/");
+  const base = callNumber(ctx, parent);
+  return rest.length ? `${base}.${rest.join(".").replace(/[^\w.-]/g, "_")}` : base;
+}
+
+export function callOutFile(ctx: ExtensionContext, toolCallId: string, kind: string): string {
+  const dir = storeDir(ctx, "out");
+  const id = freeId(callFileId(ctx, toolCallId), (i) => existsSync(join(dir, `${i}.${kind}.log`)));
+  return join(dir, `${id}.${kind}.log`);
+}
+
 export const shorten = (path: string) => path.replace(homedir(), "~");
