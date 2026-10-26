@@ -29,17 +29,19 @@ log: ~/.pi/agent/sessions/…/out/3.2-C1.tests.log
 
 `red` starts the line when a test fails, a changed file has no test, or the output has a warning. A failure shows the failures, without passed tests and runtime stack frames. A warning shows each warning line with its context. A warning line has "warn" in it (not in an option such as `--error-on-warnings`), or starts with `! ` (biome). The run stops after 10 minutes. A stop by the user ends the run and its child processes.
 
+A run that takes more than 15 s continues in the background. The tool result then says so, and the agent continues. When the run ends, a message gives the short result to the agent: during a run as a steer message, else it starts a new turn. A second call for the same change does not start a second run. A new session stops the background runs.
+
 ## Bash
 
 Each bash command goes through these steps, in this order:
 
-1. A test command (`just test`, `bun test`, `bun x.test.ts`, `pytest`, `python -m unittest`, `cargo test`, `go test`, `dotnet test`, `Invoke-Pester`, ...) is blocked. In its place, `run_tests` runs for the changed files, in the directory of a leading `cd <dir> &&`. The reason of the block tells the agent to use `run_tests` and gives the result. `# rerun` in the command runs it again when no file changed.
+1. A test command (`just test`, `bun test`, `bun x.test.ts`, `pytest`, `python -m unittest`, `cargo test`, `go test`, `dotnet test`, `Invoke-Pester`, ...): `run_tests` runs for the changed files, in the directory of a leading `cd <dir> &&`. The bash result is the `run_tests` result, and tells the agent to use `run_tests`. `# rerun` in the command runs it again when no file changed.
 2. A command that is the body of a recipe is blocked: run the recipe instead.
-3. A check command (`just check`, `just lint`, `nix flake check`, `biome check`, `eslint`, `tsc`, `cargo clippy`, `ruff check`, `go vet`, ...) is blocked and runs in place, with the same short result as the tests. A warning makes it red. When no file changed, it gives the earlier result; `# rerun` runs it again.
+3. A check command (`just check`, `just lint`, `nix flake check`, `biome check`, `eslint`, `tsc`, `cargo clippy`, `ruff check`, `go vet`, ...): the extension runs it, and the bash result is the same short result as for the tests. A warning makes it red. When no file changed, it gives the earlier result; `# rerun` runs it again.
+
+For 1 and 3 nothing is blocked. The extension starts the run in `tool_call`, and bash runs `:` in place of the command. The `tool_result` hook waits for the run and replaces the result and its error state, so the pi UI shows green or red. The transcript keeps the command of the agent: pi gives `tool_call` a copy of the arguments.
 
 A command counts only at the start of a command: after `;`, `&&`, `|`, `(`, `then` or `do`, and after `VAR=x`, `npx`, `bunx`, `uv run`, `poetry run`, `nix develop -c`, `timeout` or `time`. Text in quotes and heredocs does not count. The string of `bash -c`, `sh -c` and `pwsh -c` counts.
-
-A blocked call shows as an error in the pi UI, also when the result is green: pi skips the `tool_result` hook for a blocked call.
 
 ## Hint
 

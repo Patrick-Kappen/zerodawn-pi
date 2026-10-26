@@ -9,6 +9,7 @@ import { counts, failures, warningCount, warnings } from "./report.ts";
 import { isCode, parseStatus, type Read, selectTests } from "./select.ts";
 
 const TIMEOUT_MS = 10 * 60 * 1000;
+const INLINE_MS = 15 * 1000;
 const CHANGED_RECIPE = "test-changed";
 const ALL_RECIPE = "test";
 const RERUN = "# rerun";
@@ -177,8 +178,9 @@ export const TOOL = {
   ].join(" "),
   promptSnippet: "Run the tests for the changed files; green in one line, or only the failures",
   promptGuidelines: [
-    "Run tests only with run_tests. A test command in bash is blocked, and run_tests runs in its place.",
-    "A check command in bash (lint, types, just check) runs in place, with a short result. A warning is an error: fix it.",
+    "Run tests only with run_tests. A test command in bash runs run_tests in its place.",
+    "A check command in bash (lint, types, just check) gives a short result. A warning is an error: fix it.",
+    `A run longer than ${INLINE_MS / 1000} s continues in the background. Continue with other work; a message reports the result.`,
     "Add or change a test for each new behaviour or bug fix, then run run_tests.",
     "run_tests gives the earlier result when no file changed. Set rerun only for a flaky test.",
   ],
@@ -193,42 +195,106 @@ export function cdOf(command: string): string | undefined {
   return command.match(LEADING_CD)?.[1].replace(/^["']|["']$/g, "");
 }
 
-const TEST_HEAD = "Test commands are blocked in bash. Use the run_tests tool. run_tests ran in place of your command:";
-const CHECK_HEAD = "Check commands run in place, with a short result. Do not run the same check in another form. The result of your command:";
+const LATER = "Continue with other work. A message gives the result. It is not a bash job: jobs wait does not see it.";
+const TEST_HEAD = "Test commands in bash run through run_tests. Use run_tests next time. Result:";
+const CHECK_HEAD = "Check commands in bash give a short result. Do not run the same check in another form. Result:";
 
-/** The run_tests tool without its schema, and the check commands; keeps the last results to give them again when no file changed. */
+/** The text and the state of a bash call that a test or check run replaced. */
+export type Replacement = { text: string; isError: boolean };
+
+/** Gives the result of a run that went to the background, as a message to the agent. */
+export type Notify = (text: string, ok: boolean) => void;
+
+const text = (t: string, isError: boolean, details: Record<string, unknown> = {}): Result => ({ content: [{ type: "text", text: t }], details, isError });
+
+/**
+ * The run_tests tool without its schema, and the check commands. Keeps the last results to give them again when no file changed.
+ * A run waits up to inlineMs for its result; after that it continues in the background, and notify gives its result.
+ */
 export class RunTests {
   private last = new Map<string, Result>();
+  private running = new Map<string, Promise<Result>>();
+  private session = new AbortController();
 
+  constructor(
+    private readonly notify: Notify,
+    private readonly inlineMs = INLINE_MS,
+  ) {}
+
+  /** Forgets the results and stops the background runs, for a new session. */
   reset() {
     this.last.clear();
+    this.running.clear();
+    this.session.abort();
+    this.session = new AbortController();
   }
 
-  /** Runs the tests for the changed files in place of a test command in bash, in the directory of its leading cd; the text is the reason of the block. */
-  async insteadOfBash(toolCallId: string, command: string, ctx: ExtensionContext): Promise<string> {
+  /** Runs the tests for the changed files in place of a test command in bash, in the directory of its leading cd. */
+  async insteadOfBash(toolCallId: string, command: string, ctx: ExtensionContext): Promise<Replacement> {
     try {
-      return `${TEST_HEAD}\n${(await this.execute(toolCallId, { path: cdOf(command), rerun: command.includes(RERUN) }, ctx.signal, ctx)).content[0].text}`;
+      const r = await this.execute(toolCallId, { path: cdOf(command), rerun: command.includes(RERUN) }, ctx.signal, ctx);
+      return { text: `${TEST_HEAD}\n${r.content[0].text}`, isError: r.isError };
     } catch (err) {
-      return `${TEST_HEAD}\n${(err as Error).message}`;
+      return { text: `${TEST_HEAD}\n${(err as Error).message}`, isError: true };
     }
   }
 
-  /** Runs a check command such as "just check" in place of bash, with the same short result as the tests; the text is the reason of the block. */
-  async check(toolCallId: string, command: string, ctx: ExtensionContext): Promise<string> {
+  /** Runs a check command such as "just check" in place of bash, with the same short result as the tests. */
+  async check(toolCallId: string, command: string, ctx: ExtensionContext): Promise<Replacement> {
     try {
       const dir = absolutePath(cdOf(command) ?? ".", ctx.cwd);
-      const key = inGit(dir) ? fingerprint(dir, `check ${command.replace(RERUN, "").trim()}`, changedFiles(dir)) : undefined;
-      const earlier = key ? this.last.get(key) : undefined;
-      if (earlier && !command.includes(RERUN)) return `${CHECK_HEAD}\n${again(earlier, `add "${RERUN}" to run it again`).content[0].text}`;
-      const run = await execute(["bash", "-c", command], ctx.cwd, ctx.signal);
-      const log = callOutFile(ctx, toolCallId, "check");
-      writeFileSync(log, run.output);
-      const { text, ok } = report(run, command, [], log);
-      if (key) this.last.set(key, { content: [{ type: "text", text }], details: { log }, isError: !ok });
-      return `${CHECK_HEAD}\n${text}`;
+      const clean = command.replace(RERUN, "").trim();
+      const key = inGit(dir) ? fingerprint(dir, `check ${clean}`, changedFiles(dir)) : `check ${dir} ${clean}`;
+      const earlier = this.last.get(key);
+      if (earlier && !command.includes(RERUN))
+        return { text: `${CHECK_HEAD}\n${again(earlier, `add "${RERUN}" to run it again`).content[0].text}`, isError: earlier.isError };
+      const r = await this.inline(key, `check "${clean}"`, ctx.signal, async (signal) => {
+        const run = await execute(["bash", "-c", command], ctx.cwd, signal);
+        const log = callOutFile(ctx, toolCallId, "check");
+        writeFileSync(log, run.output);
+        const { text: t, ok } = report(run, command, [], log);
+        return text(t, !ok, { log });
+      });
+      return { text: `${CHECK_HEAD}\n${r.content[0].text}`, isError: r.isError };
     } catch (err) {
-      return `${CHECK_HEAD}\n${(err as Error).message}`;
+      return { text: `${CHECK_HEAD}\n${(err as Error).message}`, isError: true };
     }
+  }
+
+  /** Starts a run and waits up to inlineMs for it. A later result goes to notify. A second call for the same key does not start a second run. */
+  private async inline(key: string, label: string, signal: AbortSignal | undefined, start: (signal: AbortSignal) => Promise<Result>): Promise<Result> {
+    if (this.running.has(key)) return text(`${label} still runs for this change. ${LATER}`, false, { background: true });
+    const stop = new AbortController();
+    const session = this.session.signal;
+    const stopRun = () => stop.abort();
+    session.addEventListener("abort", stopRun, { once: true });
+    signal?.addEventListener("abort", stopRun, { once: true });
+    const run = start(stop.signal)
+      .then((r) => {
+        if (!session.aborted) this.last.set(key, r);
+        return r;
+      })
+      .finally(() => {
+        session.removeEventListener("abort", stopRun);
+        if (this.running.get(key) === run) this.running.delete(key);
+      });
+    this.running.set(key, run);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<undefined>((resolve) => {
+      timer = setTimeout(() => resolve(undefined), this.inlineMs);
+    });
+    const first = await Promise.race([run, late]).finally(() => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", stopRun);
+    });
+    if (first) return first;
+    run.then(
+      (r) => this.notify(`${label}: ${r.content[0].text}`, !r.isError),
+      (err: Error) => {
+        if (!session.aborted) this.notify(`${label} failed: ${err.message}`, false);
+      },
+    );
+    return text(`${label} runs in the background (more than ${this.inlineMs / 1000} s). ${LATER}`, false, { background: true });
   }
 
   async execute(toolCallId: string, params: Params, signal: AbortSignal | undefined, ctx: ExtensionContext): Promise<Result> {
@@ -240,23 +306,21 @@ export class RunTests {
     if (earlier && !params.rerun) return again(earlier, "set rerun only for a flaky test");
 
     const p = plan(cwd, loadRecipes(cwd), scope, changed);
-    let result: Result;
-    if ("nothing" in p) result = { content: [{ type: "text", text: p.nothing }], details: { changed }, isError: false };
-    else if ("uncoveredOnly" in p)
-      result = {
-        content: [{ type: "text", text: `red: ${p.uncoveredOnly.length} changed files without a test\n${noTest(p.uncoveredOnly)}` }],
-        details: { changed, uncovered: p.uncoveredOnly },
-        isError: true,
-      };
-    else {
-      const run = await execute(p.run, cwd, signal);
+    if ("nothing" in p || "uncoveredOnly" in p) {
+      const result =
+        "nothing" in p
+          ? text(p.nothing, false, { changed })
+          : text(`red: ${p.uncoveredOnly.length} changed files without a test\n${noTest(p.uncoveredOnly)}`, true, { changed, uncovered: p.uncoveredOnly });
+      this.last.set(key, result);
+      return result;
+    }
+    return this.inline(key, `run_tests "${p.run.join(" ")}"`, signal, async (stop) => {
+      const run = await execute(p.run, cwd, stop);
       const log = callOutFile(ctx, toolCallId, "tests");
       writeFileSync(log, run.output);
-      const { text, ok } = report(run, p.run.join(" "), p.uncovered, log);
-      result = { content: [{ type: "text", text }], details: { changed, tests: p.tests, uncovered: p.uncovered, log }, isError: !ok };
-    }
-    this.last.set(key, result);
-    return result;
+      const { text: t, ok } = report(run, p.run.join(" "), p.uncovered, log);
+      return text(t, !ok, { changed, tests: p.tests, uncovered: p.uncovered, log });
+    });
   }
 }
 

@@ -27,7 +27,9 @@ write("a.test.ts", TEST_A);
 git("add", ".");
 git("commit", "-qm", "init");
 
-const tool = new RunTests();
+const notes: { text: string; ok: boolean }[] = [];
+const notify = (text: string, ok: boolean) => notes.push({ text, ok });
+const tool = new RunTests(notify);
 const ctx = { cwd: dir, sessionManager: { getSessionFile: () => join(session, "s.jsonl"), getBranch: () => [] } } as any;
 const call = async (params: object) => {
   const r = await tool.execute("call-1", params, undefined, ctx);
@@ -93,25 +95,52 @@ test("cdOf: the directory of a leading cd", () => {
   assert.equal(cdOf("bun test && cd x"), undefined);
 });
 
-test("in place of a bash test command: the result after the reason of the block, in the directory of its cd", async () => {
-  assert.match(
-    await new RunTests().insteadOfBash("call-2", `cd ${dir} && bun test`, { ...ctx, cwd: tmpdir() }),
-    /^Test commands are blocked in bash\. Use the run_tests tool\. run_tests ran in place of your command:\ngreen: 1 pass, 0 fail · /,
-  );
+test("in place of a bash test command: the run_tests result, in the directory of its cd", async () => {
+  const r = await new RunTests(notify).insteadOfBash("call-2", `cd ${dir} && bun test`, { ...ctx, cwd: tmpdir() });
+  assert.equal(r.isError, false);
+  assert.match(r.text, /^Test commands in bash run through run_tests\. Use run_tests next time\. Result:\ngreen: 1 pass, 0 fail · /);
+  const failed = await new RunTests(notify).insteadOfBash("call-2", "bun test", { ...ctx, cwd: tmpdir() });
+  assert.equal(failed.isError, true);
+  assert.match(failed.text, /\nrun_tests: "git rev-parse --show-toplevel" failed/);
+});
+
+test("a run longer than the inline time continues in the background; a message gives its result; a second call does not start it again", async () => {
+  const slow = new RunTests(notify, 50);
+  notes.length = 0;
+  const command = `cd ${dir} && sleep 0.3; echo done`;
+  const first = await slow.check("call-6", command, ctx);
+  assert.deepEqual(first.isError, false);
+  assert.match(first.text, /check "cd .* echo done" runs in the background \(more than 0\.05 s\)\. Continue with other work\. A message gives the result\./);
+  assert.match((await slow.check("call-7", command, ctx)).text, /still runs for this change/);
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  assert.equal(notes.length, 1);
+  assert.equal(notes[0].ok, true);
+  assert.match(notes[0].text, /^check "cd .* echo done": green: exit 0 · /);
+  assert.match((await slow.check("call-8", command, ctx)).text, /same result/);
+});
+
+test("reset stops a background run without a message", async () => {
+  const slow = new RunTests(notify, 50);
+  notes.length = 0;
+  await slow.check("call-9", `cd ${dir} && sleep 5`, ctx);
+  slow.reset();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.deepEqual(notes, []);
 });
 
 test("a check command runs in place: green, red on a failure, red on a warning, the same result until a change or # rerun", async () => {
-  const checks = new RunTests();
-  const check = (command: string) => checks.check("call-3", `cd ${dir} && ${command}`, ctx);
+  const checks = new RunTests(notify);
+  const check = async (command: string) => (await checks.check("call-3", `cd ${dir} && ${command}`, ctx)).text;
   assert.match(
     await check("echo ok"),
-    /^Check commands run in place, with a short result\. .*\ngreen: exit 0 · [\d.]+ s\ncommand: cd .* && echo ok\nlog: .*\.check\.log$/,
+    /^Check commands in bash give a short result\. .*\ngreen: exit 0 · [\d.]+ s\ncommand: cd .* && echo ok\nlog: .*\.check\.log$/,
   );
+  assert.equal((await checks.check("call-5", `cd ${dir} && exit 1`, ctx)).isError, true);
   assert.match(await check("echo boom; exit 3"), /\nred: exit 3 · [\d.]+ s\ncommand: .*\n\nboom\n/);
   assert.match(await check("echo 'warning: unused x'"), /\nred: exit 0 · 1 warning lines · (.*\n)*warning: unused x/);
   assert.match(await check("echo ok"), /green: exit 0 · .* · no file changed since the last run; same result \(add "# rerun" to run it again\)/);
   assert.doesNotMatch(await check("echo ok # rerun"), /same result/);
-  assert.match(await checks.check("call-4", `cd ${plain} && echo outside`, ctx), /green: exit 0/);
+  assert.match((await checks.check("call-4", `cd ${plain} && echo outside`, ctx)).text, /green: exit 0/);
 });
 
 test("a stop by the user ends the command and its children at once", async () => {
