@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.0 — 2026-10-26
+
+### subagents 0.6.0
+
+- strict ask and blocker, enforced handoff tool
+
 ## 0.9.0 — 2026-10-26
 
 ### subagents 0.5.0

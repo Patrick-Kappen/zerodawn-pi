@@ -128,10 +128,9 @@ The main pi connects to the supervisor when the first subagent starts. At `sessi
 ## Changes
 
 <!-- changelog:start -->
-## 0.5.0 — 2026-10-26
+## 0.6.0 — 2026-10-26
 
-- read a tmux server that exits during a check as absent
-- max 3 gate tries, handoff at 100k tokens
+- strict ask and blocker, enforced handoff tool
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
