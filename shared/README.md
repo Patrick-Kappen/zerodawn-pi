@@ -27,9 +27,9 @@ Tests: `util.test.ts`, `store.test.ts`, `config.test.ts`, `testrun.test.ts`. The
 ## Changes
 
 <!-- changelog:start -->
-## 0.4.1 — 2026-10-26
+## 0.4.2 — 2026-10-26
 
-- tests: short check result: diagnostics only, deduplicated
+- diagnostics shows a missing command, no echoed option or summary
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

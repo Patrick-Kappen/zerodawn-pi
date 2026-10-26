@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2 — 2026-10-26
+
+### shared 0.4.2
+
+- diagnostics shows a missing command, no echoed option or summary
+
 ## 0.8.1 — 2026-10-26
 
 ### shared 0.4.1

@@ -89,6 +89,12 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.8.2 — 2026-10-26
+
+### shared 0.4.2
+
+- diagnostics shows a missing command, no echoed option or summary
+
 ## 0.8.1 — 2026-10-26
 
 ### shared 0.4.1
@@ -112,12 +118,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ### tests 0.3.0
 
 - subagents: done gate runs the tests in the subagent
-
-## 0.7.0 — 2026-10-26
-
-### subagents 0.3.0
-
-- ask and blocker tools, answer action
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
