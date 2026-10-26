@@ -2,22 +2,25 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GateResult } from "./gate.ts";
 import type { ClientMessage } from "./protocol.ts";
-import { createSubHandlers, DONE_PROMPT, GATE_HANDOFF_PROMPT, HANDOFF_PROMPT, readSubEnv, shorten } from "./sub.ts";
-
-const HANDOFF = { done: ["a"], open: ["b"], next: "c", files: ["f"], risks: [], tests: "green" };
+import { CHOICE_PROMPT, createSubHandlers, GATE_HANDOFF_PROMPT, GREEN_HANDOFF_PROMPT, HANDOFF_PROMPT, readSubEnv, shorten } from "./sub.ts";
 
 const GREEN: GateResult = { ok: true, reason: "tests and checks green", files: ["a.ts", "a.test.ts"], tests: "green: 3 pass, 0 fail" };
 const SCOUT_GREEN: GateResult = { ok: true, reason: "no changed files", files: [], tests: "not run: no changed files" };
-const DONE = {
+const HANDOFF = {
   summary: "It works.",
   changes: [
     { file: "a.ts", what: "w" },
     { file: "a.test.ts", what: "t" },
   ],
   tests: [{ file: "a.test.ts", covers: "c" }],
+  findings: [],
   decisions: [],
   open: [],
+  next: "",
+  risks: [],
 };
+const FINDINGS = { ...HANDOFF, changes: [], tests: [], findings: ["a.ts:1 x"] };
+const ANTHROPIC = { tools: [{ name: "done", input_schema: {} }] };
 
 function setup(result: GateResult | Error = GREEN, idle = false, changed = ["a.ts", "a.test.ts"]) {
   const sent: ClientMessage[] = [];
@@ -89,114 +92,158 @@ test("assistant messages send shortened text and usage; other roles are ignored"
   assert.throws(() => handlers.messageEnd({ role: "assistant", content: [] }), /no usage/);
 });
 
-test("a green gate forces the tool done with the gate data; the model data goes out with the gate", async () => {
-  const { sent, user, calls, handlers } = setup();
+async function stopAndDone(handlers: ReturnType<typeof setup>["handlers"]) {
   await handlers.settled();
-  assert.deepEqual(sent, [{ type: "event", event: { kind: "gate", ok: true, text: "tests and checks green" } }]);
-  assert.deepEqual(user, [DONE_PROMPT]);
-  assert.deepEqual(calls, ["tools done"]);
-  assert.deepEqual(handlers.beforeRequest({ tools: [{ name: "done", input_schema: {} }] }), {
-    tools: [{ name: "done", input_schema: {} }],
-    tool_choice: { type: "tool", name: "done" },
-  });
-  assert.match(handlers.done(DONE), /Done sent/);
-  assert.deepEqual(sent.at(-1), { type: "done", data: DONE, gate: { ok: true, files: ["a.ts", "a.test.ts"], tests: "green: 3 pass, 0 fail" } });
-  sent.length = 0;
+  handlers.done();
   await handlers.settled();
+}
+
+test("a settle without done, ask or blocker forces a choice between continue, done, ask and blocker", async () => {
+  const { sent, user, calls, handlers, gates } = setup();
+  await handlers.settled();
+  assert.deepEqual(user, [CHOICE_PROMPT]);
+  assert.deepEqual(calls, ["tools continue,done,ask,blocker"]);
+  assert.equal(gates(), 0);
   assert.deepEqual(sent, []);
-  assert.equal(handlers.beforeRequest({ tools: [{ name: "done", input_schema: {} }] }), undefined);
+  assert.deepEqual(handlers.beforeRequest(ANTHROPIC), { ...ANTHROPIC, tool_choice: { type: "any" } });
 });
 
-test("a new task after done restores the tools and the gate runs again", async () => {
-  const { user, calls, handlers, gates } = setup();
+test("continue restores the tools, stops the forcing and returns the text; the next settle asks again", async () => {
+  const { user, calls, handlers } = setup();
   await handlers.settled();
-  handlers.done(DONE);
+  assert.equal(handlers.continue(), "Continue with the task.");
+  assert.deepEqual(calls, ["tools continue,done,ask,blocker", "tools read,ask"]);
+  assert.equal(handlers.beforeRequest(ANTHROPIC), undefined);
+  await handlers.settled();
+  await handlers.settled();
+  assert.deepEqual(user, [CHOICE_PROMPT, CHOICE_PROMPT]);
+});
+
+test("continue outside a choice fails", () => {
+  assert.throws(() => setup().handlers.continue(), /not active/);
+});
+
+test("settled while the choice is forced and no tool call came is an error event", async () => {
+  const { handlers, sent } = setup();
+  await handlers.settled();
+  await handlers.settled();
+  const error = sent.at(-1);
+  assert.ok(error?.type === "event" && error.event.kind === "error");
+  assert.match(error.event.text, /without a call of continue, done, ask or blocker/);
+});
+
+test("done in the choice restores the tools and the next settle runs the gate; the green gate forces the handoff", async () => {
+  const { sent, user, calls, handlers, gates } = setup();
+  await handlers.settled();
+  assert.match(handlers.done(), /checks run now/);
+  assert.equal(handlers.beforeRequest(ANTHROPIC), undefined);
+  await handlers.settled();
+  assert.equal(gates(), 1);
+  assert.deepEqual(sent, [{ type: "event", event: { kind: "gate", ok: true, text: "tests and checks green" } }]);
+  assert.deepEqual(user, [CHOICE_PROMPT, GREEN_HANDOFF_PROMPT]);
+  assert.deepEqual(calls, ["tools continue,done,ask,blocker", "tools read,ask", "tools handoff"]);
+  const tools = { tools: [{ name: "handoff", input_schema: {} }] };
+  assert.deepEqual(handlers.beforeRequest(tools), { ...tools, tool_choice: { type: "tool", name: "handoff" } });
+});
+
+test("done without a prior stop (the model chose it) runs the gate at the settle", async () => {
+  const { handlers, gates, user } = setup();
+  handlers.done();
+  await handlers.settled();
+  assert.equal(gates(), 1);
+  assert.deepEqual(user, [GREEN_HANDOFF_PROMPT]);
+});
+
+test("a valid handoff after a green gate sends the gate data and nothing more goes to the agent", async () => {
+  const { sent, user, calls, handlers } = setup();
+  await stopAndDone(handlers);
+  sent.length = 0;
+  assert.match(handlers.handoff(HANDOFF), /Handoff sent/);
+  assert.deepEqual(sent, [{ type: "handoff", data: HANDOFF, gate: { ok: true, files: ["a.ts", "a.test.ts"], tests: "green: 3 pass, 0 fail" } }]);
+  const users = user.length;
+  const toolCalls = calls.length;
+  await handlers.settled();
+  assert.equal(user.length, users);
+  assert.equal(calls.length, toolCalls);
+  assert.equal(sent.length, 1);
+  assert.equal(handlers.beforeRequest({ tools: [{ name: "handoff", input_schema: {} }] }), undefined);
+});
+
+test("a new task after the handoff restores the tools and resets the gate data", async () => {
+  const { sent, user, calls, handlers, gates } = setup();
+  await stopAndDone(handlers);
+  handlers.handoff(HANDOFF);
   handlers.onServerMessage({ type: "task", task: "more" });
-  assert.deepEqual(calls, ["tools done", "tools read,ask"]);
-  assert.deepEqual(user, [DONE_PROMPT, "more"]);
-  await handlers.settled();
+  assert.deepEqual(calls.slice(-1), ["tools read,ask"]);
+  assert.equal(user.at(-1), "more");
+  await stopAndDone(handlers);
   assert.equal(gates(), 2);
-  assert.deepEqual(user.at(-1), DONE_PROMPT);
+  assert.equal(user.at(-1), GREEN_HANDOFF_PROMPT);
+  sent.length = 0;
+  handlers.handoff(HANDOFF);
+  assert.ok(sent[0]?.type === "handoff" && sent[0].gate !== undefined);
 });
 
-test("a green gate without changed files forces done_findings", async () => {
-  const { sent, calls, handlers } = setup(SCOUT_GREEN, false, []);
-  await handlers.settled();
-  assert.deepEqual(calls, ["tools done_findings"]);
-  assert.throws(() => handlers.done(DONE), /not active/);
-  const findings = { summary: "S", findings: ["a.ts:1 x"] };
-  assert.match(handlers.doneFindings(findings), /Done sent/);
-  assert.deepEqual(sent.at(-1), { type: "done", data: findings, gate: { ok: true, files: [], tests: "not run: no changed files" } });
+test("no changed files and nothing to test: green, and the handoff needs findings", async () => {
+  const { sent, handlers } = setup(SCOUT_GREEN, false, []);
+  await stopAndDone(handlers);
+  assert.throws(() => handlers.handoff({ ...FINDINGS, findings: [] }), /needs at least one entry/);
+  assert.match(handlers.handoff(FINDINGS), /Handoff sent/);
+  assert.deepEqual(sent.at(-1), { type: "handoff", data: FINDINGS, gate: { ok: true, files: [], tests: "not run: no changed files" } });
 });
 
-test("done before it is forced fails", () => {
-  const { handlers } = setup();
-  assert.throws(() => handlers.done(DONE), /not active/);
-  assert.throws(() => handlers.doneFindings({ summary: "s", findings: ["x"] }), /not active/);
-});
-
-test("done checks changes against git: a missing file, an extra file, and an exact match", async () => {
+test("handoff checks changes against git: a missing file, an extra file, and an exact match", async () => {
   const missing = setup(GREEN, false, ["a.ts", "a.test.ts", "b.ts"]);
-  await missing.handlers.settled();
-  assert.throws(() => missing.handlers.done(DONE), /Changed: a\.ts, a\.test\.ts, b\.ts\. Listed: a\.ts, a\.test\.ts\. Not changed: none\. Missing: b\.ts\./);
+  await stopAndDone(missing.handlers);
+  assert.throws(
+    () => missing.handlers.handoff(HANDOFF),
+    /Changed: a\.ts, a\.test\.ts, b\.ts\. Listed: a\.ts, a\.test\.ts\. Not changed: none\. Missing: b\.ts\./,
+  );
   const extra = setup(GREEN, false, ["a.ts"]);
-  await extra.handlers.settled();
-  assert.throws(() => extra.handlers.done(DONE), /Not changed: a\.test\.ts\. Missing: none\./);
-  assert.ok(!extra.sent.some((message) => message.type === "done"));
+  await stopAndDone(extra.handlers);
+  assert.throws(() => extra.handlers.handoff(HANDOFF), /Not changed: a\.test\.ts\. Missing: none\./);
+  assert.ok(!extra.sent.some((message) => message.type === "handoff"));
+  const none = setup(GREEN, false, []);
+  await stopAndDone(none.handlers);
+  assert.throws(() => none.handlers.handoff(HANDOFF), /Changed: none\./);
   const ok = setup(GREEN, false, ["a.test.ts", "a.ts"]);
-  await ok.handlers.settled();
-  assert.match(ok.handlers.done(DONE), /Done sent/);
+  await stopAndDone(ok.handlers);
+  assert.match(ok.handlers.handoff(HANDOFF), /Handoff sent/);
 });
 
-test("two invalid done calls send an error event; a valid call between is not needed", async () => {
-  const { handlers, sent } = setup();
-  await handlers.settled();
-  handlers.toolEnd({ toolName: "done", isError: true });
-  assert.ok(!sent.some((message) => message.type === "event" && message.event.kind === "error"));
-  handlers.toolEnd({ toolName: "done", isError: true });
-  const error = sent.at(-1);
-  assert.ok(error?.type === "event" && error.event.kind === "error");
-  assert.match(error.event.text, /2 invalid calls of the tool done/);
-});
-
-test("two invalid done_findings calls fail the agent", async () => {
-  const { handlers, sent } = setup(SCOUT_GREEN, false, []);
-  await handlers.settled();
-  handlers.toolEnd({ toolName: "done_findings", isError: true });
-  handlers.toolEnd({ toolName: "done_findings", isError: true });
-  const error = sent.at(-1);
-  assert.ok(error?.type === "event" && error.event.kind === "error");
-  assert.match(error.event.text, /2 invalid calls of the tool done_findings/);
-});
-
-test("settled while done is forced and no call came is an error event", async () => {
-  const { handlers, sent } = setup();
-  await handlers.settled();
-  await handlers.settled();
-  const error = sent.at(-1);
-  assert.ok(error?.type === "event" && error.event.kind === "error");
-  assert.match(error.event.text, /without a call of the tool done/);
-});
-
-test("settled with a red gate sends only the gate event and keeps the agent running", async () => {
-  const { sent, handlers } = setup({ ok: false, reason: "the repository tests are red" });
+test("settled with a red gate sends the gate event and the failures; the agent keeps running", async () => {
+  const { sent, user, handlers } = setup({ ok: false, reason: "the repository tests are red" });
   handlers.messageEnd({ role: "assistant", content: [{ type: "text", text: "done" }], usage });
   sent.length = 0;
-  await handlers.settled();
+  await stopAndDone(handlers);
   assert.deepEqual(sent, [{ type: "event", event: { kind: "gate", ok: false, text: "the repository tests are red" } }]);
+  assert.deepEqual(user, [CHOICE_PROMPT, "fix it"]);
 });
 
-test("settled skips the gate after ask or blocker, once", async () => {
-  const { sent, handlers, gates } = setup();
+test("settled skips the choice and the gate after ask or blocker, once", async () => {
+  const { sent, user, handlers, gates } = setup();
   handlers.ask("which db?");
   await handlers.settled();
   assert.equal(gates(), 0);
   assert.deepEqual(sent.at(-1), { type: "event", event: { kind: "settled", text: "" } });
   handlers.blocker({ issue: "no access", files: [], tried: ["x"] });
   await handlers.settled();
-  assert.equal(gates(), 0);
+  assert.deepEqual(user, []);
   await handlers.settled();
-  assert.equal(gates(), 1);
+  assert.deepEqual(user, [CHOICE_PROMPT]);
+});
+
+test("ask and blocker in the choice restore the tools and stop the forcing", async () => {
+  const { calls, handlers } = setup();
+  await handlers.settled();
+  handlers.ask("which db?");
+  assert.deepEqual(calls, ["tools continue,done,ask,blocker", "tools read,ask"]);
+  assert.equal(handlers.beforeRequest(ANTHROPIC), undefined);
+  await handlers.settled();
+  const again = setup();
+  await again.handlers.settled();
+  again.handlers.blocker({ issue: "i", files: [], tried: ["x"] });
+  assert.equal(again.handlers.beforeRequest(ANTHROPIC), undefined);
 });
 
 test("ask and blocker send their text and tell the model to stop", () => {
@@ -212,13 +259,13 @@ test("ask and blocker send their text and tell the model to stop", () => {
 
 test("the third red gate starts a forced handoff with the gate reason", async () => {
   const { sent, user, calls, handlers } = setup({ ok: false, reason: "the repository tests are red" });
-  await handlers.settled();
-  await handlers.settled();
-  assert.deepEqual(user, ["fix it", "fix it"]);
+  await stopAndDone(handlers);
+  await stopAndDone(handlers);
+  assert.equal(user.filter((text) => text === "fix it").length, 2);
   sent.length = 0;
-  await handlers.settled();
-  assert.deepEqual(user, ["fix it", "fix it", GATE_HANDOFF_PROMPT]);
-  assert.deepEqual(calls, ["tools handoff"]);
+  await stopAndDone(handlers);
+  assert.equal(user.at(-1), GATE_HANDOFF_PROMPT);
+  assert.equal(calls.at(-1), "tools handoff");
   assert.deepEqual(sent, [{ type: "event", event: { kind: "gate", ok: false, text: "the repository tests are red" } }]);
   assert.match(handlers.handoff(HANDOFF), /Handoff sent/);
   assert.deepEqual(sent.at(-1), { type: "handoff", data: HANDOFF, reason: "the repository tests are red" });
@@ -229,17 +276,18 @@ test("the third red gate starts a forced handoff with the gate reason", async ()
 
 test("a new task resets the red gate count", async () => {
   const { user, sent, handlers } = setup({ ok: false, reason: "red" });
-  await handlers.settled();
-  await handlers.settled();
+  await stopAndDone(handlers);
+  await stopAndDone(handlers);
   handlers.onServerMessage({ type: "task", task: "again" });
-  await handlers.settled();
-  await handlers.settled();
-  assert.deepEqual(user, ["fix it", "fix it", "again", "fix it", "fix it"]);
+  await stopAndDone(handlers);
+  await stopAndDone(handlers);
+  assert.equal(user.filter((text) => text === "fix it").length, 4);
+  assert.ok(!user.includes(GATE_HANDOFF_PROMPT));
   assert.ok(!sent.some((message) => message.type === "event" && message.event.kind === "error"));
 });
 
 test("a handoff message aborts, sets only the tool handoff and sends the prompt at the next settle", async () => {
-  const { handlers, gates, calls, user, sent } = setup();
+  const { handlers, gates, calls, user, sent } = setup(GREEN, false, []);
   handlers.onServerMessage({ type: "handoff" });
   assert.deepEqual(calls, ["abort", "tools handoff"]);
   assert.deepEqual(user, []);
@@ -248,11 +296,20 @@ test("a handoff message aborts, sets only the tool handoff and sends the prompt 
   assert.equal(gates(), 0);
   handlers.onServerMessage({ type: "handoff" });
   assert.deepEqual(calls, ["abort", "tools handoff"]);
-  assert.match(handlers.handoff(HANDOFF), /Handoff sent\. Stop\./);
-  assert.deepEqual(sent, [{ type: "handoff", data: HANDOFF }]);
+  assert.match(handlers.handoff(FINDINGS), /Handoff sent\. Stop\./);
+  assert.deepEqual(sent, [{ type: "handoff", data: FINDINGS }]);
   await handlers.settled();
   assert.equal(gates(), 0);
   assert.equal(sent.length, 1);
+});
+
+test("a handoff message during the choice goes on and keeps the saved tools", async () => {
+  const { handlers, calls, user } = setup(undefined, true);
+  await handlers.settled();
+  handlers.onServerMessage({ type: "handoff" });
+  assert.deepEqual(user, [CHOICE_PROMPT, HANDOFF_PROMPT]);
+  handlers.onServerMessage({ type: "task", task: "x" });
+  assert.equal(calls.at(-1), "tools read,ask");
 });
 
 test("a handoff message on an idle agent sends the prompt at once", () => {
@@ -264,6 +321,12 @@ test("a handoff message on an idle agent sends the prompt at once", () => {
 test("the tool handoff fails before a handoff is asked for", () => {
   const { handlers } = setup();
   assert.throws(() => handlers.handoff(HANDOFF), /not active/);
+});
+
+test("done fails while a handoff is forced", () => {
+  const { handlers } = setup(undefined, true);
+  handlers.onServerMessage({ type: "handoff" });
+  assert.throws(() => handlers.done(), /not active/);
 });
 
 test("two invalid handoff calls send an error event", () => {
@@ -307,6 +370,6 @@ test("shorten keeps short text", () => {
 
 test("a gate that throws sends an error event and no settled", async () => {
   const { sent, handlers } = setup(new Error("git status failed"));
-  await handlers.settled();
+  await stopAndDone(handlers);
   assert.deepEqual(sent, [{ type: "event", event: { kind: "error", text: "done gate failed in the subagent: git status failed" } }]);
 });

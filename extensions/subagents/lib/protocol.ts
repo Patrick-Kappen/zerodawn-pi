@@ -1,4 +1,4 @@
-import type { Blocker, Done, Findings, GateInfo, Handoff } from "./format.ts";
+import type { Blocker, GateInfo, Handoff } from "./format.ts";
 import type { AgentEntry } from "./register.ts";
 
 export interface Usage {
@@ -25,7 +25,6 @@ export interface AgentResult {
   blocker?: Blocker;
   handoff?: Handoff;
   reason?: string;
-  done?: Done | Findings;
   gate?: GateInfo;
 }
 
@@ -37,8 +36,7 @@ export type ClientMessage =
   | { type: "answer"; id: string; text: string }
   | { type: "ask"; text: string }
   | { type: "blocker"; data: Blocker }
-  | { type: "handoff"; data: Handoff; reason?: string }
-  | { type: "done"; data: Done | Findings; gate: GateInfo }
+  | { type: "handoff"; data: Handoff; reason?: string; gate?: GateInfo }
   | { type: "event"; event: SubEvent };
 
 export type ServerMessage =
@@ -92,12 +90,14 @@ function parseBlocker(fields: Fields, type: string): Blocker {
 
 function parseHandoff(fields: Fields, type: string): Handoff {
   return {
-    done: strings(fields, "done", type),
+    summary: text(fields, "summary", type),
+    changes: objects(fields, "changes", type, ["file", "what"]) as Handoff["changes"],
+    tests: objects(fields, "tests", type, ["file", "covers"]) as Handoff["tests"],
+    findings: strings(fields, "findings", type),
+    decisions: strings(fields, "decisions", type),
     open: strings(fields, "open", type),
     next: text(fields, "next", type),
-    files: strings(fields, "files", type),
     risks: strings(fields, "risks", type),
-    tests: text(fields, "tests", type),
   };
 }
 
@@ -110,17 +110,6 @@ function objects(fields: Fields, key: string, type: string, names: [string, stri
     if (typeof entry !== "object" || entry === null || names.some((name) => typeof (entry as Fields)[name] !== "string")) throw bad();
     return { [names[0]]: (entry as Fields)[names[0]], [names[1]]: (entry as Fields)[names[1]] } as Record<string, string>;
   });
-}
-
-function parseDone(fields: Fields, type: string): Done | Findings {
-  if ("findings" in fields) return { summary: text(fields, "summary", type), findings: strings(fields, "findings", type) };
-  return {
-    summary: text(fields, "summary", type),
-    changes: objects(fields, "changes", type, ["file", "what"]) as Done["changes"],
-    tests: objects(fields, "tests", type, ["file", "covers"]) as Done["tests"],
-    decisions: strings(fields, "decisions", type),
-    open: strings(fields, "open", type),
-  };
 }
 
 function parseGate(fields: Fields, type: string): GateInfo {
@@ -191,15 +180,18 @@ export function parseClientLine(line: string): ClientMessage {
       return { type: "blocker", data: parseBlocker(object(message, "data", "blocker"), "blocker") };
     case "handoff": {
       const data = parseHandoff(object(message, "data", "handoff"), "handoff");
-      return message.reason === undefined ? { type: "handoff", data } : { type: "handoff", data, reason: text(message, "reason", "handoff") };
+      return {
+        type: "handoff",
+        data,
+        ...(message.reason === undefined ? {} : { reason: text(message, "reason", "handoff") }),
+        ...(message.gate === undefined ? {} : { gate: parseGate(object(message, "gate", "handoff"), "handoff.gate") }),
+      };
     }
-    case "done":
-      return { type: "done", data: parseDone(object(message, "data", "done"), "done"), gate: parseGate(object(message, "gate", "done"), "done.gate") };
     case "event":
       return { type: "event", event: parseEvent(message.event) };
   }
   throw new Error(
-    `protocol: unknown message type ${JSON.stringify(message.type)}. Use "hello", "status", "start", "answer", "ask", "blocker", "handoff", "done" or "event".`,
+    `protocol: unknown message type ${JSON.stringify(message.type)}. Use "hello", "status", "start", "answer", "ask", "blocker", "handoff" or "event".`,
   );
 }
 
@@ -247,7 +239,6 @@ export function parseServerLine(line: string): ServerMessage {
         ...(message.blocker === undefined ? {} : { blocker: parseBlocker(object(message, "blocker", "result"), "result.blocker") }),
         ...(message.handoff === undefined ? {} : { handoff: parseHandoff(object(message, "handoff", "result"), "result.handoff") }),
         ...(message.reason === undefined ? {} : { reason: text(message, "reason", "result") }),
-        ...(message.done === undefined ? {} : { done: parseDone(object(message, "done", "result"), "result.done") }),
         ...(message.gate === undefined ? {} : { gate: parseGate(object(message, "gate", "result"), "result.gate") }),
       };
     }

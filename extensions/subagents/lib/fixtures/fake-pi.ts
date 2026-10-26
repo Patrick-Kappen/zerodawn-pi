@@ -4,6 +4,7 @@ import { createConnection } from "node:net";
 const path = process.env.PI_SUBAGENT_SOCKET;
 const id = process.env.PI_SUBAGENT_ID;
 if (path === undefined || id === undefined) throw new Error("fake-pi: PI_SUBAGENT_SOCKET and PI_SUBAGENT_ID must be set.");
+const empty = { summary: "", changes: [], tests: [], findings: [], decisions: [], open: [], next: "", risks: [] };
 const socket = createConnection(path);
 const send = (message: object) => socket.write(`${JSON.stringify(message)}\n`);
 let buffer = "";
@@ -15,7 +16,7 @@ socket.on("data", (chunk) => {
     const message = JSON.parse(buffer.slice(0, i));
     buffer = buffer.slice(i + 1);
     if (message.type === "handoff") {
-      send({ type: "handoff", data: { done: ["a"], open: ["b"], next: "c", files: ["f.ts"], risks: [], tests: "green" } });
+      send({ type: "handoff", data: { ...empty, summary: "token limit", findings: ["a.ts:1 fact"], open: ["b"], next: "c" } });
       continue;
     }
     if (message.type !== "task") continue;
@@ -30,8 +31,8 @@ socket.on("data", (chunk) => {
     }
     if (message.task === "CHANGES") {
       send({
-        type: "done",
-        data: { summary: "It works.", changes: [{ file: "a.ts", what: "w" }], tests: [{ file: "a.test.ts", covers: "c" }], decisions: ["d"], open: [] },
+        type: "handoff",
+        data: { ...empty, summary: "It works.", changes: [{ file: "a.ts", what: "w" }], tests: [{ file: "a.test.ts", covers: "c" }], decisions: ["d"] },
         gate: { ok: true, files: ["a.ts", "a.test.ts"], tests: "green: 2 pass, 0 fail" },
       });
       continue;
@@ -45,8 +46,8 @@ socket.on("data", (chunk) => {
     send({ type: "event", event: { kind: "tool_end", name: "bash", isError: false } });
     send({ type: "event", event: { kind: "message", text: "working", usage: { tokens: 7, cost: 0.01 } } });
     send({
-      type: "done",
-      data: { summary: `answer to: ${message.task}`, findings: ["a.ts:1 fact"] },
+      type: "handoff",
+      data: { ...empty, summary: `answer to: ${message.task}`, findings: ["a.ts:1 fact"] },
       gate: { ok: true, files: [], tests: "not run: no changed files" },
     });
   }

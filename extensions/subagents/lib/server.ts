@@ -188,11 +188,7 @@ export async function startSupervisor(options: SupervisorOptions) {
           throw new Error(`supervisor: only a connection with hello role "sub" can send "${message.type}".`);
         if (message.type === "ask") agents.pending(connection.id, "question", message.text);
         else if (message.type === "blocker") agents.pending(connection.id, "blocked", blockerText(message.data), message.data);
-        else agents.handoff(connection.id, message.data, message.reason);
-        return;
-      case "done":
-        if (connection.role !== "sub" || connection.id === undefined) throw new Error('supervisor: only a connection with hello role "sub" can send "done".');
-        agents.done(connection.id, message.data, message.gate);
+        else agents.handoff(connection.id, message.data, message.reason, message.gate);
         return;
       case "event":
         if (connection.role !== "sub" || connection.id === undefined) throw new Error('supervisor: only a connection with hello role "sub" can send events.');

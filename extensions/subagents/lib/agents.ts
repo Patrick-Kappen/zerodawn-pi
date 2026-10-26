@@ -1,8 +1,7 @@
-import { type Blocker, type Done, doneText, type Findings, type GateInfo, type Handoff, handoffText } from "./format.ts";
+import { type Blocker, type GateInfo, type Handoff, handoffText } from "./format.ts";
 import type { Timers } from "./lifecycle.ts";
 import type { AgentResult, AgentStatus, ServerMessage, SubEvent, Usage } from "./protocol.ts";
 import type { AgentEntry } from "./register.ts";
-import { MAX_GATE_TRIES } from "./sub.ts";
 import type { Tmux } from "./tmux.ts";
 
 export const HELLO_TIMEOUT_MS = 30_000;
@@ -36,7 +35,7 @@ interface AgentRecord {
   usage: Usage;
   helloTimer: unknown;
   pending?: { kind: "question" | "blocked"; text: string; blocker?: Blocker };
-  extra: Pick<AgentResult, "blocker" | "handoff" | "reason" | "done" | "gate">;
+  extra: Pick<AgentResult, "blocker" | "handoff" | "reason" | "gate">;
   handingOff?: boolean;
 }
 
@@ -206,29 +205,22 @@ export function createAgents(options: AgentsOptions) {
       const pending = record.pending;
       record.pending = undefined;
       if (pending === undefined)
-        fail(record, `subagent ${id} settled without a done call, a question or a blocker. Read its window: tmux attach -t ${options.session}`);
+        fail(record, `subagent ${id} settled without a handoff, a question or a blocker. Read its window: tmux attach -t ${options.session}`);
       else finish(record, pending.kind, pending.text, pending.blocker === undefined ? {} : { blocker: pending.blocker });
     }
   }
 
-  function handoff(id: string, data: Handoff, reason: string | undefined): void {
+  function handoff(id: string, data: Handoff, reason: string | undefined, gate: GateInfo | undefined): void {
     const record = find(id);
     if (record.entry.status !== "running") {
       throw new Error(`supervisor: subagent ${id} has status "${record.entry.status}" and cannot send a handoff.`);
     }
     record.pending = undefined;
-    const body = handoffText(data);
-    if (reason === undefined) finish(record, "handoff", body, { handoff: data });
-    else finish(record, "handoff", `gate red ${MAX_GATE_TRIES} times: ${reason}\n${body}`, { handoff: data, reason });
-  }
-
-  function done(id: string, data: Done | Findings, gate: GateInfo): void {
-    const record = find(id);
-    if (record.entry.status !== "running") {
-      throw new Error(`supervisor: subagent ${id} has status "${record.entry.status}" and cannot send done.`);
-    }
-    record.pending = undefined;
-    finish(record, "idle", doneText(data, gate), { done: data, gate });
+    finish(record, gate === undefined ? "handoff" : "idle", handoffText(data, gate, reason), {
+      handoff: data,
+      ...(reason === undefined ? {} : { reason }),
+      ...(gate === undefined ? {} : { gate }),
+    });
   }
 
   function pending(id: string, kind: "question" | "blocked", text: string, blocker?: Blocker): void {
@@ -258,5 +250,5 @@ export function createAgents(options: AgentsOptions) {
     for (const record of records.values()) options.timers.clearTimeout(record.helloTimer);
   }
 
-  return { start, hello, event, pending, handoff, done, answer, running, dispose, entries: () => entries };
+  return { start, hello, event, pending, handoff, answer, running, dispose, entries: () => entries };
 }

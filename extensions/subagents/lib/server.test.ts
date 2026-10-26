@@ -143,15 +143,17 @@ test("supervisor: start, sub hello, task, events, one result to main, immediate 
     main.write('{"type":"status"}\n');
     const status = (await mainNext()) as { agents: { status: string }[] };
     assert.equal(status.agents[0]?.status, "running");
-    sub.write('{"type":"done","data":{"summary":"s","findings":["a.ts:1 x"]},"gate":{"ok":true,"files":[],"tests":"none"}}\n');
+    sub.write(
+      '{"type":"handoff","data":{"summary":"s","changes":[],"tests":[],"findings":["a.ts:1 x"],"decisions":[],"open":[],"next":"","risks":[]},"gate":{"ok":true,"files":[],"tests":"none"}}\n',
+    );
     assert.deepEqual(await mainNext(), {
       type: "result",
       id: ID,
       status: "idle",
-      text: "s\na.ts:1 x",
+      text: "s\na.ts:1 x\ntests: none",
       usage: { tokens: 3, cost: 0.1 },
       events: ["tool bash {}", "message m"],
-      done: { summary: "s", findings: ["a.ts:1 x"] },
+      handoff: { summary: "s", changes: [], tests: [], findings: ["a.ts:1 x"], decisions: [], open: [], next: "", risks: [] },
       gate: { ok: true, files: [], tests: "none" },
     });
 
@@ -183,7 +185,9 @@ test("supervisor: main gone while an agent runs; the supervisor ends when the ag
       calls.some((call) => call[0] === "kill"),
       false,
     );
-    sub.write('{"type":"done","data":{"summary":"s","findings":["a.ts:1 x"]},"gate":{"ok":true,"files":[],"tests":"none"}}\n');
+    sub.write(
+      '{"type":"handoff","data":{"summary":"s","changes":[],"tests":[],"findings":["a.ts:1 x"],"decisions":[],"open":[],"next":"","risks":[]},"gate":{"ok":true,"files":[],"tests":"none"}}\n',
+    );
     await supervisor.done;
     assert.deepEqual(calls.at(-1), ["kill", "pi-sub-abcd1234"]);
   } finally {

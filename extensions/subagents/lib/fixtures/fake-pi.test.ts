@@ -26,7 +26,7 @@ test("the fake pi says hello and answers a task with a settle", async () => {
           buffer = buffer.slice(i + 1);
           lines.push(message);
           if (message.type === "hello") socket.write(`${JSON.stringify({ type: "task", task: "x" })}\n`);
-          if (message.type === "done") {
+          if (message.type === "handoff") {
             socket.end();
             server.close();
             resolve();
@@ -49,8 +49,8 @@ test("the fake pi says hello and answers a task with a settle", async () => {
   }
   assert.deepEqual(lines[0], { type: "hello", role: "sub", id: "id-1" });
   assert.deepEqual(lines.at(-1), {
-    type: "done",
-    data: { summary: "answer to: x", findings: ["a.ts:1 fact"] },
+    type: "handoff",
+    data: { summary: "answer to: x", changes: [], tests: [], findings: ["a.ts:1 fact"], decisions: [], open: [], next: "", risks: [] },
     gate: { ok: true, files: [], tests: "not run: no changed files" },
   });
 });
