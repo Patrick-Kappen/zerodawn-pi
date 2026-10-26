@@ -5,7 +5,7 @@ import { Key } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { callFileId, freeId, shorten, storeDir } from "../../../shared/store.ts";
 import { age } from "../../../shared/util.ts";
-import { DEFAULT_LIMIT_S, MAX_BYTES, MAX_LINES, NO_TIME_LIMIT, STREAM_LINES, STREAM_MS, STREAM_TAIL_BYTES } from "../config.ts";
+import { DEFAULT_LIMIT_S, INLINE_LINES, INLINE_WAIT_S, NO_TIME_LIMIT, STREAM_LINES, STREAM_MS, STREAM_TAIL_BYTES } from "../config.ts";
 import type { State } from "../state.ts";
 import type { Widget } from "../ui/dashboard.ts";
 import { type Job, kill, limitText, type Meta, render, resultText, saveMeta, spawnJob, statsOf } from "./jobproc.ts";
@@ -29,11 +29,12 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
   pi.registerTool({
     name: "bash",
     label: "bash",
-    description: `Run a bash command and return its output (up to ${MAX_LINES} lines or ${MAX_BYTES} bytes; longer output: first lines, lines that look like errors, last lines, and the path of the full output). background: true returns the job id at once; the result comes later as a message, or through jobs wait.`,
-    promptSnippet: "Run a bash command and wait for it; background: true to keep working",
+    description: `Run a bash command. Returns the exit status; output up to ${INLINE_LINES} lines, else its size and path. A failure adds every distinct error line. Over ${INLINE_WAIT_S} s it continues as a job and a message reports it. Use it for builds, scripts and tools; not to read or search files.`,
+    promptSnippet: "Run a bash command; short output back, long commands continue in the background",
     promptGuidelines: [
-      "Independent commands: put them in one message; they run in parallel.",
-      "background: true only for a server, a watcher or a long build. Get the result with jobs wait, or from the message. Never sleep or poll.",
+      "Use bash to run things, not to read: read for a file or an output path, grep for a search, git for a diff or log.",
+      "Put independent commands in one message with the same group; they report once. Keep working until the message comes. Never sleep or poll.",
+      'jobs wait with id "3,4" returns several results together.',
       `A command stops after ${DEFAULT_LIMIT_S / 3600} hour; add "${NO_TIME_LIMIT}" when it must run longer.`,
     ],
     parameters: Type.Object({
@@ -41,8 +42,8 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       timeout: Type.Optional(
         Type.Number({ description: `Timeout in seconds; the job is killed after this time. Default ${DEFAULT_LIMIT_S}, or none with "${NO_TIME_LIMIT}".` }),
       ),
-      background: Type.Optional(Type.Boolean({ description: "Run in the background at once; a message reports the result." })),
-      group: Type.Optional(Type.String({ description: "Jobs with the same group report together, in one message when the last one ends." })),
+      background: Type.Optional(Type.Boolean({ description: "Return the job id at once, for a server or a watcher." })),
+      group: Type.Optional(Type.String({ description: "Jobs with the same group report together in one message." })),
     }),
 
     async execute(toolCallId, params, signal, onUpdate, ctx) {
@@ -113,9 +114,10 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       let toBackground!: () => void;
       const moved = new Promise<undefined>((r) => (toBackground = () => r(undefined)));
       waiting.set(id, toBackground);
-      if (params.background) toBackground();
+      const autoMove = setTimeout(toBackground, params.background ? 0 : INLINE_WAIT_S * 1000);
       ctx.ui.setStatus("bash-wait", ctx.ui.theme.fg("dim", "bash running · ctrl+shift+b: background"));
       const inline = await Promise.race([done, moved]);
+      clearTimeout(autoMove);
       clearInterval(stream);
       waiting.delete(id);
       if (waiting.size === 0) ctx.ui.setStatus("bash-wait", undefined);

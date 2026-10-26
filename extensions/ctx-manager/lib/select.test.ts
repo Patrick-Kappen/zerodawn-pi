@@ -37,6 +37,24 @@ test("the stub names the tool, the size, the first line and the log", () => {
   assert.match(stub("read", big, {}, true), /^\[pruned read error: 1 lines, 2000 chars\. First line: x+\. Run the tool again when you need it\.\]$/);
 });
 
+test("prunes bash-job messages and names their logs", () => {
+  const job = {
+    type: "message",
+    id: "j1",
+    message: { role: "custom", customType: "bash-job", content: `A bash job ended.\n${big}`, details: { items: [{ id: "3", log: "/tmp/3.log" }] } },
+  };
+  const other = { type: "message", id: "o1", message: { role: "custom", customType: "other", content: big } };
+  const edits = selectEdits([user("u1"), job, other, user("u2"), user("u3")], 2, 1500, 0);
+  assert.deepEqual(
+    edits.map((e) => e.targetId),
+    ["j1"],
+  );
+  assert.equal(
+    edits[0].replacement.content,
+    `[pruned bash-job result: 2 lines, ${big.length + 18} chars. First line: A bash job ended.. Full output: /tmp/3.log]`,
+  );
+});
+
 test("prunedChars counts the saved characters", () => {
   const branch = [user("u1"), result("r1"), user("u2"), user("u3")];
   const edits = selectEdits(branch, 2, 1500, 0);

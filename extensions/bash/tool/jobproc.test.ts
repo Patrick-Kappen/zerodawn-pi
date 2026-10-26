@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { digest, errorLines, exitStatus, render, resultText, spawnJob, summarizeFromDisk, tailLimit } from "./jobproc.ts";
+import { errorLines, exitStatus, render, resultText, spawnJob, summarizeFromDisk } from "./jobproc.ts";
 
 function run(command: string, limit = 10): Promise<{ code: number | null; sig: string | null; dir: string; log: string; status: string }> {
   const dir = mkdtempSync(join(tmpdir(), "bash-"));
@@ -25,7 +25,10 @@ test("a job runs without a terminal, keeps the output and reports its exit code"
   const out = render(r.log, 1 << 20);
   assert.deepEqual(out.plain, ["no-tty", "ok", "b"]);
   assert.match(out.lines[1], /\x1b\[32mok\x1b\[0m/);
-  assert.equal(resultText(r.log, "exit 3 (1s)"), "exit 3 (1s)\nno-tty\nok\nb");
+  assert.match(
+    resultText(r.log, "exit 3 (1s)"),
+    /^exit 3 \(1s\) · 3 lines, \d+ bytes · output: .*\.txt\nno line looks like an error; last 3 lines:\nno-tty\nok\nb$/,
+  );
 });
 
 test("a prompt gets EOF at once and an editor fails instead of waiting", async () => {
@@ -53,43 +56,39 @@ test("summarizeFromDisk reads the exit code from the script footer of an old log
   const log = join(dir, "job.log");
   writeFileSync(log, 'Script started on x\nhi\r\n\nScript done on y [COMMAND_EXIT_CODE="5"]\n');
   const meta = { id: "x", command: "echo hi", log, status: join(dir, "missing"), start: Date.now(), limit: 0, bg: true, reported: false };
-  assert.equal(summarizeFromDisk(meta), "exit 5\nhi");
+  assert.match(summarizeFromDisk(meta), /^exit 5 · 1 lines, \d+ bytes · output: .*\.txt\nno line looks like an error; last 1 lines:\nhi$/);
 });
 
-test("tailLimit keeps the last lines inside both limits", () => {
-  const lines = ["a", "bb", "ccc", "dddd"];
-  assert.deepEqual(tailLimit(lines, 10, 1000), { kept: lines, truncated: false });
-  assert.deepEqual(tailLimit(lines, 2, 1000), { kept: ["ccc", "dddd"], truncated: true });
-  assert.deepEqual(tailLimit(lines, 10, 9), { kept: ["ccc", "dddd"], truncated: true });
-  assert.deepEqual(tailLimit([], 10, 10), { kept: [], truncated: false });
-});
-
-test("long output returns head, error lines, tail and the path of the clean output", async () => {
-  const r = await run("seq 1 3000 | sed 's/$/ line of forty bytes of padding text ......../; 1500s/.*/error: thing 1500 broke/; 2000s/.*/FAIL case 2000/'");
-  const text = resultText(r.log, "exit 0 (1s)");
-  const lines = text.split("\n");
-  assert.match(lines[0], /^exit 0 \(1s\) · 3000 lines, \d+ bytes · output: .*\.txt$/);
-  assert.equal(lines[1], "first 20 lines:");
-  assert.match(lines[2], /^1 line of forty/);
-  assert.match(lines[21], /^20 line of forty/);
-  assert.match(lines[22], /^… \d+ lines not shown · 2 of them look like errors \(line: text\):$/);
-  assert.equal(lines[23], "  1500: error: thing 1500 broke");
-  assert.equal(lines[24], "  2000: FAIL case 2000");
-  assert.match(lines[25], /^last \d+ lines:$/);
-  assert.match(lines[lines.length - 1], /^3000 line of forty/);
+test("a failure returns the status, the path and only the lines that look like errors", async () => {
+  const r = await run("seq 1 3000 | sed 's/$/ line of padding/; 1500s/.*/error: thing 1500 broke/; 2000s/.*/FAIL case 2000/'; exit 1");
+  const lines = resultText(r.log, "exit 1 (1s)").split("\n");
+  assert.match(lines[0], /^exit 1 \(1s\) \u00b7 3000 lines, \d+ bytes \u00b7 output: .*\.txt$/);
+  assert.deepEqual(lines.slice(1), ["2 distinct lines look like errors (lines: text):", "  1500: error: thing 1500 broke", "  2000: FAIL case 2000"]);
   const txt = r.log.replace(/\.log$/, ".txt");
   assert.equal(readFileSync(txt, "utf8").split("\n")[1499], "error: thing 1500 broke");
 });
 
-test("digest keeps everything when it fits", () => {
-  assert.deepEqual(digest(["a", "b"]), { head: [], errors: [], tail: ["a", "b"], hidden: 0, truncated: false });
+test("a failure without error lines returns the last lines", async () => {
+  const r = await run("seq 1 10; exit 2");
+  const lines = resultText(r.log, "exit 2 (1s)").split("\n");
+  assert.match(lines[0], /^exit 2 \(1s\) \u00b7 10 lines/);
+  assert.deepEqual(lines.slice(1), ["no line looks like an error; last 3 lines:", "8", "9", "10"]);
 });
 
-test("errorLines reports each distinct error once with its line number", () => {
+test("a success returns short output inline, else only the status and the path", async () => {
+  const short = await run("seq 1 50");
+  assert.equal(resultText(short.log, "exit 0 (1s)"), `exit 0 (1s)\n${Array.from({ length: 50 }, (_, i) => i + 1).join("\n")}`);
+  const r = await run("seq 1 51");
+  assert.match(resultText(r.log, "exit 0 (1s)"), /^exit 0 \(1s\) \u00b7 51 lines, \d+ bytes \u00b7 output: .*\.txt$/);
+  const silent = await run("true");
+  assert.equal(resultText(silent.log, "exit 0 (1s)"), "exit 0 (1s)");
+});
+
+test("errorLines reports each distinct error once with all its line numbers", () => {
   const lines = ["ok", "error: x", "fine", "error: x", "panic: y", "Error 123"];
-  assert.deepEqual(errorLines(lines, 0, lines.length, 10, 1000), [
-    { n: 2, text: "error: x" },
-    { n: 5, text: "panic: y" },
-    { n: 6, text: "Error 123" },
+  assert.deepEqual(errorLines(lines), [
+    { n: [2, 4], text: "error: x" },
+    { n: [5], text: "panic: y" },
+    { n: [6], text: "Error 123" },
   ]);
 });
