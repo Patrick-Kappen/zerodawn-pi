@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.12.0 — 2026-10-26
+
+### bash 0.5.1
+
+- a command that moves to the background ends the turn
+
+- end the turn when only jobs are left, not jobs wait
+
+### subagents 0.7.0
+
+- merge action with a merge agent on a conflict
+
+- the subagent commits with its own subject
+
+- a git worktree and branch per subagent
+
+- agent calls done, gate runs, green forces a handoff
+
+- enforced done tool with a git check of the changes
+
+### tests 0.4.1
+
+- bash: a command that moves to the background ends the turn
+
+- bash: end the turn when only jobs are left, not jobs wait
+
+### repository
+
+- subagents: the subagent commits with its own subject
+- subagents: a git worktree and branch per subagent
+- subagents: agent calls done, gate runs, green forces a handoff
+- subagents: enforced done tool with a git check of the changes
+- docs: rules for found bugs and for releases
+- repo: release notes list repository commits; empty notes fail
+
 ## 0.11.0 — 2026-10-26
 
 ### shared 0.5.0

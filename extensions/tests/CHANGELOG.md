@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 — 2026-10-26
+
+- bash: a command that moves to the background ends the turn
+
+- bash: end the turn when only jobs are left, not jobs wait
+
 ## 0.4.0 — 2026-10-26
 
 - shared: keep diagnostics and warningCount as released

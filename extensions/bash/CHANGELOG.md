@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1 — 2026-10-26
+
+- a command that moves to the background ends the turn
+
+- end the turn when only jobs are left, not jobs wait
+
 ## 0.5.0 — 2026-10-26
 
 - just check-findings shows unhelpful check results
