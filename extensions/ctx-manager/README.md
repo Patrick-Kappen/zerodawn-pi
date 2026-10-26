@@ -11,9 +11,10 @@ The edits are written only when they free at least 16 KB together, so the prompt
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.0 — 2026-10-25
+## 0.2.0 — 2026-10-26
 
-- First release.
+- bash: background after 15 s, status line result, errors only on failure
+- docs: AGENTS.md of each extension as rules, facts to README
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
