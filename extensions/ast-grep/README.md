@@ -10,6 +10,10 @@ Structural code search with [ast-grep](https://ast-grep.github.io): the pattern 
 
 `astGrep` in `config.json`: path of the `ast-grep` binary. Without it, `ast-grep` from `PATH`. The Nix module sets it from `programs.zerodawn-pi.astGrep` (default `pkgs.ast-grep`).
 
+## Layout
+
+`lib/format.ts`: the output format. The tests cover it.
+
 ## Changes
 
 <!-- changelog:start -->

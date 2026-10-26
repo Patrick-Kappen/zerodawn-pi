@@ -15,6 +15,10 @@ Also:
 
 The user name in `row` style is the OS user name.
 
+## Layout
+
+`lib/hook.ts` wraps a render method of a pi component. Each file in `features/` is one wrapped component.
+
 ## Changes
 
 <!-- changelog:start -->

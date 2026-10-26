@@ -1,3 +1,4 @@
 # gateway
 
-Sends the pi session id to agentgateway as a request header so its logs group by session. No config; does nothing when no gateway is in use.
+- Add the header only to requests with `x-gateway-key`. Never send it to a direct endpoint.
+- Do not add config.

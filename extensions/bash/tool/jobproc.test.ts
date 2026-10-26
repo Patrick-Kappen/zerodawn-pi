@@ -34,6 +34,7 @@ test("a prompt gets EOF at once and an editor fails instead of waiting", async (
 });
 
 test("a pipe that closes early ends the writer with SIGPIPE, not with an error", async () => {
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: a bash variable, not a template placeholder
   const r = await run('yes | head -1; echo "${PIPESTATUS[0]}"', 5);
   assert.deepEqual(render(r.log, 1 << 20).plain, ["y", "141"]);
 });

@@ -13,6 +13,7 @@ The result that the model sees is small: agent id, status, final text (cut at 80
 
 - One detached tmux session per main agent: `pi-sub-<first 8 characters of its pi session id>`.
 - Window 0 runs the supervisor. Each subagent gets its own window.
+- The supervisor needs `--pi <command>` and `--extension <absolute path>`. The main pi passes `pi`.
 - The supervisor owns the subagents:
   - It starts and stops them.
   - It sends their events to the main pi, so the tool calls show in the UI.
