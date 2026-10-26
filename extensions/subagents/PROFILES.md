@@ -30,7 +30,6 @@ models:
 tools: [read, grep, bash]
 extensions: [bash, files]
 skills: []
-mcp: []
 system: replace
 checks: []
 ---
@@ -41,10 +40,9 @@ You are a scout. ...
 |---|---|---|
 | `description` | yes | When to use this profile. The main agent reads it to choose a profile. |
 | `models` | yes | Model ladder, `<provider>/<model>[:<thinking>]`. The tool takes the first available one. |
-| `tools` | yes | Exact tool set, passed as `--tools`. `[]` is no tools. |
-| `extensions` | yes | Extensions of this package by name (`bash`, `files`, `tests`, ...), or absolute paths. Loaded with `-e`. |
-| `skills` | yes | Skill names or absolute paths. Loaded with `--skill`. |
-| `mcp` | yes | MCP server names. Empty list: `--no-mcp`. |
+| `tools` | yes | Exact tool set, passed as `--tools`. `[]` is no tools. MCP tools by pattern, for example `mcp__github__*`. Without an `mcp__` entry the subagent starts with `--no-mcp`. |
+| `extensions` | yes | Extensions of this package by name (`bash`, `files`, `tests`, ...), found next to the subagents extension (`../<name>/index.ts`), or absolute paths. Loaded with `-e`. |
+| `skills` | yes | Skill names, found only in `~/.pi/agent/skills/<name>`. A package delivers its skills there through Home Manager. Loaded with `--skill`. |
 | `system` | yes | `replace`: the body replaces the pi system prompt. `append`: the body goes after it. |
 | `checks` | yes | Extra commands that must pass before the agent is done, after the repository tests. |
 
@@ -52,6 +50,4 @@ Every key is required, so a profile shows all that the agent gets. An unknown ke
 
 ## Open questions
 
-- Where do skill names resolve to: `~/.pi/agent/skills/`, or the skills of this package?
-- How does a profile select MCP servers when `~/.pi/agent/mcp.json` holds them all?
-- Does `extensions` by name resolve against the installed package or the worktree (`just dev`)?
+- MCP: with an `mcp__` entry, all servers of `~/.pi/agent/mcp.json` connect; the subagent only sees the chosen tools. Do a test of `--tools` with `mcp__` patterns.
