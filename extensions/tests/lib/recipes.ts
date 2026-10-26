@@ -1,16 +1,56 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { stripQuoted } from "../../../shared/util.ts";
 
 export type Recipe = { name: string; doc?: string; body?: string };
 export type Recipes = { tool: "just" | "make"; file: string; list: Recipe[] };
 
 const REPEAT_MAX = 2;
 const LONG = 80;
-const TEST =
-  /(^|[\s;&|(])(just\s+test\S*|make\s+test\S*|npm\s+(run\s+)?test|pnpm\s+test|yarn\s+test|bun\s+test|node\s+(--\S+\s+)*--test|pytest|python3?\s+-m\s+pytest|cargo\s+(test|nextest)|go\s+test|vitest|jest)(\s|$)/;
+const TEST_TOOLS = [
+  "(just|make)\\s+test\\S*",
+  "(npm|pnpm|yarn|bun)\\s+(run\\s+)?test\\S*",
+  "node\\s+(--\\S+\\s+)*--test",
+  "(bun|node|deno|tsx|ts-node)\\s+(--?\\S+\\s+)*\\S+\\.(test|spec)\\.[cm]?[jt]sx?",
+  "deno\\s+test",
+  "pytest",
+  "python3?\\s+-m\\s+(pytest|unittest)",
+  "(tox|nox)",
+  "cargo\\s+(test|nextest)",
+  "go\\s+test",
+  "(vitest|jest|mocha|ava)",
+  "dotnet\\s+test",
+  "Invoke-Pester",
+  "mvn\\s+(\\S+\\s+)*test",
+  "(gradle|\\./gradlew)\\s+(\\S+\\s+)*test",
+  "(ctest|rspec|phpunit)",
+  "mix\\s+test",
+  "zig\\s+build\\s+test",
+];
+const CHECK_TOOLS = [
+  "(just|make)\\s+(check|lint|types|typecheck|verify|ci)\\S*",
+  "(npm|pnpm|yarn|bun)\\s+(run\\s+)?(check|lint|types|typecheck)\\S*",
+  "nix\\s+flake\\s+check",
+  "biome\\s+(check|lint|ci)",
+  "(eslint|tsc|mypy|pyright|shellcheck|golangci-lint|statix|deadnix|Invoke-ScriptAnalyzer)",
+  "ruff\\s+check",
+  "cargo\\s+(clippy|check)",
+  "go\\s+vet",
+];
+const WRAPPERS = "((\\w+=\\S*|npx|bunx|pnpm\\s+exec|uv\\s+run|poetry\\s+run|pipenv\\s+run|nix\\s+develop\\s+(\\S+\\s+)*-c|timeout\\s+\\S+|time)\\s+)*";
+const atCommand = (tools: string[]) => new RegExp(`(^|[;&|(]|\\bthen|\\bdo)\\s*${WRAPPERS}(${tools.join("|")})(?=$|[\\s;&|)])`);
+const TEST = atCommand(TEST_TOOLS);
+const CHECK = atCommand(CHECK_TOOLS);
+const SHELL_C = /\b(bash|sh|zsh|pwsh|powershell)\s+(-\S+\s+)*-c(ommand)?\s+(["'])([\s\S]*?)\4/g;
 
-export const isTest = (command: string) => TEST.test(command);
+/** The command, and the commands in the strings of "bash -c", without the other quoted text and heredocs. */
+function commandsOf(command: string): string[] {
+  return [stripQuoted(command), ...[...command.matchAll(SHELL_C)].flatMap((m) => commandsOf(m[5]))];
+}
+
+export const isTest = (command: string) => commandsOf(command).some((c) => TEST.test(c));
+export const isCheck = (command: string) => commandsOf(command).some((c) => CHECK.test(c));
 
 export function normalize(command: string): string {
   return command
@@ -87,7 +127,7 @@ export function loadRecipes(cwd: string): Recipes | undefined {
 export function promptText(r: Recipes): string {
   const run = r.tool === "just" ? "just" : "make";
   const lines = r.list.map((x) => `- ${run} ${x.name}${x.doc ? `: ${x.doc}` : ""}`);
-  return `Project recipes (${r.file}). Run project tasks with them. Run tests with run_tests. A bash command that a recipe does is blocked. A hint tells you when a long command runs ${REPEAT_MAX + 1} times. Then add it as a recipe.\n${lines.join("\n")}`;
+  return `Project recipes (${r.file}). Run project tasks with them. Run tests with run_tests. A test or check command in bash runs in place, with a short result. A bash command that a recipe does is blocked. A hint tells you when a long command runs ${REPEAT_MAX + 1} times. Then add it as a recipe.\n${lines.join("\n")}`;
 }
 
 export class Tracker {

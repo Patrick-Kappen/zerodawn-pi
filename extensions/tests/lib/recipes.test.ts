@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isTest, normalize, parseJust, parseMake, promptText, Tracker } from "./recipes.ts";
+import { isCheck, isTest, normalize, parseJust, parseMake, promptText, Tracker } from "./recipes.ts";
 
 const dump = JSON.stringify({
   recipes: {
@@ -33,11 +33,52 @@ const recipe = parseJust(
   "/p/justfile",
 );
 
-test("normalize and isTest", () => {
+test("normalize", () => {
   assert.equal(normalize("cd /p &&  node --test   a.ts 2>&1"), "node --test a.ts");
-  for (const c of ["just test", "just test-changed a.ts", "npm test", "bun test x", "node --experimental-strip-types --test x.ts", "cd x && pytest -q"])
-    assert.ok(isTest(c), c);
-  for (const c of ["just build", "just check", "nix flake check", "node x.ts", "grep test file", "nix build"]) assert.ok(!isTest(c), c);
+});
+
+test("isTest: test commands of many tools, also behind cd, env, npx, uv run, nix develop, bash -c", () => {
+  const tests = [
+    "just test",
+    "just test-changed a.ts",
+    "npm test",
+    "bun run test:unit",
+    "bun test x | tail",
+    "node --experimental-strip-types --test x.ts",
+    "bun extensions/x/a.test.ts",
+    "node --experimental-strip-types a.test.ts",
+    "cd x && pytest -q",
+    "CI=1 uv run pytest",
+    "python -m unittest",
+    "npx vitest run",
+    "deno test",
+    "go test ./...",
+    "cargo nextest run",
+    "dotnet test",
+    "nix develop -c pytest",
+    "pwsh -c 'Invoke-Pester ./tests'",
+    'bash -c "cd x && bun test"',
+    "ls; make test",
+  ];
+  for (const c of tests) assert.ok(isTest(c), c);
+  const others = [
+    "just build",
+    "just check",
+    "nix flake check",
+    "node x.ts",
+    "grep test file",
+    "ls pytest",
+    "nix build",
+    'git commit -m "run pytest"',
+    "cat <<EOF\ngo test\nEOF",
+  ];
+  for (const c of others) assert.ok(!isTest(c), c);
+});
+
+test("isCheck: lint, type and check commands; not tests or builds", () => {
+  for (const c of ["just check", "just lint", "nix flake check", "biome check .", "npx eslint src", "tsc", "cargo clippy", "ruff check .", "go vet ./..."])
+    assert.ok(isCheck(c), c);
+  for (const c of ["just test", "nix build", "just fmt", "echo tsc", 'git commit -m "just check"']) assert.ok(!isCheck(c), c);
 });
 
 test("a command that a recipe does is blocked", () => {

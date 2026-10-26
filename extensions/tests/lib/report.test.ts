@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { counts, failures } from "./report.ts";
+import { counts, failures, warningCount, warnings } from "./report.ts";
 
 const bun = `bun test v1.4.2
 
@@ -39,4 +39,27 @@ test("failures: a long output keeps its start and end", () => {
   assert.equal(out[0], "line 0");
   assert.match(out[110], /350 lines more in the log/);
   assert.equal(out.at(-1), "line 499");
+});
+
+const lint = `Checked 85 files in 12ms.
+extensions/bash/tool/jobproc.test.ts:37:45 lint/suspicious/noTemplateCurlyInString
+  ! Unexpected template string placeholder.
+    37 | const r = await run('echo "\${PIPESTATUS[0]}"');
+
+other output
+Found 1 warning.
+✓ a test about warnings
+eslint: 0 warnings`;
+
+test("warningCount: warning lines and biome '!' lines; not '0 warnings' and not passed test names", () => {
+  assert.equal(warningCount(lint), 2);
+  assert.equal(warningCount("all good\nFound 0 warnings"), 0);
+});
+
+test("warnings: each warning line with two lines before it and its block after it", () => {
+  const out = warnings(lint);
+  assert.match(out, /jobproc\.test\.ts:37:45 .*\n {2}! Unexpected template string placeholder\.\n.*PIPESTATUS/);
+  assert.match(out, /Found 1 warning\./);
+  assert.doesNotMatch(out, /a test about warnings/);
+  assert.equal(warnings("a\nb\nc\nwarning: x\n  detail\n\nd"), "b\nc\nwarning: x\n  detail");
 });
