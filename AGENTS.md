@@ -4,24 +4,30 @@ pi package with independent extensions in TypeScript. Nix flake with a Home Mana
 
 ## Layout
 
-- `extensions/<name>/`: one extension. `index.ts` registers; code and tests in `lib/` (or `tool/`, `ui/`, `screen/`, `features/` for the big ones). Every extension has `package.json` (name, version), `README.md`, `CHANGELOG.md`, and at least one `*.test.ts`; the flake fails without them.
-- `shared/`: helpers used by more than one extension. Only add exports; never change or remove one. See `shared/README.md`.
-- `docs/decisions.md`: why things are the way they are. Read it before a structural change; add a numbered entry when you make one.
-- Each extension has its own `AGENTS.md` with what it does, what it needs, and what to check after a pi upgrade. Read it before you change that extension.
+- `extensions/<name>/`: one extension, with `package.json`, `README.md`, `CHANGELOG.md` and tests.
+- `shared/`: only add exports. Never change or remove one.
+- Read the `AGENTS.md` of an extension before you change it.
+- Read `docs/decisions.md` before a structural change. Add an entry for a new one.
 - `TODO.md` files are the owner's notes. Do not act on them unless asked.
 
-## Rules
+## Work
 
-- Repository behaviour (`flake.nix` checks and dev shell, `.github/workflows/ci.yml`, `scripts/`, `justfile`, `biome.json`, `tsconfig.json`) is shared with [zerodawn-pi-private](https://github.com/Patrick-Kappen/zerodawn-pi-private). Change it in both and run `just sync-check`; CI of the private repository fails on drift.
-- Commit subject: `<scope>: what changed`, scope is an extension name, `shared`, `release`, `ci`, `docs`, `flake`, `repo` or `deps`. Max 72 characters. The subjects become the changelog.
-- Work on a branch and worktree add ~/.worktrees and open a PR; `main` is protected by a hook. CI tests only what changed on a PR, everything on `main`.
-- Do not edit `CHANGELOG.md` files or versions by hand. A release is `just bump-changed <level>` on a clean `main`, as its own PR.
-- Do not add a dependency. pi and its packages come from the `llm-agents` flake input; `nix flake update llm-agents` follows a new pi.
-- Fail loud: no fallback that hides a missing input. Errors name the file or the id and the next step.
-- No comments except for a reason the code cannot show. English everywhere.
+- Work in a worktree under `~/.worktrees` on a branch. Open a PR.
+- Commit subject: `<scope>: what changed`, max 72 characters.
+- Do not edit `CHANGELOG.md` files or versions. A release is its own PR.
+- Do not add a dependency.
+- Fail loud. Errors name the file or id and the next step.
+- No comments, except for a reason the code cannot show.
 
-## Checks
+## Same repositories
 
-- `just check`: biome, tsc, bun test, `nix flake check`.
-- `just test`, `just types`, `just lint` for one of them.
-- `just dev` starts pi with all extensions in a tmux sandbox; `just dev-screen`, `just dev-send`, `just dev-stop`.
+- This repository and zerodawn-pi-private share CI, `scripts/`, `justfile`, `flake.nix` checks, `biome.json` and `tsconfig.json`.
+- Change them in both, in one PR each. Run `just sync-check`.
+- When CI fails on drift, find the cause. Do not copy one side over the other.
+
+## Tests and checks
+
+- Run tests with `run_tests`. Run checks with `just check`.
+- A warning is an error. Fix it.
+- Add a test for each new behaviour and each bug fix.
+- When CI fails, find the cause before you change code.
