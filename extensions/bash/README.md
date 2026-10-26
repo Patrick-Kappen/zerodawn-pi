@@ -44,9 +44,9 @@ Jobs survive a pi restart: `session_start` reads the job files, reports jobs tha
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.1 — 2026-10-26
+## 0.2.0 — 2026-10-26
 
-- deps: take pi and its packages from llm-agents, not from npm
+- run jobs without a terminal, like CI
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

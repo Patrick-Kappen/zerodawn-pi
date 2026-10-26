@@ -16,9 +16,9 @@
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.0 — 2026-10-25
+## 0.2.0 — 2026-10-26
 
-- First release.
+- name output files of codemode calls without ENOENT
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

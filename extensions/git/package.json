@@ -1,6 +1,6 @@
 {
   "name": "git",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "compact read-only `git` tool; blocks `git status/diff/log/show` in bash",
   "type": "module"
 }

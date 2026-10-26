@@ -88,6 +88,20 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.4.0 — 2026-10-26
+
+### shared 0.2.0
+
+- file ids for codemode tool calls
+
+### bash 0.2.0
+
+- run jobs without a terminal, like CI
+
+### git 0.2.0
+
+- name output files of codemode calls without ENOENT
+
 ## 0.3.1 — 2026-10-26
 
 ### bash 0.1.1
