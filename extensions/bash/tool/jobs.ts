@@ -36,6 +36,20 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
     const shown = visible();
     return shown.length ? shown.map(describe).join("\n") : "No bash jobs in this session.";
   };
+  const delivered = new Set<string>();
+  const statusLine = () =>
+    [...jobs.values()]
+      .filter((j) => j.bg && !delivered.has(j.id))
+      .sort((a, b) => a.start - b.start)
+      .map((j) => `job ${j.id}${j.group ? ` [${j.group}]` : ""}: ${ending(j) ?? "running"}`);
+  let noted = new Set<string>();
+  pi.on("before_agent_start", (event) => {
+    if (event.messageType !== "user") return;
+    const now = statusLine();
+    if (!now.some((entry) => !noted.has(entry))) return;
+    noted = new Set(now);
+    return { message: { customType: "bash-status", content: `Background jobs: ${now.join(" · ")}`, display: false } };
+  });
   const killById = (id: string) => {
     const job = jobs.get(id);
     if (!job) throw new Error(`jobs: no job ${id}. Known jobs: ${[...jobs.keys()].join(", ") || "none"}.`);
@@ -79,6 +93,7 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
     if (m?.role !== "custom" || m.customType !== "bash-job") return;
     const key = (m.details as { jobs?: unknown } | undefined)?.jobs;
     if (typeof key !== "string") return;
+    for (const id of key.split(",")) delivered.add(id);
     const sent = unconfirmed.get(key);
     if (!sent) return;
     unconfirmed.delete(key);
@@ -121,6 +136,7 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
     const waiting = waiters.get(job.id);
     if (waiting) {
       waiters.delete(job.id);
+      delivered.add(job.id);
       saveMeta(job.meta, { ...m, reported: true });
       for (const resolve of waiting) resolve();
       if (job.group) releaseGroup(job.group, triggerTurn);

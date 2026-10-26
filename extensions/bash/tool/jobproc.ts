@@ -2,19 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync, readSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { shorten } from "../../../shared/store.ts";
 import { age, commandLine } from "../../../shared/util.ts";
-import {
-  DEFAULT_COLUMNS,
-  DEFAULT_LIMIT_S,
-  DEFAULT_ROWS,
-  ERROR_BYTES,
-  ERROR_LINES,
-  HEAD_BYTES,
-  HEAD_LINES,
-  MAX_BYTES,
-  MAX_LINES,
-  NO_TIME_LIMIT,
-  RESULT_TAIL_BYTES,
-} from "../config.ts";
+import { DEFAULT_COLUMNS, DEFAULT_LIMIT_S, DEFAULT_ROWS, INLINE_LINES, NO_TIME_LIMIT, RESULT_TAIL_BYTES, TAIL_LINES } from "../config.ts";
 import { Screen, stripScript } from "../screen/screen.ts";
 
 export type Job = {
@@ -188,78 +176,35 @@ export function render(log: string, maxBytes: number): Rendered {
   });
 }
 
-export function tailLimit(lines: string[], maxLines: number, maxBytes: number): { kept: string[]; truncated: boolean } {
-  let bytes = 0;
-  let from = lines.length;
-  while (from > 0 && from > lines.length - maxLines) {
-    const next = bytes + Buffer.byteLength(lines[from - 1]) + 1;
-    if (next > maxBytes) break;
-    bytes = next;
-    from--;
-  }
-  return { kept: lines.slice(from), truncated: from > 0 };
-}
-
-export function headLimit(lines: string[], maxLines: number, maxBytes: number): string[] {
-  let bytes = 0;
-  let to = 0;
-  while (to < lines.length && to < maxLines) {
-    const next = bytes + Buffer.byteLength(lines[to]) + 1;
-    if (next > maxBytes) break;
-    bytes = next;
-    to++;
-  }
-  return lines.slice(0, to);
-}
-
 export const ERROR_PATTERN =
   /\b(error|errors|fail|failed|failure|failures|fatal|panic|panicked|exception|traceback|denied|not found|cannot|unable|unexpected|invalid|refused|timed out|timeout)\b|✗|\bE\d{3,}\b|^\s*at\s+\S+\s+\(/i;
 
-export function errorLines(lines: string[], from: number, to: number, maxLines: number, maxBytes: number): { n: number; text: string }[] {
-  const out: { n: number; text: string }[] = [];
-  const seen = new Set<string>();
-  let bytes = 0;
-  for (let i = from; i < to && out.length < maxLines; i++) {
-    const text = lines[i].trim();
-    if (!text || !ERROR_PATTERN.test(text) || seen.has(text)) continue;
-    const next = bytes + Buffer.byteLength(text) + 8;
-    if (next > maxBytes) break;
-    bytes = next;
-    seen.add(text);
-    out.push({ n: i + 1, text });
-  }
-  return out;
+export function errorLines(lines: string[]): { n: number[]; text: string }[] {
+  const out = new Map<string, number[]>();
+  lines.forEach((line, i) => {
+    const text = line.trim();
+    if (!text || !ERROR_PATTERN.test(text)) return;
+    out.set(text, [...(out.get(text) ?? []), i + 1]);
+  });
+  return [...out].map(([text, n]) => ({ n, text }));
 }
 
-export type Digest = { head: string[]; errors: { n: number; text: string }[]; tail: string[]; hidden: number; truncated: boolean };
-
-export function digest(lines: string[], maxLines = MAX_LINES, maxBytes = MAX_BYTES): Digest {
-  const whole = tailLimit(lines, maxLines, maxBytes);
-  if (!whole.truncated) return { head: [], errors: [], tail: whole.kept, hidden: 0, truncated: false };
-  const head = headLimit(lines, HEAD_LINES, HEAD_BYTES);
-  const headBytes = head.reduce((n, l) => n + Buffer.byteLength(l) + 1, 0);
-  const tail = tailLimit(lines, maxLines - head.length, maxBytes - headBytes - ERROR_BYTES).kept;
-  const middleEnd = lines.length - tail.length;
-  const errors = errorLines(lines, head.length, middleEnd, ERROR_LINES, ERROR_BYTES);
-  return { head, errors, tail, hidden: middleEnd - head.length, truncated: true };
-}
-
+// The context gets the status and the path of the output. A success adds short output. A failure adds every distinct error line.
 export function resultText(log: string, status: string): string {
-  const { plain, cut } = render(log, RESULT_TAIL_BYTES);
-  const d = digest(plain);
-  if (!d.truncated && !cut) return d.tail.length ? `${status}\n${d.tail.join("\n")}` : status;
+  const ok = /^exit 0\b/.test(status);
+  const { plain, cut } = render(log, ok ? RESULT_TAIL_BYTES : Number.POSITIVE_INFINITY);
+  if (plain.length === 0) return status;
+  if (ok && plain.length <= INLINE_LINES) return `${status}\n${plain.join("\n")}`;
   const txt = log.replace(/\.log$/, ".txt");
   writeFileSync(txt, `${plain.join("\n")}\n`);
   const { bytes } = statsOf(log);
   const total = cut ? `last ${plain.length} lines of ${bytes} bytes` : `${plain.length} lines, ${bytes} bytes`;
-  const parts = [`${status} · ${total} · output: ${shorten(txt)}`];
-  if (d.head.length) parts.push(`first ${d.head.length} lines:`, ...d.head);
-  if (d.hidden > 0) {
-    const note = d.errors.length ? ` · ${d.errors.length} of them look like errors (line: text):` : "";
-    parts.push(`… ${d.hidden} lines not shown${note}`, ...d.errors.map((e) => `  ${e.n}: ${e.text}`));
-  }
-  parts.push(`last ${d.tail.length} lines:`, ...d.tail);
-  return parts.join("\n");
+  const head = `${status} · ${total} · output: ${shorten(txt)}`;
+  if (ok) return head;
+  const errors = errorLines(plain);
+  if (errors.length === 0)
+    return `${head}\nno line looks like an error; last ${Math.min(TAIL_LINES, plain.length)} lines:\n${plain.slice(-TAIL_LINES).join("\n")}`;
+  return `${head}\n${errors.length} distinct lines look like errors (lines: text):\n${errors.map((e) => `  ${e.n.join(",")}: ${e.text}`).join("\n")}`;
 }
 
 export function summarizeFromDisk(m: Meta): string {
