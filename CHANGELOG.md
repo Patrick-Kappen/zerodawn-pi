@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.0 — 2026-10-26
+
+### bash 0.4.0
+
+- guidelines say continue working while a job runs
+- guide a wait as one chained command, block a bare sleep
+- short messages, no prose in reports
+
+### subagents 0.2.0
+
+- start a subagent from an agent profile
+- profile prompt always replaces the pi prompt
+- absent profile keys load nothing
+- profile extensions resolve in installed packages
+- profile skills, MCP and extension lookup
+- document the profile proposal and the plan
+
 ## 0.5.2 — 2026-10-26
 
 ### tests 0.2.2

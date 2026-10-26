@@ -89,6 +89,23 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.6.0 — 2026-10-26
+
+### bash 0.4.0
+
+- guidelines say continue working while a job runs
+- guide a wait as one chained command, block a bare sleep
+- short messages, no prose in reports
+
+### subagents 0.2.0
+
+- start a subagent from an agent profile
+- profile prompt always replaces the pi prompt
+- absent profile keys load nothing
+- profile extensions resolve in installed packages
+- profile skills, MCP and extension lookup
+- document the profile proposal and the plan
+
 ## 0.5.2 — 2026-10-26
 
 ### tests 0.2.2
@@ -100,73 +117,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ### tests 0.2.1
 
 - an option such as --error-on-warnings is not a warning
-
-## 0.5.0 — 2026-10-26
-
-### shared 0.3.0
-
-- tests: add run_tests tool, block test commands in bash
-- subagents: dev sandbox uses the config of the installed package
-- subagents: start subagents with nothing but explicit extensions
-
-### ast-grep 0.2.0
-
-- docs: AGENTS.md of each extension as rules, facts to README
-
-### bash 0.3.0
-
-- background after 15 s, status line result, errors only on failure
-- docs: AGENTS.md of each extension as rules, facts to README
-- mark a bash variable in a test string for biome
-
-### core 0.2.0
-
-- docs: AGENTS.md of each extension as rules, facts to README
-
-### ctx-manager 0.2.0
-
-- bash: background after 15 s, status line result, errors only on failure
-- docs: AGENTS.md of each extension as rules, facts to README
-
-### files 0.2.0
-
-- docs: AGENTS.md of each extension as rules, facts to README
-
-### gateway 0.2.0
-
-- docs: AGENTS.md of each extension as rules, facts to README
-
-### git 0.3.0
-
-- docs: AGENTS.md of each extension as rules, facts to README
-
-### opencode 0.2.0
-
-- docs: AGENTS.md of each extension as rules, facts to README
-
-### subagents 0.1.0
-
-- First release.
-
-### systemstate 0.2.0
-
-- docs: AGENTS.md of each extension as rules, facts to README
-
-### tests 0.2.0
-
-- docs: AGENTS.md as short rules for the agent
-- run checks in place, a warning is red, recipe contract
-- run run_tests in place of a blocked bash test command
-- test the registration in index.ts
-- add run_tests tool, block test commands in bash
-
-### ui 0.2.0
-
-- docs: AGENTS.md of each extension as rules, facts to README
-
-### watchdog 0.2.0
-
-- docs: AGENTS.md of each extension as rules, facts to README
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

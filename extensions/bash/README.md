@@ -45,11 +45,11 @@ Jobs survive a pi restart: `session_start` reads the job files, reports jobs tha
 ## Changes
 
 <!-- changelog:start -->
-## 0.3.0 — 2026-10-26
+## 0.4.0 — 2026-10-26
 
-- background after 15 s, status line result, errors only on failure
-- docs: AGENTS.md of each extension as rules, facts to README
-- mark a bash variable in a test string for biome
+- guidelines say continue working while a job runs
+- guide a wait as one chained command, block a bare sleep
+- short messages, no prose in reports
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
