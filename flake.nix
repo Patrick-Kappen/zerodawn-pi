@@ -318,6 +318,27 @@
                 pass_filenames = false;
                 always_run = true;
               };
+              sync-branch = {
+                enable = true;
+                name = "repository behaviour matches the sibling branch of the same name";
+                entry = "${pkgs.writeShellScript "sync-branch" ''
+                  export PATH=${
+                    pkgs.lib.makeBinPath [
+                      pkgs.git
+                      pkgs.jq
+                      pkgs.diffutils
+                      pkgs.gawk
+                      pkgs.gnused
+                      pkgs.gnugrep
+                      pkgs.coreutils
+                    ]
+                  }:$PATH
+                  exec scripts/sync-branch.sh
+                ''}";
+                stages = [ "pre-push" ];
+                pass_filenames = false;
+                always_run = true;
+              };
               gitleaks = {
                 enable = true;
                 name = "gitleaks";

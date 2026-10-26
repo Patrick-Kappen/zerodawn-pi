@@ -9,7 +9,7 @@ other="${1:?usage: sync-check.sh PATH_TO_OTHER_REPO}"
 self_name="$(jq -r .name package.json)"
 other_name="$(jq -r .name "$other/package.json")"
 # The sibling name and the CI step that checks the sibling are the one intended difference.
-normalize() { sed "s/$2/REPO/g; s/${2//-/_}/REPO_/g" "$1" | sed '/^sibling := /d' | sed '/Repository behaviour matches/,/ci-sync.sh/d'; }
+normalize() { sed "s/$2/REPO/g; s/${2//-/_}/REPO_/g" "$1" | sed '/^sibling := /d' | sed '/Repository behaviour matches/,/sync-branch.sh/d'; }
 
 files=(.github/workflows/ci.yml biome.json tsconfig.json .gitignore .envrc)
 for f in scripts/*.sh; do files+=("$f"); done
@@ -28,7 +28,7 @@ show() {
   differ+=("$label: $n lines differ; first: ${first:0:100}")
 }
 for f in "${files[@]}"; do
-  case "$f" in scripts/dev.sh|scripts/ci-sync.sh) continue ;; esac
+  case "$f" in scripts/dev.sh) continue ;; esac
   if [ ! -f "$other/$f" ]; then differ+=("$f: missing in $other_name"); continue; fi
   a="$(normalize "$f" "$self_name")"; b="$(normalize "$other/$f" "$other_name")"
   [ "$a" == "$b" ] || show "$f" "$a" "$b"
