@@ -89,6 +89,12 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.5.1 — 2026-10-26
+
+### tests 0.2.1
+
+- an option such as --error-on-warnings is not a warning
+
 ## 0.5.0 — 2026-10-26
 
 ### shared 0.3.0
@@ -169,24 +175,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ### git 0.2.0
 
 - name output files of codemode calls without ENOENT
-
-## 0.3.1 — 2026-10-26
-
-### bash 0.1.1
-
-- deps: take pi and its packages from llm-agents, not from npm
-
-### core 0.1.1
-
-- deps: take pi and its packages from llm-agents, not from npm
-
-### gateway 0.1.1
-
-- deps: take pi and its packages from llm-agents, not from npm
-
-### opencode 0.1.1
-
-- deps: take pi and its packages from llm-agents, not from npm
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
