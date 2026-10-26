@@ -41,6 +41,8 @@ function setup(options: { has?: boolean[]; option: (string | undefined)[]; alive
 }
 
 const SUPERVISOR_COMMAND = [
+  "env",
+  "BUN_BE_BUN=1",
   "/bin/node",
   "/x/supervisor.ts",
   "--session",

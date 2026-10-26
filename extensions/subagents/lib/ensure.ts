@@ -43,7 +43,11 @@ export async function ensureSupervisor(options: EnsureOptions): Promise<{ sessio
   }
 
   if (start) {
+    // pi ships as a compiled bun binary: process.execPath is pi itself, and runs a script only with BUN_BE_BUN.
+    // Set it through env, not tmux -e: tmux -e on new-session reaches every later window, and the subagent pi would run as bun.
     await options.tmux.openWindow(session, SUPERVISOR_WINDOW, [
+      "env",
+      "BUN_BE_BUN=1",
       options.execPath,
       options.supervisorPath,
       "--session",
