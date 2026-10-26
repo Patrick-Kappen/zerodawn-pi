@@ -82,7 +82,7 @@ Some extensions read `config.json` next to `package.json`; copy `config.example.
 | `just lint` | biome and shellcheck |
 | `just fmt` | format and apply safe fixes |
 | `just check` | lint, types, tests, `nix flake check` |
-| `just dev` | pi in a tmux sandbox with all extensions; `just dev-screen`, `just dev-send "…"`, `just dev-key C-c`, `just dev-stop` |
+| `just dev` | pi in a tmux sandbox with all extensions; `just dev-screen`, `just dev-send "…"`, `just dev-key C-c`, `just dev-stop`. `PI_DEV=<name>` on each of them gives a separate session and sandbox |
 
 Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
