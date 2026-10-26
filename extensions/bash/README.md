@@ -1,6 +1,6 @@
 # bash
 
-Replaces pi's `bash` tool. Every command runs as a job in a PTY under `script`, so the output keeps colors and progress lines. The tool waits for the command and streams the last 40 lines while it runs.
+Replaces pi's `bash` tool. Every command runs as a job without a terminal, like in CI: stdout and stderr go to a log file, stdin is `/dev/null`. A pager, editor or prompt fails at once instead of waiting. `FORCE_COLOR` and `CLICOLOR_FORCE` keep the colors of tools that obey them. The tool waits for the command and streams the last 40 lines while it runs.
 
 ## Tools
 
@@ -29,13 +29,13 @@ The dashboard shows every tool call of the turn with status, elapsed time and th
 
 ## Files
 
-Logs and job state live next to the session file: `<session>/out/<id>.bash.log` (raw PTY), `<id>.bash.txt` (clean text, only when the inline result was cut), `<session>/jobs/<id>.{sh,json,status}`. The id is `<turn>.<round>-C<n>`.
+Logs and job state live next to the session file: `<session>/out/<id>.bash.log` (raw output), `<id>.bash.txt` (clean text, only when the inline result was cut), `<session>/jobs/<id>.{sh,json,status}`. The id is `<turn>.<round>-C<n>`.
 
 Jobs survive a pi restart: `session_start` reads the job files, reports jobs that ended, and polls jobs that still run.
 
 ## Layout
 
-`tool/` the `bash` and `jobs` tools, the guard and the job process; `ui/` dashboard, follow view, transcript rendering, icons; `screen/` the terminal screen model with PTY fixtures.
+`tool/` the `bash` and `jobs` tools, the guard and the job process; `ui/` dashboard, follow view, transcript rendering, icons; `screen/` the screen model that turns raw output with escapes into lines.
 
 ## Constants
 

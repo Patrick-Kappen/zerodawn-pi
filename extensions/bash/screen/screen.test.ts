@@ -23,9 +23,9 @@ function render(name: string): Screen {
 }
 
 describe("control characters", () => {
-  test("newline keeps the column, CR LF starts a new line", () => {
+  test("LF and CR LF both start a new line, because pipe output has no CR", () => {
     assert.deepEqual(plain("ab\r\ncd"), ["ab", "cd"]);
-    assert.deepEqual(plain("ab\ncd"), ["ab", "  cd"]);
+    assert.deepEqual(plain("ab\ncd"), ["ab", "cd"]);
   });
   test("CR overwrites from column 0", () => {
     assert.deepEqual(plain("hello\rab"), ["abllo"]);

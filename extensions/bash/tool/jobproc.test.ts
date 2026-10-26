@@ -18,14 +18,24 @@ function run(command: string, limit = 10): Promise<{ code: number | null; sig: s
   });
 }
 
-test("a job runs in a pty, keeps colors and reports its exit code", async () => {
-  const r = await run('tty | grep -q /dev/pts && echo pty-ok; printf "\\e[32mok\\e[0m\\n"; printf "a\\rb\\n"; exit 3');
+test("a job runs without a terminal, keeps the output and reports its exit code", async () => {
+  const r = await run('tty -s || echo no-tty; printf "\\e[32mok\\e[0m\\n"; printf "a\\rb\\n"; exit 3');
   assert.equal(r.code, 3);
   assert.equal(readFileSync(r.status, "utf8").trim(), "3");
   const out = render(r.log, 1 << 20);
-  assert.deepEqual(out.plain, ["pty-ok", "ok", "b"]);
+  assert.deepEqual(out.plain, ["no-tty", "ok", "b"]);
   assert.match(out.lines[1], /\x1b\[32mok\x1b\[0m/);
-  assert.equal(resultText(r.log, "exit 3 (1s)"), "exit 3 (1s)\npty-ok\nok\nb");
+  assert.equal(resultText(r.log, "exit 3 (1s)"), "exit 3 (1s)\nno-tty\nok\nb");
+});
+
+test("a prompt gets EOF at once and an editor fails instead of waiting", async () => {
+  const r = await run('read -r a </dev/stdin; echo "read=$?"; $GIT_EDITOR x || echo editor-failed; printf "x\\n" | $PAGER', 5);
+  assert.deepEqual(render(r.log, 1 << 20).plain, ["read=1", "editor-failed", "x"]);
+});
+
+test("a pipe that closes early ends the writer with SIGPIPE, not with an error", async () => {
+  const r = await run('yes | head -1; echo "${PIPESTATUS[0]}"', 5);
+  assert.deepEqual(render(r.log, 1 << 20).plain, ["y", "141"]);
 });
 
 test("the time limit kills the whole job", async () => {
@@ -37,9 +47,11 @@ test("the time limit kills the whole job", async () => {
   assert.deepEqual(render(r.log, 1 << 20).plain, ["start"]);
 });
 
-test("summarizeFromDisk reads the exit code from the script footer when the status file is gone", async () => {
-  const r = await run("echo hi; exit 5");
-  const meta = { id: "x", command: "echo hi", log: r.log, status: join(r.dir, "missing"), start: Date.now(), limit: 0, bg: true, reported: false };
+test("summarizeFromDisk reads the exit code from the script footer of an old log when the status file is gone", () => {
+  const dir = mkdtempSync(join(tmpdir(), "bash-"));
+  const log = join(dir, "job.log");
+  writeFileSync(log, 'Script started on x\nhi\r\n\nScript done on y [COMMAND_EXIT_CODE="5"]\n');
+  const meta = { id: "x", command: "echo hi", log, status: join(dir, "missing"), start: Date.now(), limit: 0, bg: true, reported: false };
   assert.equal(summarizeFromDisk(meta), "exit 5\nhi");
 });
 
