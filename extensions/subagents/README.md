@@ -2,7 +2,7 @@
 
 Delegate tasks to pi agents. Each agent runs as a normal interactive pi in a window of a detached tmux session.
 
-Status: work in progress. The extension registers no tool yet.
+Status: work in progress. The supervisor (`supervisor.ts`) exists. The extension registers no tool yet.
 
 ## Design
 
@@ -20,6 +20,7 @@ Status: work in progress. The extension registers no tool yet.
 
 - When the main pi stops, the running subagents finish their task. Then the supervisor closes the session.
 - 2 hours after the main pi stops, the supervisor stops all subagents and closes the session. This also cleans up after a crash.
+- When no main pi connects within 2 hours after the supervisor starts, the supervisor closes the session.
 
 ## Watch
 

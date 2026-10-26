@@ -48,6 +48,15 @@ test("an unknown tmux error is not read as an absent session", async () => {
   await assert.rejects(createTmux(exec).hasSession("s"), /exit code 1: permission denied/);
 });
 
+test("setOption and killSession use an exact session target", async () => {
+  const { exec, calls } = fake([{}, {}]);
+  const tmux = createTmux(exec);
+  await tmux.setOption("pi-sub-x", "@pi-sub-socket", "/run/x.sock");
+  await tmux.killSession("pi-sub-x");
+  assert.deepEqual(calls[0], ["tmux", "set-option", "-t", "=pi-sub-x:", "@pi-sub-socket", "/run/x.sock"]);
+  assert.deepEqual(calls[1], ["tmux", "kill-session", "-t", "=pi-sub-x"]);
+});
+
 const socket = `pi-subagents-test-${process.pid}`;
 const realExec: Exec = (command, args) =>
   new Promise((resolve) => {
@@ -70,4 +79,14 @@ test("real tmux: open two windows and list them", async () => {
     { id: first, name: "one" },
     { id: second, name: "two" },
   ]);
+});
+
+test("real tmux: setOption stores the value and killSession removes the session", async () => {
+  const tmux = createTmux(realExec, socket);
+  await tmux.openWindow("pi-sub-opt", "one", ["sleep", "30"]);
+  await tmux.setOption("pi-sub-opt", "@pi-sub-socket", "/run/x.sock");
+  const shown = await realExec("tmux", ["-L", socket, "show-options", "-t", "=pi-sub-opt:", "-v", "@pi-sub-socket"]);
+  assert.equal(shown.stdout.trim(), "/run/x.sock");
+  await tmux.killSession("pi-sub-opt");
+  assert.equal(await tmux.hasSession("pi-sub-opt"), false);
 });

@@ -71,5 +71,13 @@ export function createTmux(exec: Exec, socket?: string) {
     });
   }
 
-  return { hasSession, openWindow, listWindows };
+  async function setOption(session: string, option: string, value: string): Promise<void> {
+    await check(["set-option", "-t", `=${session}:`, option, value]);
+  }
+
+  async function killSession(session: string): Promise<void> {
+    await check(["kill-session", "-t", `=${session}`]);
+  }
+
+  return { hasSession, openWindow, listWindows, setOption, killSession };
 }
