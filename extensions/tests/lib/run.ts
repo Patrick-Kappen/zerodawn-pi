@@ -10,7 +10,7 @@ import { counts, type Diagnosis, diagnose, failures, warningLines } from "./repo
 const INLINE_MS = 15 * 1000;
 const RERUN = "# rerun";
 
-type Result = { content: { type: "text"; text: string }[]; details: Record<string, unknown>; isError: boolean };
+type Result = { content: { type: "text"; text: string }[]; details: Record<string, unknown>; isError: boolean; terminate?: boolean };
 
 const noTest = (uncovered: string[]) =>
   `No test for: ${uncovered.join(", ")}. Add a test file that imports each of them, at the place and in the form that the AGENTS.md or README of the project gives, then run run_tests again.`;
@@ -65,7 +65,7 @@ export const TOOL = {
   promptGuidelines: [
     "Run tests only with run_tests. A test command in bash runs run_tests in its place.",
     "A check command in bash (lint, types, just check) gives a short result. A warning is an error: fix it.",
-    `A run longer than ${INLINE_MS / 1000} s continues in the background. Continue with other work, or end the turn when nothing else is left; a message reports the result and starts your next turn.`,
+    `A run longer than ${INLINE_MS / 1000} s ends your turn; a message gives the result.`,
     "Add or change a test for each new behaviour or bug fix, then run run_tests.",
     "run_tests gives the earlier result when no file changed. Set rerun only for a flaky test.",
   ],
@@ -80,13 +80,13 @@ export function cdOf(command: string): string | undefined {
   return command.match(LEADING_CD)?.[1].replace(/^["']|["']$/g, "");
 }
 
-const LATER =
-  "Continue with other work, or end the turn when nothing else is left. A message gives the result and starts your next turn. It is not a bash job: jobs wait does not see it.";
-const TEST_HEAD = "Test commands in bash run through run_tests. Use run_tests next time. Result:";
-const CHECK_HEAD = "Check commands in bash give a short result. Do not run the same check in another form. Result:";
+const LATER = "A message gives the result.";
+const TEST_HEAD = "run_tests result (use run_tests next time):";
+const CHECK_HEAD = "Check result (do not run it again in another form):";
 
 /** The text and the state of a bash call that a test or check run replaced. */
-export type Replacement = { text: string; isError: boolean };
+/** background: the run went to the background; the bash call then ends the turn. */
+export type Replacement = { text: string; isError: boolean; background: boolean };
 
 /** Gives the result of a run that went to the background, as a message to the agent. */
 export type Notify = (text: string, ok: boolean) => void;
@@ -119,9 +119,9 @@ export class RunTests {
   async insteadOfBash(toolCallId: string, command: string, ctx: ExtensionContext): Promise<Replacement> {
     try {
       const r = await this.execute(toolCallId, { path: cdOf(command), rerun: command.includes(RERUN) }, ctx.signal, ctx);
-      return { text: `${TEST_HEAD}\n${r.content[0].text}`, isError: r.isError };
+      return { text: `${TEST_HEAD}\n${r.content[0].text}`, isError: r.isError, background: r.details.background === true };
     } catch (err) {
-      return { text: `${TEST_HEAD}\n${(err as Error).message}`, isError: true };
+      return { text: `${TEST_HEAD}\n${(err as Error).message}`, isError: true, background: false };
     }
   }
 
@@ -133,7 +133,7 @@ export class RunTests {
       const key = inGit(dir) ? fingerprint(dir, `check ${clean}`, changedFiles(dir)) : `check ${dir} ${clean}`;
       const earlier = this.last.get(key);
       if (earlier && !command.includes(RERUN))
-        return { text: `${CHECK_HEAD}\n${again(earlier, `add "${RERUN}" to run it again`).content[0].text}`, isError: earlier.isError };
+        return { text: `${CHECK_HEAD}\n${again(earlier, `add "${RERUN}" to run it again`).content[0].text}`, isError: earlier.isError, background: false };
       const r = await this.inline(key, `check ${callFileId(ctx, toolCallId)}`, ctx.signal, async (signal) => {
         const run = await execute(["bash", "-c", command], ctx.cwd, signal);
         const log = callOutFile(ctx, toolCallId, "check");
@@ -141,15 +141,15 @@ export class RunTests {
         const { text: t, ok } = report(run, "check", command, [], log);
         return text(t, !ok, { log });
       });
-      return { text: `${CHECK_HEAD}\n${r.content[0].text}`, isError: r.isError };
+      return { text: `${CHECK_HEAD}\n${r.content[0].text}`, isError: r.isError, background: r.details.background === true };
     } catch (err) {
-      return { text: `${CHECK_HEAD}\n${(err as Error).message}`, isError: true };
+      return { text: `${CHECK_HEAD}\n${(err as Error).message}`, isError: true, background: false };
     }
   }
 
   /** Starts a run and waits up to inlineMs for it. A later result goes to notify. A second call for the same key does not start a second run. */
   private async inline(key: string, label: string, signal: AbortSignal | undefined, start: (signal: AbortSignal) => Promise<Result>): Promise<Result> {
-    if (this.running.has(key)) return text(`${label} still runs for this change. ${LATER}`, false, { background: true });
+    if (this.running.has(key)) return { ...text(`${label} still runs for this change. ${LATER}`, false, { background: true }), terminate: true };
     const stop = new AbortController();
     const session = this.session.signal;
     const stopRun = () => stop.abort();
@@ -180,7 +180,7 @@ export class RunTests {
         if (!session.aborted) this.notify(`${label} failed: ${err.message}`, false);
       },
     );
-    return text(`${label} runs in the background (more than ${this.inlineMs / 1000} s). ${LATER}`, false, { background: true });
+    return { ...text(`${label}: background (more than ${this.inlineMs / 1000} s). ${LATER}`, false, { background: true }), terminate: true };
   }
 
   async execute(toolCallId: string, params: Params, signal: AbortSignal | undefined, ctx: ExtensionContext): Promise<Result> {

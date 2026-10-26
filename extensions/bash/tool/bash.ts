@@ -33,10 +33,9 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
     promptSnippet: "Run a bash command; short output back, long commands continue in the background",
     promptGuidelines: [
       "Use bash to run things, not to read: read for a file or an output path, grep for a search, git for a diff or log.",
-      "A job in the background runs on without you. Continue with work that does not need its result. When only jobs are left, end the turn with a short status: the user can chat, and the message of the job starts your next turn.",
+      "A command over 15 s ends your turn; its result comes as a message.",
       "Put independent commands in one message with the same group; they report once.",
       "Dependent steps: chain them in one command with &&. A wait for a condition is part of that command: timeout 30 bash -c 'until CHECK; do sleep 1; done' && NEXT. Never a separate sleep or a repeated check.",
-      'Do not use jobs wait to fill the time until a job ends; end the turn. Use jobs wait only for a job of a few seconds whose result the next step needs; id "3,4" returns several together.',
       `A command stops after ${DEFAULT_LIMIT_S / 3600} hour; add "${NO_TIME_LIMIT}" when it must run longer.`,
     ],
     parameters: Type.Object({
@@ -144,6 +143,9 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       return {
         content: [{ type: "text", text: `job ${id}: running · log: ${shorten(log)}` }],
         details: { log, job: id, background: true },
+        // A command that moved to the background ends the turn, so the user can chat; its message starts the next turn.
+        // A command started with background: true (a server) does not: the agent works with it.
+        terminate: params.background ? undefined : true,
       };
     },
   });
