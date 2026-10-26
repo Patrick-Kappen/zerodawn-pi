@@ -5,7 +5,11 @@ missing=()
 for manifest in shared/package.json extensions/*/package.json; do
   name="$(jq -r .name "$manifest")"; version="$(jq -r .version "$manifest")"
   tag="$(git tag --list "$name-v*" --sort=-v:refname | head -n1)"
-  [ -n "$tag" ] || continue
+  # A component without a tag is new: this release must ship it, with a changelog section for its version.
+  if [ -z "$tag" ]; then
+    grep -q "^## $version " "$(dirname "$manifest")/CHANGELOG.md" || missing+=("$name (new, $version has no section in its CHANGELOG.md)")
+    continue
+  fi
   git diff --quiet "$tag" -- "$(dirname "$manifest")" && continue
   [ "$version" != "${tag#"$name-v"}" ] || missing+=("$name (still ${version}, changed since $tag)")
 done

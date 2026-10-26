@@ -37,6 +37,13 @@ if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
 fi
 notes="$(section CHANGELOG.md "$version")"
 if [ -z "$notes" ]; then echo "$tag: no changelog section in CHANGELOG.md, not released ($tagged component tags)"; exit 0; fi
+untagged=()
+for manifest in shared/package.json extensions/*/package.json; do
+  t="$(jq -r .name "$manifest")-v$(jq -r .version "$manifest")"
+  git rev-parse -q --verify "refs/tags/$t" >/dev/null || untagged+=("$t")
+done
+[ ${#untagged[@]} -eq 0 ] || fail "package $tag would ship components without a tag: ${untagged[*]}" \
+  "give each one a changelog section for its version (just bump-changed), merge, and the next run tags it"
 tag_it "$tag" "$notes"
 gh release create "$tag" --title "$tag" --notes "$notes" ||
   fail "tag $tag is pushed but the GitHub release was not created" "create it by hand with the section of CHANGELOG.md: gh release create $tag --title $tag --notes-file FILE"
