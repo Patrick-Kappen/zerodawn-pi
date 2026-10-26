@@ -61,9 +61,9 @@ export function createTmux(exec: Exec, socket?: string) {
 
   async function listWindows(session: string): Promise<Window[]> {
     if (!(await hasSession(session))) return [];
-    const out = await check(["list-windows", "-t", `=${session}`, "-F", "#{window_id}\t#{window_name}"]);
+    const out = await check(["list-windows", "-t", `=${session}`, "-F", "#{window_id} #{window_name}"]);
     return out.split("\n").map((line) => {
-      const [id, name] = line.split("\t");
+      const [id, name] = line.split(" ");
       if (id === undefined || name === undefined) {
         throw new Error(`subagents: unexpected line from "tmux list-windows": "${line}"`);
       }

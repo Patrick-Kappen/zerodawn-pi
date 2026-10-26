@@ -106,7 +106,7 @@
             ) (./extensions + "/${name}"))
           ];
         };
-      # The job tests spawn bash and script in a PTY; the sandbox has /dev/pts.
+      # The job tests spawn bash and script in a PTY; the sandbox has /dev/pts. The subagents tests start their own tmux server.
       runTests =
         pkgs: name: src:
         pkgs.runCommand "tests-${name}"
@@ -114,6 +114,7 @@
             inherit src;
             nativeBuildInputs = [
               pkgs.bun
+              pkgs.tmux
               pkgs.bashInteractive
               pkgs.util-linux
               pkgs.coreutils

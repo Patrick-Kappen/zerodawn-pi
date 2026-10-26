@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { chmod, readFile, rm } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { connectMain } from "./client.ts";
@@ -20,7 +22,14 @@ const exec: Exec = (command, args) =>
   });
 const timers = { setTimeout, clearTimeout: (handle: unknown) => clearTimeout(handle as NodeJS.Timeout) };
 const sessionId = randomUUID();
-const fakePi = fileURLToPath(new URL("./fixtures/fake-pi.mjs", import.meta.url));
+const fakePiScript = fileURLToPath(new URL("./fixtures/fake-pi.ts", import.meta.url));
+// The Nix test sandbox has no XDG_RUNTIME_DIR, no node and no /usr/bin/env: give the tmux server its own runtime dir,
+// and start the fake pi through /bin/sh with the runtime of this test.
+const work = await mkdtemp(join(tmpdir(), "pi-subagents-it-"));
+process.env.XDG_RUNTIME_DIR = work;
+const fakePi = join(work, "fake-pi");
+await writeFile(fakePi, `#!/bin/sh\nexec "${process.execPath}" "${fakePiScript}" "$@"\n`);
+await chmod(fakePi, 0o755);
 const supervisorPath = fileURLToPath(new URL("../supervisor.ts", import.meta.url));
 const extensionPath = fileURLToPath(new URL("../index.ts", import.meta.url));
 const sessionIds = [sessionId];
@@ -28,6 +37,7 @@ const sessionIds = [sessionId];
 after(async () => {
   await exec("tmux", ["-L", socket, "kill-server"]);
   for (const id of sessionIds) await rm(`/tmp/${sessionName(id)}`, { recursive: true, force: true });
+  await rm(work, { recursive: true, force: true });
 });
 
 function ensure(id: string, piCommand: string) {
@@ -60,7 +70,6 @@ test("real supervisor: ensure, hello, status, close, session ends", { timeout: 3
 test("real supervisor with a fake pi: one small result reaches main, the session ends", { timeout: 30_000 }, async () => {
   const id = randomUUID();
   sessionIds.push(id);
-  await chmod(fakePi, 0o755);
   const tmux = createTmux(exec, socket);
   const { session, socket: path } = await ensure(id, fakePi);
   const client = await connectMain(path, timers);

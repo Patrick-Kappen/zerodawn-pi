@@ -1,10 +1,11 @@
-#!/usr/bin/env node
 // Stands in for pi in tests: connects with the env vars, answers a task with fake events and a settle.
 import { createConnection } from "node:net";
 
-const socket = createConnection(process.env.PI_SUBAGENT_SOCKET);
+const path = process.env.PI_SUBAGENT_SOCKET;
 const id = process.env.PI_SUBAGENT_ID;
-const send = (message) => socket.write(`${JSON.stringify(message)}\n`);
+if (path === undefined || id === undefined) throw new Error("fake-pi: PI_SUBAGENT_SOCKET and PI_SUBAGENT_ID must be set.");
+const socket = createConnection(path);
+const send = (message: object) => socket.write(`${JSON.stringify(message)}\n`);
 let buffer = "";
 socket.setEncoding("utf8");
 socket.on("connect", () => send({ type: "hello", role: "sub", id }));
