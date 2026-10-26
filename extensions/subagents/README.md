@@ -22,6 +22,21 @@ Status: work in progress. The supervisor (`supervisor.ts`) exists. The extension
 - 2 hours after the main pi stops, the supervisor stops all subagents and closes the session. This also cleans up after a crash.
 - When no main pi connects within 2 hours after the supervisor starts, the supervisor closes the session.
 
+## UI (planned)
+
+The same kind of view as the `bash` extension:
+
+| bash | subagent |
+|---|---|
+| The tool waits and streams the last 40 lines | The tool waits and streams the last tool calls and text of the subagent |
+| `background: true` returns an id; a `bash-job` message reports the result | The same, with a `subagent` message |
+| `jobs wait / list / kill` | Tool `subagents`: `wait`, `list`, `abort` |
+| `/jobs`, `ctrl+shift+j` follow a job | `/subagents` follows a subagent and shows `tmux attach -t pi-sub-<id>` |
+| Dashboard: status, time, last lines | Dashboard: each subagent with status, time, current tool call, cost |
+| `session_start` reports jobs that ended | `session_start` finds a running `pi-sub-<id>`, connects, reports what ended |
+
+The main pi connects to the supervisor when the first subagent starts. At `session_start` it only looks for a running session.
+
 ## Watch
 
 `tmux attach -t pi-sub-<id>`. Window 0 shows the overview; the other windows show each subagent.
