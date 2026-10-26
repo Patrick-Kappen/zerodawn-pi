@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 12. A warning is an error; check commands run in place (2026-10-26)
+
+`run_tests` and the check commands in bash (`just check`, `just lint`, `nix flake check`, linters) are red when the output has a warning. A check command runs in place of bash, with the same short result as the tests. `just lint` runs biome with `--error-on-warnings`, and `nix flake check` runs with `warn-dirty false`: a dirty tree is the normal state during work, not a fault. A project without bun tests gets the tests for its changes from a recipe `test-changed *files`; this repository has one (`scripts/test-changed.sh`). Reason: a warning that passes stays, and the agent read the full output of every check.
+
 ## 11. Tests run through the tool run_tests, not through bash (2026-10-26)
 
 The extension `tests` registers `run_tests` and blocks test commands in bash. The tool picks the tests for the changed files, fails for a changed code file without a test, and returns one line for green or only the failures for red. Reason: the agent ran tests in many forms around the old block of a repeated run, and got the full output in its context.
