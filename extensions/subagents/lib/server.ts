@@ -3,6 +3,7 @@ import { createServer, type Server, type Socket } from "node:net";
 import { join } from "node:path";
 import { createAgents } from "./agents.ts";
 import { blockerText } from "./format.ts";
+import type { Git } from "./git.ts";
 import { createLifecycle, GRACE_MS, type Timers } from "./lifecycle.ts";
 import { answers } from "./probe.ts";
 import { formatServerMessage, parseClientLine, type ServerMessage } from "./protocol.ts";
@@ -16,6 +17,8 @@ export interface SupervisorOptions {
   dir: string;
   id: string;
   pi: string;
+  home: string;
+  git: Git;
   extensions: string[];
   newId: () => string;
   runtimeDir: string | undefined;
@@ -117,6 +120,8 @@ export async function startSupervisor(options: SupervisorOptions) {
     dir: options.dir,
     socket: path,
     piCommand: options.pi,
+    home: options.home,
+    git: options.git,
     extensions: options.extensions,
     tmux: options.tmux,
     timers: options.timers,
@@ -168,11 +173,18 @@ export async function startSupervisor(options: SupervisorOptions) {
         return;
       case "start":
         if (connection.role !== "main") throw new Error('supervisor: only a connection with hello role "main" can start a subagent.');
-        agents.start(message.task, message.args, message.checks).then(
+        agents.start(message.task, message.args, message.checks, { repo: message.repo, sha: message.sha }).then(
           async (id) => {
             await writing;
             send(socket, { type: "started", id });
           },
+          (error: Error) => send(socket, { type: "error", message: error.message }),
+        );
+        return;
+      case "discard":
+        if (connection.role !== "main") throw new Error('supervisor: only a connection with hello role "main" can discard a subagent.');
+        agents.discard(message.id).then(
+          (text) => send(socket, { type: "discarded", id: message.id, text }),
           (error: Error) => send(socket, { type: "error", message: error.message }),
         );
         return;
@@ -188,7 +200,10 @@ export async function startSupervisor(options: SupervisorOptions) {
           throw new Error(`supervisor: only a connection with hello role "sub" can send "${message.type}".`);
         if (message.type === "ask") agents.pending(connection.id, "question", message.text);
         else if (message.type === "blocker") agents.pending(connection.id, "blocked", blockerText(message.data), message.data);
-        else agents.handoff(connection.id, message.data, message.reason, message.gate);
+        else {
+          const sub = connection.id;
+          agents.handoff(sub, message.data, message.reason, message.gate).catch((error: Error) => send(socket, { type: "error", message: error.message }));
+        }
         return;
       case "event":
         if (connection.role !== "sub" || connection.id === undefined) throw new Error('supervisor: only a connection with hello role "sub" can send events.');

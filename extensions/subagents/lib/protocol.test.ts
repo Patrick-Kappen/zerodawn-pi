@@ -5,6 +5,7 @@ import { formatClientMessage, formatServerMessage, parseClientLine, parseServerL
 const usage = { tokens: 5, cost: 0.01 };
 const handoff = {
   summary: "s",
+  change: "fix" as const,
   changes: [{ file: "a.ts", what: "w" }],
   tests: [{ file: "a.test.ts", covers: "c" }],
   findings: [],
@@ -18,12 +19,24 @@ test("parseClientLine accepts hello, status, start and events", () => {
   assert.deepEqual(parseClientLine('{"type":"hello","role":"main"}'), { type: "hello", role: "main" });
   assert.deepEqual(parseClientLine('{"type":"hello","role":"sub","id":"a"}'), { type: "hello", role: "sub", id: "a" });
   assert.deepEqual(parseClientLine('{"type":"status","extra":1}'), { type: "status" });
-  assert.deepEqual(parseClientLine('{"type":"start","task":"t","args":["--a","b c"],"checks":["just lint"]}'), {
-    type: "start",
-    task: "t",
-    args: ["--a", "b c"],
-    checks: ["just lint"],
-  });
+  assert.deepEqual(
+    parseClientLine('{"type":"start","task":"t","args":["--a","b c"],"checks":["just lint"],"repo":"/r","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'),
+    {
+      type: "start",
+      task: "t",
+      args: ["--a", "b c"],
+      checks: ["just lint"],
+      repo: "/r",
+      sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+  );
+  assert.deepEqual(parseClientLine('{"type":"discard","id":"a"}'), { type: "discard", id: "a" });
+  assert.throws(
+    () => parseClientLine('{"type":"start","task":"t","args":[],"checks":[],"repo":"r","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'),
+    /absolute/,
+  );
+  assert.throws(() => parseClientLine('{"type":"start","task":"t","args":[],"checks":[],"repo":"/r","sha":"main"}'), /commit hash/);
+  assert.deepEqual(parseServerLine('{"type":"discarded","id":"a","text":"t"}'), { type: "discarded", id: "a", text: "t" });
   for (const event of [
     { kind: "tool_start", name: "bash", args: "{}" },
     { kind: "tool_end", name: "bash", isError: false },
@@ -42,7 +55,7 @@ test("parseClientLine accepts answer, ask and blocker", () => {
   assert.deepEqual(parseClientLine(formatClientMessage({ type: "blocker", data: blocker })), { type: "blocker", data: blocker });
   assert.deepEqual(parseClientLine(formatClientMessage({ type: "handoff", data: handoff })), { type: "handoff", data: handoff });
   assert.deepEqual(parseClientLine(formatClientMessage({ type: "handoff", data: handoff, reason: "r" })), { type: "handoff", data: handoff, reason: "r" });
-  assert.throws(() => parseClientLine('{"type":"handoff","data":{"summary":"s"}}'), /field "changes"/);
+  assert.throws(() => parseClientLine('{"type":"handoff","data":{"summary":"s","change":"fix"}}'), /field "changes"/);
   assert.throws(() => parseClientLine('{"type":"answer","text":"t"}'), /field "id"/);
   assert.throws(() => parseClientLine('{"type":"answer","id":"a"}'), /field "text"/);
   assert.throws(() => parseClientLine('{"type":"ask"}'), /field "text"/);

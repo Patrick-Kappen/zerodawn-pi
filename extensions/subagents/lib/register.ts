@@ -5,6 +5,9 @@ export interface AgentEntry {
   id: string;
   role: string;
   window: string;
+  base: string;
+  worktree?: string;
+  branch?: string;
   status: "starting" | "running" | "idle" | "failed" | "question" | "blocked" | "handoff";
 }
 

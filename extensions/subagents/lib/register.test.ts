@@ -10,9 +10,9 @@ test("writeRegister creates the dir and replaces the file without a temp file le
   try {
     const dir = join(root, "nested");
     await writeRegister(dir, []);
-    await writeRegister(dir, [{ id: "a", role: "scout", window: "@1", status: "running" }]);
+    await writeRegister(dir, [{ id: "a", role: "scout", window: "@1", status: "running", base: "abc" }]);
     assert.deepEqual(JSON.parse(await readFile(join(dir, "register.json"), "utf8")), {
-      agents: [{ id: "a", role: "scout", window: "@1", status: "running" }],
+      agents: [{ id: "a", role: "scout", window: "@1", status: "running", base: "abc" }],
     });
     assert.deepEqual(await readdir(dir), ["register.json"]);
   } finally {

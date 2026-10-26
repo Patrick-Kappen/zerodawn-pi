@@ -1,4 +1,6 @@
+import { basename, join } from "node:path";
 import { type Blocker, type GateInfo, type Handoff, handoffText } from "./format.ts";
+import { type Git, MAX_SUBJECT, type Source } from "./git.ts";
 import type { Timers } from "./lifecycle.ts";
 import type { AgentResult, AgentStatus, ServerMessage, SubEvent, Usage } from "./protocol.ts";
 import type { AgentEntry } from "./register.ts";
@@ -15,6 +17,8 @@ export interface AgentsOptions {
   dir: string;
   socket: string;
   piCommand: string;
+  home: string;
+  git: Git;
   extensions: string[];
   tmux: Pick<Tmux, "openWindow" | "listWindows">;
   timers: Timers;
@@ -29,6 +33,7 @@ export interface AgentsOptions {
 
 interface AgentRecord {
   entry: AgentEntry;
+  repo: string;
   task: string;
   events: string[];
   text: string;
@@ -37,10 +42,15 @@ interface AgentRecord {
   pending?: { kind: "question" | "blocked"; text: string; blocker?: Blocker };
   extra: Pick<AgentResult, "blocker" | "handoff" | "reason" | "gate">;
   handingOff?: boolean;
+  concluding?: boolean;
+}
+
+function cut(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 function line(text: string): string {
-  return text.length > MAX_LINE ? `${text.slice(0, MAX_LINE - 1)}…` : text;
+  return cut(text, MAX_LINE);
 }
 
 export function formatEvent(event: SubEvent): string {
@@ -86,6 +96,7 @@ export function createAgents(options: AgentsOptions) {
       usage: record.usage,
       events: record.events,
       ...record.extra,
+      ...(record.entry.worktree === undefined ? {} : { worktree: record.entry.worktree, branch: record.entry.branch }),
     };
   }
 
@@ -98,8 +109,47 @@ export function createAgents(options: AgentsOptions) {
     options.sendToMains({ type: "result", ...result(record) });
   }
 
+  async function drop(record: AgentRecord): Promise<string | undefined> {
+    const { worktree, branch } = record.entry;
+    if (worktree === undefined || branch === undefined) return undefined;
+    await options.git.removeWorktree(record.repo, worktree, branch);
+    delete record.entry.worktree;
+    delete record.entry.branch;
+    options.onChange();
+    return `removed worktree ${worktree} and branch ${branch}`;
+  }
+
+  // The end of an agent: a worktree without changes goes away, one with changes gets the commit when there is one.
+  async function conclude(
+    record: AgentRecord,
+    status: AgentStatus,
+    text: string,
+    extra: AgentRecord["extra"] = {},
+    commit?: { subject: string; body: string[]; change: string },
+  ): Promise<void> {
+    if (record.concluding) return;
+    record.concluding = true;
+    options.timers.clearTimeout(record.helloTimer);
+    const { worktree } = record.entry;
+    try {
+      if (worktree !== undefined) {
+        const state = await options.git.state(worktree, record.entry.base);
+        if (!state.dirty && !state.moved) await drop(record);
+        else if (state.dirty && commit !== undefined) await options.git.commitAll(worktree, commit);
+      }
+    } catch (cause) {
+      finish(
+        record,
+        "failed",
+        `subagent ${record.entry.id} ended, but git failed in its worktree ${worktree}. Read the error, fix the worktree by hand or discard it: ${(cause as Error).message}`,
+      );
+      return;
+    }
+    finish(record, status, text, extra);
+  }
+
   function fail(record: AgentRecord, reason: string): void {
-    finish(record, "failed", reason);
+    conclude(record, "failed", reason).catch(options.onError);
   }
 
   function schedulePoll(): void {
@@ -125,10 +175,14 @@ export function createAgents(options: AgentsOptions) {
     }
   }
 
-  async function start(task: string, args: string[], checks: string[]): Promise<string> {
+  async function start(task: string, args: string[], checks: string[], source: Source): Promise<string> {
     const id = options.newId();
+    const worktree = join(options.home, ".worktrees", basename(source.repo), `sub-${id.slice(0, 8)}`);
+    const branch = `sub/${id.slice(0, 8)}`;
+    await options.git.addWorktree({ ...source, path: worktree, branch });
     const record: AgentRecord = {
-      entry: { id, role: "sub", window: "", status: "starting" },
+      entry: { id, role: "sub", window: "", status: "starting", base: source.sha, worktree, branch },
+      repo: source.repo,
       task,
       events: [],
       text: "",
@@ -153,15 +207,25 @@ export function createAgents(options: AgentsOptions) {
       `${options.dir}/sessions`,
     ];
     try {
-      record.entry.window = await options.tmux.openWindow(options.session, `sub-${id.slice(0, 4)}`, command, {
-        PI_SUBAGENT_SOCKET: options.socket,
-        PI_SUBAGENT_ID: id,
-        PI_SUBAGENT_CHECKS: JSON.stringify(checks),
-      });
+      record.entry.window = await options.tmux.openWindow(
+        options.session,
+        `sub-${id.slice(0, 4)}`,
+        command,
+        {
+          PI_SUBAGENT_SOCKET: options.socket,
+          PI_SUBAGENT_ID: id,
+          PI_SUBAGENT_CHECKS: JSON.stringify(checks),
+        },
+        worktree,
+      );
     } catch (cause) {
       records.delete(id);
       entries.splice(entries.indexOf(record.entry), 1);
-      throw new Error(`supervisor: could not start subagent ${id}. Make sure tmux runs and "${options.piCommand}" is in PATH.`, { cause });
+      const cleanup = await options.git.removeWorktree(source.repo, worktree, branch).then(
+        () => "",
+        (error: Error) => ` The worktree "${worktree}" stays: ${error.message}`,
+      );
+      throw new Error(`supervisor: could not start subagent ${id}. Make sure tmux runs and "${options.piCommand}" is in PATH.${cleanup}`, { cause });
     }
     record.helloTimer = options.timers.setTimeout(() => fail(record, `subagent ${id} did not connect; run tmux attach -t ${options.session}`), helloTimeoutMs);
     options.onChange();
@@ -201,7 +265,7 @@ export function createAgents(options: AgentsOptions) {
       }
     } else if (value.kind === "error") {
       fail(record, value.text);
-    } else if (value.kind === "settled" && record.entry.status === "running") {
+    } else if (value.kind === "settled" && record.entry.status === "running" && !record.concluding) {
       const pending = record.pending;
       record.pending = undefined;
       if (pending === undefined)
@@ -210,17 +274,35 @@ export function createAgents(options: AgentsOptions) {
     }
   }
 
-  function handoff(id: string, data: Handoff, reason: string | undefined, gate: GateInfo | undefined): void {
+  // The checks throw at once; the commit and the result follow.
+  function handoff(id: string, data: Handoff, reason: string | undefined, gate: GateInfo | undefined): Promise<void> {
     const record = find(id);
-    if (record.entry.status !== "running") {
+    if (record.entry.status !== "running" || record.concluding) {
       throw new Error(`supervisor: subagent ${id} has status "${record.entry.status}" and cannot send a handoff.`);
     }
     record.pending = undefined;
-    finish(record, gate === undefined ? "handoff" : "idle", handoffText(data, gate, reason), {
-      handoff: data,
-      ...(reason === undefined ? {} : { reason }),
-      ...(gate === undefined ? {} : { gate }),
-    });
+    const subject = cut(`subagent ${id.slice(0, 8)}${gate === undefined ? " (unfinished)" : ""}: ${data.summary.replace(/\s+/g, " ")}`, MAX_SUBJECT);
+    return conclude(
+      record,
+      gate === undefined ? "handoff" : "idle",
+      handoffText(data, gate, reason),
+      {
+        handoff: data,
+        ...(reason === undefined ? {} : { reason }),
+        ...(gate === undefined ? {} : { gate }),
+      },
+      { subject, body: data.changes.map((change) => `${change.file}: ${change.what}`), change: data.change },
+    );
+  }
+
+  async function discard(id: string): Promise<string> {
+    const record = find(id);
+    if (active(record)) throw new Error(`supervisor: subagent ${id} runs. Wait for its result, then discard it.`);
+    const removed = await drop(record);
+    if (removed === undefined) {
+      throw new Error(`supervisor: subagent ${id} has no worktree. It ended without changes, or it was discarded before.`);
+    }
+    return removed;
   }
 
   function pending(id: string, kind: "question" | "blocked", text: string, blocker?: Blocker): void {
@@ -238,6 +320,10 @@ export function createAgents(options: AgentsOptions) {
     if (status !== "idle" && status !== "question" && status !== "blocked") {
       throw new Error(`supervisor: subagent ${id} has status "${status}". Use "answer" only for status idle, question or blocked.`);
     }
+    if (record.entry.worktree === undefined) {
+      throw new Error(`supervisor: subagent ${id} has no worktree. It ended without changes, or it was discarded. Start a new agent.`);
+    }
+    record.concluding = false;
     options.sendToSub(id, { type: "task", task: text });
     record.entry.status = "running";
     options.onChange();
@@ -250,5 +336,5 @@ export function createAgents(options: AgentsOptions) {
     for (const record of records.values()) options.timers.clearTimeout(record.helloTimer);
   }
 
-  return { start, hello, event, pending, handoff, answer, running, dispose, entries: () => entries };
+  return { start, hello, event, pending, handoff, discard, answer, running, dispose, entries: () => entries };
 }

@@ -1,10 +1,11 @@
 // Stands in for pi in tests: connects with the env vars, answers a task with fake events and a settle.
+import { writeFileSync } from "node:fs";
 import { createConnection } from "node:net";
 
 const path = process.env.PI_SUBAGENT_SOCKET;
 const id = process.env.PI_SUBAGENT_ID;
 if (path === undefined || id === undefined) throw new Error("fake-pi: PI_SUBAGENT_SOCKET and PI_SUBAGENT_ID must be set.");
-const empty = { summary: "", changes: [], tests: [], findings: [], decisions: [], open: [], next: "", risks: [] };
+const empty = { summary: "", change: "fix", changes: [], tests: [], findings: [], decisions: [], open: [], next: "", risks: [] };
 const socket = createConnection(path);
 const send = (message: object) => socket.write(`${JSON.stringify(message)}\n`);
 let buffer = "";
@@ -34,6 +35,15 @@ socket.on("data", (chunk) => {
         type: "handoff",
         data: { ...empty, summary: "It works.", changes: [{ file: "a.ts", what: "w" }], tests: [{ file: "a.test.ts", covers: "c" }], decisions: ["d"] },
         gate: { ok: true, files: ["a.ts", "a.test.ts"], tests: "green: 2 pass, 0 fail" },
+      });
+      continue;
+    }
+    if (message.task === "WRITE") {
+      writeFileSync("new.txt", "hello\n");
+      send({
+        type: "handoff",
+        data: { ...empty, summary: "wrote a file", change: "feature", changes: [{ file: "new.txt", what: "new" }] },
+        gate: { ok: true, files: ["new.txt"], tests: "green" },
       });
       continue;
     }

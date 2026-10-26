@@ -4,8 +4,11 @@ export interface Blocker {
   tried: string[];
 }
 
+export type Change = "fix" | "feature" | "breaking";
+
 export interface Handoff {
   summary: string;
+  change: Change;
   changes: { file: string; what: string }[];
   tests: { file: string; covers: string }[];
   findings: string[];

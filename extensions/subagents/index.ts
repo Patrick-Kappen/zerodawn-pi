@@ -8,6 +8,7 @@ import { changedFiles, execute, plan, uncoveredOf } from "../../shared/testrun.t
 import { type Client, connectMain } from "./lib/client.ts";
 import { ensureSupervisor } from "./lib/ensure.ts";
 import { runGate } from "./lib/gate.ts";
+import { resolveBase } from "./lib/git.ts";
 import type { Timers } from "./lib/lifecycle.ts";
 import { answers } from "./lib/probe.ts";
 import { nodeFiles, resolveProfile } from "./lib/resolve.ts";
@@ -170,14 +171,19 @@ export default function (pi: ExtensionAPI): void {
     name: "subagent",
     label: "subagent",
     description:
-      "Delegate tasks to pi agents in a tmux session. start: run the task in a new agent and return its final answer. answer: send text to an agent by id and wait for its next result. status: show the supervisor and its agents. A result has status idle, failed, question, blocked or handoff. On question, answer it with answer. On blocked, first try to solve the problem within your own limits, then send the solution with answer. On handoff, the agent reached its token limit: start a new agent with the handoff text in its task.",
+      "Delegate tasks to pi agents in a tmux session. start: run the task in a new agent in its own git worktree and return its final answer; base (optional) is a branch, a commit or a worktree path to start from, default the HEAD of the current directory. discard: remove the worktree and branch of an agent that does not run. answer: send text to an agent by id and wait for its next result. status: show the supervisor and its agents. A result has status idle, failed, question, blocked or handoff. On question, answer it with answer. On blocked, first try to solve the problem within your own limits, then send the solution with answer. On handoff, the agent reached its token limit: start a new agent with the handoff text in its task.",
     promptSnippet: "Delegate tasks to pi agents in tmux",
     // One object at the root: a root anyOf made the model send empty arguments.
     parameters: Type.Object({
-      action: Type.Union([Type.Literal("start"), Type.Literal("answer"), Type.Literal("status")]),
+      action: Type.Union([Type.Literal("start"), Type.Literal("answer"), Type.Literal("discard"), Type.Literal("status")]),
       profile: Type.Optional(Type.String({ description: "Required for start. Name of a profile in ~/.pi/agent/agents/<name>.md." })),
       task: Type.Optional(Type.String({ description: "Required for start. The complete task. The agent knows nothing else." })),
-      id: Type.Optional(Type.String({ description: "Required for answer. The id of the agent." })),
+      base: Type.Optional(
+        Type.String({
+          description: "For start. A branch, a commit, or the absolute path of a worktree (then its HEAD). Default: the HEAD of the current directory.",
+        }),
+      ),
+      id: Type.Optional(Type.String({ description: "Required for answer and discard. The id of the agent." })),
       text: Type.Optional(Type.String({ description: "Required for answer. The answer for the agent." })),
     }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
@@ -187,6 +193,12 @@ export default function (pi: ExtensionAPI): void {
         const connected = await connection(ctx.sessionManager.getSessionId());
         return shapeResult(await connected.answer(params.id, params.text, signal));
       }
+      if (params.action === "discard") {
+        if (params.id === undefined || params.id.trim() === "") throw new Error('subagent: action "discard" needs an "id".');
+        const connected = await connection(ctx.sessionManager.getSessionId());
+        const text = await connected.discard(params.id);
+        return { content: [{ type: "text", text }], details: { id: params.id } };
+      }
       if (params.action === "start" && (params.task === undefined || params.task.trim() === "")) {
         throw new Error('subagent: action "start" needs a non-empty "task".');
       }
@@ -195,8 +207,11 @@ export default function (pi: ExtensionAPI): void {
       }
       if (params.action === "start") {
         const { args, profile } = await resolveProfile(homedir(), params.profile as string, nodeFiles);
+        const source = await resolveBase((command, commandArgs, options) => pi.exec(command, commandArgs, options), ctx.cwd, params.base);
         const connected = await connection(ctx.sessionManager.getSessionId());
-        return shapeResult(await connected.start(params.task as string, args, profile.checks, signal));
+        const shaped = shapeResult(await connected.start(params.task as string, args, profile.checks, source, signal));
+        if (source.dirty) shaped.content[0].text += `\nuncommitted changes in ${ctx.cwd} are not in the subagent`;
+        return shaped;
       }
       const connected = await connection(ctx.sessionManager.getSessionId());
       const status = await connected.status();

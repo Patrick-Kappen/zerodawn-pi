@@ -47,12 +47,20 @@ export function createTmux(exec: Exec, socket?: string) {
     throw new Error(`subagents: "tmux has-session -t =${session}" failed with exit code ${result.code}: ${result.stderr.trim()}`);
   }
 
-  async function openWindow(session: string, name: string, command: string[], env: Record<string, string> = {}): Promise<string> {
+  async function openWindow(session: string, name: string, command: string[], env: Record<string, string> = {}, cwd?: string): Promise<string> {
     if (!WINDOW_NAME.test(name)) {
       throw new Error(`subagents: window name "${name}" is not valid. Use only A-Z, a-z, 0-9, "_" or "-".`);
     }
     if (command.length === 0) throw new Error(`subagents: no command given for window "${name}".`);
-    const format = ["-P", "-F", "#{window_id}", "-n", name, ...Object.entries(env).flatMap(([key, value]) => ["-e", `${key}=${value}`])];
+    const format = [
+      "-P",
+      "-F",
+      "#{window_id}",
+      "-n",
+      name,
+      ...(cwd === undefined ? [] : ["-c", cwd]),
+      ...Object.entries(env).flatMap(([key, value]) => ["-e", `${key}=${value}`]),
+    ];
     const args = (await hasSession(session))
       ? ["new-window", "-d", "-t", `=${session}:`, ...format, ...command]
       : ["new-session", "-d", "-s", session, ...format, ...command];
