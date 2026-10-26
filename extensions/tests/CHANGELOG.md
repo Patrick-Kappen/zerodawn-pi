@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0 — 2026-10-26
+
+- subagents: done gate runs the tests in the subagent
+
 ## 0.2.2 — 2026-10-26
 
 - no block; replace the bash result, background after 15 s

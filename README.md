@@ -89,6 +89,20 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.8.0 — 2026-10-26
+
+### shared 0.4.0
+
+- subagents: done gate runs the tests in the subagent
+
+### subagents 0.4.0
+
+- done gate runs the tests in the subagent
+
+### tests 0.3.0
+
+- subagents: done gate runs the tests in the subagent
+
 ## 0.7.0 — 2026-10-26
 
 ### subagents 0.3.0
@@ -111,12 +125,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 - profile extensions resolve in installed packages
 - profile skills, MCP and extension lookup
 - document the profile proposal and the plan
-
-## 0.5.2 — 2026-10-26
-
-### tests 0.2.2
-
-- no block; replace the bash result, background after 15 s
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

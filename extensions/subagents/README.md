@@ -97,9 +97,9 @@ The main pi connects to the supervisor when the first subagent starts. At `sessi
 ## Changes
 
 <!-- changelog:start -->
-## 0.3.0 — 2026-10-26
+## 0.4.0 — 2026-10-26
 
-- ask and blocker tools, answer action
+- done gate runs the tests in the subagent
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

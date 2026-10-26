@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0 — 2026-10-26
+
+- subagents: done gate runs the tests in the subagent
+
 ## 0.3.0 — 2026-10-26
 
 - tests: add run_tests tool, block test commands in bash
