@@ -58,3 +58,11 @@ test("verdict: green, failed, timed out, and a warning is red", () => {
   assert.equal(warned.ok, false);
   assert.match(warned.text, /1 warning lines.*warn: old api/s);
 });
+
+test("verdict: a warning gives only the diagnostics, once, without context or nix dirty-tree noise", () => {
+  const output = "nix fmt\nwarning: Git tree '/w' is dirty\nsrc/a.ts:3:5 lint/x\n! warn here\nsrc/a.ts:3:5 lint/x\nFound 1 warning.\ntsc";
+  assert.deepEqual(verdict(run({ output })), {
+    ok: false,
+    text: "2 warning lines. A warning is an error: fix each one.\nsrc/a.ts:3:5 lint/x (\u00d72)\n! warn here",
+  });
+});
