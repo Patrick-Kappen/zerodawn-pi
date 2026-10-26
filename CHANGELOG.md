@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0 — 2026-10-26
+
+### subagents 0.3.0
+
+- ask and blocker tools, answer action
+
 ## 0.6.0 — 2026-10-26
 
 ### bash 0.4.0
