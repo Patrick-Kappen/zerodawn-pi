@@ -110,7 +110,10 @@ test("a run longer than the inline time continues in the background; a message g
   const command = `cd ${dir} && sleep 0.3; echo done`;
   const first = await slow.check("call-6", command, ctx);
   assert.deepEqual(first.isError, false);
-  assert.match(first.text, /check \S+ runs in the background \(more than 0\.05 s\)\. Continue with other work\. A message gives the result\./);
+  assert.match(
+    first.text,
+    /check \S+ runs in the background \(more than 0\.05 s\)\. Continue with other work, or end the turn when nothing else is left\. A message gives the result and starts your next turn\./,
+  );
   assert.match((await slow.check("call-7", command, ctx)).text, /still runs for this change/);
   await new Promise((resolve) => setTimeout(resolve, 600));
   assert.equal(notes.length, 1);
