@@ -202,9 +202,8 @@ export function resultText(log: string, status: string): string {
   const head = `${status} · ${total} · output: ${shorten(txt)}`;
   if (ok) return head;
   const errors = errorLines(plain);
-  if (errors.length === 0)
-    return `${head}\nno line looks like an error; last ${Math.min(TAIL_LINES, plain.length)} lines:\n${plain.slice(-TAIL_LINES).join("\n")}`;
-  return `${head}\n${errors.length} distinct lines look like errors (lines: text):\n${errors.map((e) => `  ${e.n.join(",")}: ${e.text}`).join("\n")}`;
+  if (errors.length === 0) return `${head}\nlast ${Math.min(TAIL_LINES, plain.length)} lines:\n${plain.slice(-TAIL_LINES).join("\n")}`;
+  return `${head}\nerrors (lines: text):\n${errors.map((e) => `  ${e.n.join(",")}: ${e.text}`).join("\n")}`;
 }
 
 export function summarizeFromDisk(m: Meta): string {

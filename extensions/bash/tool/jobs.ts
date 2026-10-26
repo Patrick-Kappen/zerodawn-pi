@@ -41,21 +41,21 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
     [...jobs.values()]
       .filter((j) => j.bg && !delivered.has(j.id))
       .sort((a, b) => a.start - b.start)
-      .map((j) => `job ${j.id}${j.group ? ` [${j.group}]` : ""}: ${ending(j) ?? "running"}`);
+      .map((j) => `${j.id}${j.group ? ` [${j.group}]` : ""}: ${ending(j) ?? "running"}`);
   let noted = new Set<string>();
   pi.on("before_agent_start", (event) => {
     if (event.messageType !== "user") return;
     const now = statusLine();
     if (!now.some((entry) => !noted.has(entry))) return;
     noted = new Set(now);
-    return { message: { customType: "bash-status", content: `Background jobs: ${now.join(" · ")}`, display: false } };
+    return { message: { customType: "bash-status", content: `jobs: ${now.join(" · ")}`, display: false } };
   });
   const killById = (id: string) => {
     const job = jobs.get(id);
     if (!job) throw new Error(`jobs: no job ${id}. Known jobs: ${[...jobs.keys()].join(", ") || "none"}.`);
-    if (job.result) return `job ${id} already ended: ${job.result.split("\n")[0]}`;
+    if (job.result) return `job ${id}: ended, ${job.result.split("\n")[0]}`;
     kill(job.pid);
-    return `job ${id}: SIGTERM sent`;
+    return `job ${id}: killed`;
   };
 
   const pollers = new Set<ReturnType<typeof setInterval>>();
@@ -65,13 +65,11 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
   const held: { job: Job; m: Meta; text: string }[] = [];
   let stale = false;
   const unconfirmed = new Map<string, { items: typeof held; sentAt: number }>();
-  const send = (items: typeof held, triggerTurn: boolean, whileWorking: boolean) => {
+  const send = (items: typeof held, triggerTurn: boolean) => {
     if (stale) return;
     const key = items.map((it) => it.job.id).join(",");
     unconfirmed.set(key, { items, sentAt: Date.now() });
-    const head = `${items.length === 1 ? "A bash job" : `${items.length} bash jobs`} ended${whileWorking ? " while you worked" : ""}.`;
-    const decide = whileWorking ? " Decide: use the result now, or finish your current task first." : "";
-    const body = items.map((it) => `- job ${it.job.id} (${commandLine(it.job.command, 80)}): ${it.text}`).join("\n");
+    const body = items.map((it) => `job ${it.job.id}: ${it.text}`).join("\n");
     const details: JobReport = {
       jobs: key,
       items: items.map((it) => ({
@@ -83,7 +81,7 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
       })),
     };
     try {
-      pi.sendMessage({ customType: "bash-job", content: `${head}${decide}\n${body}`, display: true, details }, { triggerTurn });
+      pi.sendMessage({ customType: "bash-job", content: body, display: true, details }, { triggerTurn });
     } catch (err) {
       s.ui?.notify(`bash: the report of job ${key} failed: ${(err as Error).message}. It is sent again in ${RESEND_MS / 1000} s.`, "error");
     }
@@ -105,14 +103,14 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
     for (const [key, sent] of unconfirmed)
       if (Date.now() - sent.sentAt > RESEND_MS) {
         unconfirmed.delete(key);
-        send(sent.items, true, false);
+        send(sent.items, true);
       }
   }, 5000);
   resender.unref();
   const deliver = (items: typeof held, triggerTurn: boolean) => {
     if (!items.length) return;
     if (agentRunning) held.push(...items);
-    else send(items, triggerTurn, false);
+    else send(items, triggerTurn);
   };
   const groups = new Map<string, typeof held>();
   const releaseGroup = (group: string, triggerTurn: boolean) => {
@@ -151,7 +149,7 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
   });
   pi.on("agent_end", () => {
     agentRunning = false;
-    if (held.length) send(held.splice(0), true, true);
+    if (held.length) send(held.splice(0), true);
   });
 
   pi.on("session_start", (_event, ctx) => {
@@ -279,19 +277,11 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
           releaseGroup(group, false);
         }
         for (const j of targets) if (j.result) saveMeta(j.meta, { ...JSON.parse(readFileSync(j.meta, "utf8")), reported: true });
-        const lines = targets.map((j) =>
-          j.result ? `- job ${j.id} (${commandLine(j.command, 80)}): ${j.result}` : `- job ${j.id} (${commandLine(j.command, 80)}): still running`,
-        );
-        const head =
-          outcome === "done"
-            ? `${targets.length === 1 ? "The job" : "All jobs"} ended.`
-            : outcome === "timeout"
-              ? `Waited ${limit / 1000}s; not every job ended.`
-              : "Wait stopped.";
-        return { content: [{ type: "text", text: `${head}\n${lines.join("\n")}` }], details: { jobs: targets.map((j) => j.id) } };
+        const lines = targets.map((j) => `job ${j.id}: ${j.result ?? "running"}`);
+        const head = outcome === "done" ? "" : outcome === "timeout" ? `wait limit ${limit / 1000}s\n` : "wait stopped\n";
+        return { content: [{ type: "text", text: `${head}${lines.join("\n")}` }], details: { jobs: targets.map((j) => j.id) } };
       }
-      if (hasBackgroundJob(s) && listedAt === changes)
-        throw new Error("No background job changed since your last jobs call. Do not poll: end the turn or do other work. A message reports each result.");
+      if (hasBackgroundJob(s) && listedAt === changes) throw new Error("no change since the last jobs call; a message reports each result");
       listedAt = changes;
       return { content: [{ type: "text", text: list() }], details: { jobs: [] as string[] } };
     },
