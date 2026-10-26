@@ -3,7 +3,7 @@ const TAIL = 40;
 const COUNT = /^\s*(\d+) (pass|fail|skip|todo)\b/;
 const NOISE = /^\s*(> )?(✓ |\(pass\) |bun test v)/;
 const RUNTIME_FRAME = /^\s*at (.*\()?node:/;
-const WARNING = /warn|^\s*! /i;
+const WARNING = /(?<!-)warn(?!-)|^\s*! /i;
 const NO_WARNING = /\b(0|no)\s+warn/i;
 const BEFORE = 2;
 const BLOCK_MAX = 12;
@@ -38,7 +38,7 @@ export function failures(output: string): string {
   return cap(clean(output));
 }
 
-/** Number of warning lines: a line with "warn", or a line that starts with "! " (biome); "0 warnings" is not one. */
+/** Number of warning lines: a line with "warn", or a line that starts with "! " (biome). Not "0 warnings", and not an option such as --error-on-warnings or warn-dirty in an echoed command. */
 export function warningCount(output: string): number {
   return clean(output).filter((l) => WARNING.test(l) && !NO_WARNING.test(l)).length;
 }
