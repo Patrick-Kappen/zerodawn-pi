@@ -109,6 +109,7 @@
           ];
         };
       # The job tests spawn bash and script in a PTY; the sandbox has /dev/pts. The subagents tests start their own tmux server.
+      # The run_tests tests make a git repository.
       runTests =
         pkgs: name: src:
         pkgs.runCommand "tests-${name}"
@@ -122,6 +123,7 @@
               pkgs.coreutils
               pkgs.gnused
               pkgs.gnugrep
+              pkgs.git
             ];
           }
           ''
