@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Check one commit message: "<scope>: <subject>" where scope is an extension, shared, or an area.
+# Check one commit message: "<scope>: <subject>" where scope is an extension, shared, or an area,
+# and a trailer "Change: fix|feature|breaking" that bump-changed reads to pick the version level.
 # Usage: check-commit-msg.sh FILE (git commit-msg hook) or check-commit-msg.sh -m "message".
 set -euo pipefail
 
@@ -25,5 +26,11 @@ if [[ $subject != *": "* || $ok -eq 0 || -z ${rest# } ]]; then
 fi
 if [[ ${#subject} -gt 72 ]]; then
   printf 'commit message: the subject has %d characters; keep it at 72\n' "${#subject}" >&2
+  exit 1
+fi
+[[ $scope == release ]] && exit 0
+changes="$(printf '%s\n' "$message" | git interpret-trailers --parse | sed -n 's/^Change: //p')"
+if [[ $(printf '%s\n' "$changes" | grep -c .) -ne 1 || ! $changes =~ ^(fix|feature|breaking)$ ]]; then
+  printf 'commit message: add one trailer line "Change: fix", "Change: feature" or "Change: breaking" after a blank line\n  fix: no new behaviour (bug fix, docs, refactor, tests, CI); feature: new behaviour that keeps old use; breaking: old use stops working\n  got: %s\n' "${changes:-no Change trailer}" >&2
   exit 1
 fi

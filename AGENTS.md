@@ -15,6 +15,8 @@ pi package with independent extensions in TypeScript. Nix flake with a Home Mana
 
 - Work in a worktree under `~/.worktrees` on a branch. Open a PR.
 - Commit subject: `<scope>: what changed`, max 72 characters.
+- Every commit (not `release:`) ends with one trailer line `Change: fix`, `Change: feature` or `Change: breaking`. `just bump-changed` takes the version level from it: fix is patch, feature is minor, breaking is major (minor below 1.0, marked in the changelog).
+- Release only for a real deliverable or when the owner asks. Small fixes wait for the next release.
 - Do not edit `CHANGELOG.md` files or versions. A release is its own PR.
 - Do not add a dependency.
 - Fail loud. Errors name the file or id and the next step.
