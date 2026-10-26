@@ -41,6 +41,22 @@ test("parseClientLine accepts answer, ask and blocker", () => {
   assert.throws(() => parseClientLine('{"type":"blocker","text":"r"}'), /field "data"/);
 });
 
+test("parseClientLine and parseServerLine carry done and gate", () => {
+  const gate = { ok: true as const, files: ["a.ts"], tests: "green: 1 pass" };
+  const done = { summary: "s", changes: [{ file: "a.ts", what: "w" }], tests: [{ file: "a.test.ts", covers: "c" }], decisions: ["d"], open: [] };
+  const findings = { summary: "s", findings: ["a.ts:1 x"] };
+  for (const data of [done, findings]) {
+    assert.deepEqual(parseClientLine(formatClientMessage({ type: "done", data, gate })), { type: "done", data, gate });
+    const result = { type: "result" as const, id: "a", status: "idle" as const, text: "t", usage, events: [], done: data, gate };
+    assert.deepEqual(parseServerLine(formatServerMessage(result)), result);
+  }
+  assert.throws(
+    () => parseClientLine('{"type":"done","data":{"summary":"s","changes":[{"file":"a"}],"tests":[],"decisions":[],"open":[]},"gate":{}}'),
+    /field "changes"/,
+  );
+  assert.throws(() => parseClientLine(formatClientMessage({ type: "done", data: findings, gate: { ...gate, ok: false } as never })), /field "ok"/);
+});
+
 test("parseClientLine rejects bad lines with a reason", () => {
   assert.throws(() => parseClientLine("nope"), /not valid JSON/);
   assert.throws(() => parseClientLine("[1]"), /not a JSON object/);

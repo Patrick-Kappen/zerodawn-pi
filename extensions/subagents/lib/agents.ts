@@ -1,4 +1,4 @@
-import { type Blocker, type Handoff, handoffText } from "./format.ts";
+import { type Blocker, type Done, doneText, type Findings, type GateInfo, type Handoff, handoffText } from "./format.ts";
 import type { Timers } from "./lifecycle.ts";
 import type { AgentResult, AgentStatus, ServerMessage, SubEvent, Usage } from "./protocol.ts";
 import type { AgentEntry } from "./register.ts";
@@ -36,7 +36,7 @@ interface AgentRecord {
   usage: Usage;
   helloTimer: unknown;
   pending?: { kind: "question" | "blocked"; text: string; blocker?: Blocker };
-  extra: Pick<AgentResult, "blocker" | "handoff" | "reason">;
+  extra: Pick<AgentResult, "blocker" | "handoff" | "reason" | "done" | "gate">;
   handingOff?: boolean;
 }
 
@@ -205,7 +205,8 @@ export function createAgents(options: AgentsOptions) {
     } else if (value.kind === "settled" && record.entry.status === "running") {
       const pending = record.pending;
       record.pending = undefined;
-      if (pending === undefined) finish(record, "idle", value.text);
+      if (pending === undefined)
+        fail(record, `subagent ${id} settled without a done call, a question or a blocker. Read its window: tmux attach -t ${options.session}`);
       else finish(record, pending.kind, pending.text, pending.blocker === undefined ? {} : { blocker: pending.blocker });
     }
   }
@@ -219,6 +220,15 @@ export function createAgents(options: AgentsOptions) {
     const body = handoffText(data);
     if (reason === undefined) finish(record, "handoff", body, { handoff: data });
     else finish(record, "handoff", `gate red ${MAX_GATE_TRIES} times: ${reason}\n${body}`, { handoff: data, reason });
+  }
+
+  function done(id: string, data: Done | Findings, gate: GateInfo): void {
+    const record = find(id);
+    if (record.entry.status !== "running") {
+      throw new Error(`supervisor: subagent ${id} has status "${record.entry.status}" and cannot send done.`);
+    }
+    record.pending = undefined;
+    finish(record, "idle", doneText(data, gate), { done: data, gate });
   }
 
   function pending(id: string, kind: "question" | "blocked", text: string, blocker?: Blocker): void {
@@ -248,5 +258,5 @@ export function createAgents(options: AgentsOptions) {
     for (const record of records.values()) options.timers.clearTimeout(record.helloTimer);
   }
 
-  return { start, hello, event, pending, handoff, answer, running, dispose, entries: () => entries };
+  return { start, hello, event, pending, handoff, done, answer, running, dispose, entries: () => entries };
 }

@@ -12,13 +12,14 @@ import type { Timers } from "./lib/lifecycle.ts";
 import { answers } from "./lib/probe.ts";
 import { nodeFiles, resolveProfile } from "./lib/resolve.ts";
 import { shapeResult } from "./lib/result.ts";
-import { askSchema, blockerSchema, handoffSchema } from "./lib/schemas.ts";
+import { askSchema, blockerSchema, doneFindingsSchema, doneSchema, handoffSchema } from "./lib/schemas.ts";
 import { createSubHandlers, readSubEnv, type SubEnv } from "./lib/sub.ts";
 import { connectSub, type SubConnection } from "./lib/subclient.ts";
 import { createTmux, sessionName } from "./lib/tmux.ts";
 
 const timers: Timers = { setTimeout: (callback, ms) => setTimeout(callback, ms), clearTimeout: (handle) => clearTimeout(handle as NodeJS.Timeout) };
 const SUPERVISOR_PATH = fileURLToPath(new URL("./supervisor.ts", import.meta.url));
+const FORCED_TOOLS = ["handoff", "done", "done_findings"];
 const EXTENSION_PATH = fileURLToPath(import.meta.url);
 
 function registerSub(pi: ExtensionAPI, env: SubEnv): void {
@@ -38,7 +39,9 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
     sendUserMessage: (text) => void pi.sendUserMessage(text),
     abort: () => running().abort(),
     isIdle: () => running().isIdle(),
+    getActiveTools: () => pi.getActiveTools(),
     setActiveTools: (names) => pi.setActiveTools(names),
+    changed: () => changedFiles(cwd),
     gate: (sendUserMessage) =>
       runGate({
         checks: env.checks,
@@ -57,7 +60,7 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
   pi.on("session_start", async (_event, ctx) => {
     cwd = ctx.cwd;
     context = ctx;
-    pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "handoff"));
+    pi.setActiveTools(pi.getActiveTools().filter((name) => !FORCED_TOOLS.includes(name)));
     connection = await connectSub(env, handlers.onServerMessage, (error) => ctx.ui.notify(error.message, "error"));
   });
   pi.registerTool({
@@ -86,6 +89,25 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
     parameters: handoffSchema,
     async execute(_toolCallId, params) {
       return { content: [{ type: "text", text: handlers.handoff(params) }], details: {} };
+    },
+  });
+  pi.registerTool({
+    name: "done",
+    label: "done",
+    description: "Report the finished work. The extension asks for it when the checks are green; do not call it before. After the call, stop.",
+    parameters: doneSchema,
+    async execute(_toolCallId, params) {
+      return { content: [{ type: "text", text: handlers.done(params) }], details: {} };
+    },
+  });
+  pi.registerTool({
+    name: "done_findings",
+    label: "done_findings",
+    description:
+      "Report the findings of a task that changed no file. The extension asks for it when the checks are green; do not call it before. After the call, stop.",
+    parameters: doneFindingsSchema,
+    async execute(_toolCallId, params) {
+      return { content: [{ type: "text", text: handlers.doneFindings(params) }], details: {} };
     },
   });
   pi.on("before_provider_request", (event) => handlers.beforeRequest(event.payload));

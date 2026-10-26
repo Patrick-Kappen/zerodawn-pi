@@ -1,3 +1,4 @@
+import { counts } from "../../../shared/report.ts";
 import { type Run, verdict } from "../../../shared/testrun.ts";
 
 export interface GateDeps {
@@ -9,10 +10,7 @@ export interface GateDeps {
   sendUserMessage: (text: string) => void;
 }
 
-export interface GateResult {
-  ok: boolean;
-  reason: string;
-}
+export type GateResult = { ok: false; reason: string } | { ok: true; reason: string; files: string[]; tests: string };
 
 const AGAIN = "Then finish again.";
 
@@ -24,7 +22,7 @@ function red(deps: GateDeps, reason: string, text: string): GateResult {
 /** Runs the done gate. Red: tells the subagent what to fix and returns ok false. */
 export async function runGate(deps: GateDeps): Promise<GateResult> {
   const changed = deps.changed();
-  if (changed.length === 0) return { ok: true, reason: "no changed files" };
+  if (changed.length === 0) return { ok: true, reason: "no changed files", files: [], tests: "not run: no changed files" };
 
   const uncovered = deps.uncovered(changed);
   if (uncovered.length > 0) {
@@ -41,12 +39,14 @@ export async function runGate(deps: GateDeps): Promise<GateResult> {
   } catch (error) {
     return red(deps, "no way to run every test", `${(error as Error).message} ${AGAIN}`);
   }
-  const tests = verdict(await deps.run(argv));
+  const testRun = await deps.run(argv);
+  const tests = verdict(testRun);
   if (!tests.ok) return red(deps, "the repository tests are red", `Command: ${argv.join(" ")}\n${tests.text}\nFix them. ${AGAIN}`);
 
   for (const check of deps.checks) {
     const result = verdict(await deps.run(["bash", "-c", check]));
     if (!result.ok) return red(deps, `the check "${check}" is red`, `${result.text}\nFix it. ${AGAIN}`);
   }
-  return { ok: true, reason: "tests and checks green" };
+  const found = counts(testRun.output);
+  return { ok: true, reason: "tests and checks green", files: changed, tests: found === undefined ? "green" : `green: ${found}` };
 }

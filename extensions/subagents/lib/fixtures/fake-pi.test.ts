@@ -26,7 +26,7 @@ test("the fake pi says hello and answers a task with a settle", async () => {
           buffer = buffer.slice(i + 1);
           lines.push(message);
           if (message.type === "hello") socket.write(`${JSON.stringify({ type: "task", task: "x" })}\n`);
-          if (message.type === "event" && message.event.kind === "settled") {
+          if (message.type === "done") {
             socket.end();
             server.close();
             resolve();
@@ -48,5 +48,9 @@ test("the fake pi says hello and answers a task with a settle", async () => {
     await rm(dir, { recursive: true, force: true });
   }
   assert.deepEqual(lines[0], { type: "hello", role: "sub", id: "id-1" });
-  assert.deepEqual(lines.at(-1), { type: "event", event: { kind: "settled", text: "answer to: x" } });
+  assert.deepEqual(lines.at(-1), {
+    type: "done",
+    data: { summary: "answer to: x", findings: ["a.ts:1 fact"] },
+    gate: { ok: true, files: [], tests: "not run: no changed files" },
+  });
 });

@@ -23,7 +23,7 @@ function addedTools(payload: Payload): unknown[] {
 
 export function forceTool(payload: unknown, name: string): Payload {
   const keys = isObject(payload) ? Object.keys(payload).join(", ") : typeof payload;
-  const unknown = new Error(`handoff: cannot force a tool for this provider payload: ${keys}`);
+  const unknown = new Error(`${name}: cannot force a tool for this provider payload: ${keys}`);
   if (!isObject(payload)) throw unknown;
   const tools = [...(Array.isArray(payload.tools) ? payload.tools : []), ...addedTools(payload)].filter(isObject);
   const copy: Payload = { ...payload };

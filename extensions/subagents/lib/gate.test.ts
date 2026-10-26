@@ -27,7 +27,7 @@ function setup(over: Partial<GateDeps> & { runs?: Run[] } = {}) {
 
 test("no changed files: the gate passes at once", async () => {
   const { deps, messages, ran } = setup({ changed: () => [] });
-  assert.deepEqual(await runGate(deps), { ok: true, reason: "no changed files" });
+  assert.deepEqual(await runGate(deps), { ok: true, reason: "no changed files", files: [], tests: "not run: no changed files" });
   assert.deepEqual([messages, ran], [[], []]);
 });
 
@@ -74,7 +74,7 @@ test("a red check: the failing command and its failures go back", async () => {
 
 test("all green: the gate passes and sends nothing", async () => {
   const { deps, messages, ran } = setup({ checks: ["just lint"] });
-  assert.deepEqual(await runGate(deps), { ok: true, reason: "tests and checks green" });
+  assert.deepEqual(await runGate(deps), { ok: true, reason: "tests and checks green", files: ["a.ts"], tests: "green: 3 pass, 0 fail" });
   assert.deepEqual(messages, []);
   assert.equal(ran.length, 2);
 });

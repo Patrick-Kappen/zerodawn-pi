@@ -1,6 +1,5 @@
 import type { AgentResult } from "./protocol.ts";
 
-export const MAX_TEXT = 8000;
 export const MAX_DETAIL_EVENTS = 20;
 export const MAX_DETAIL_LINE = 200;
 
@@ -13,12 +12,13 @@ function shapeDetails(result: AgentResult) {
     ...(result.blocker === undefined ? {} : { blocker: result.blocker }),
     ...(result.handoff === undefined ? {} : { handoff: result.handoff }),
     ...(result.reason === undefined ? {} : { reason: result.reason }),
+    ...(result.done === undefined ? {} : { done: result.done }),
+    ...(result.gate === undefined ? {} : { gate: result.gate }),
   };
 }
 
 export function shapeResult(result: AgentResult) {
-  const cut = result.text.length - MAX_TEXT;
-  const text = cut > 0 ? `${result.text.slice(0, MAX_TEXT)}\n[cut: ${cut} more characters]` : result.text;
+  const text = result.text;
   if (result.status === "question" || result.status === "blocked") {
     return {
       content: [{ type: "text" as const, text: `agent ${result.id}\nstatus: ${result.status}\n${text}` }],
