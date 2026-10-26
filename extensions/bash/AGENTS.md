@@ -1,3 +1,6 @@
 # bash
 
-Replaces pi's `bash` tool and adds `jobs`. Every command is a job without a terminal, stdin from `/dev/null` (decision 6); state and output live under the session directory (`shared/store.ts`). `tool/` runs jobs, `ui/` draws them, `screen/` turns raw output into lines. Limits and intervals are constants in `config.ts`; change them there, not inline. The job tests need bash; they run in the nix sandbox too.
+- Every command is a job without a terminal, with stdin from `/dev/null` (decision 6). Do not add a terminal.
+- Change limits and intervals in `config.ts`, not inline.
+- Keep job state and output under the session directory, through `shared/store.ts`.
+- The job tests must pass in the Nix sandbox too.

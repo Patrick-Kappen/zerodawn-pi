@@ -1,3 +1,8 @@
 # ui
 
-Changes how pi draws the transcript by wrapping render methods of pi's TUI components (`lib/hook.ts`). Each feature in `features/` is one wrapped component; a missing method fails at load, which is intended. Check this extension first after a pi upgrade.
+- One feature in `features/` wraps one pi component, through `lib/hook.ts`.
+- A missing render method fails at load. Do not catch it.
+
+## After a pi upgrade
+
+- Check this extension first.

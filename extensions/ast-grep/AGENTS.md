@@ -1,3 +1,4 @@
 # ast-grep
 
-Registers the `ast_grep` tool; wraps the `ast-grep` binary from `config.json` (`astGrep`) or `PATH`. Pure formatting lives in `lib/format.ts` and is what the tests cover. Keep the tool read-only: `rewrite` previews, never writes.
+- Keep the tool read-only. `rewrite` only previews.
+- Put output formatting in `lib/format.ts`, and test it there.

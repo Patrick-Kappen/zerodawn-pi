@@ -7,6 +7,7 @@ pi package with independent extensions in TypeScript. Nix flake with a Home Mana
 - `extensions/<name>/`: one extension, with `package.json`, `README.md`, `CHANGELOG.md` and tests.
 - `shared/`: only add exports. Never change or remove one.
 - Read the `AGENTS.md` of an extension before you change it.
+- What code does goes in `README.md`. Why goes in `docs/decisions.md`. `AGENTS.md` has only rules for the agent.
 - Read `docs/decisions.md` before a structural change. Add an entry for a new one.
 - `TODO.md` files are the owner's notes. Do not act on them unless asked.
 
