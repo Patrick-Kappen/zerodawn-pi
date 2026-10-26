@@ -71,8 +71,9 @@ function setup(options: { openFails?: boolean } = {}) {
 const ID = "abcdef12-0000-4000-8000-000000000000";
 const ARGS = ["--no-tools", "--no-mcp", "--model", "m/x:off", "--system-prompt", "You are a test."];
 const usage = { tokens: 10, cost: 0.5 };
+const HANDOFF = { done: ["a", "b"], open: ["c"], next: "d", files: ["f.ts", "g.ts"], risks: ["r"], tests: "green" };
 
-test("usage at the token limit asks for a handoff once; the next settle gives status handoff", async () => {
+test("usage at the token limit asks for a handoff once; the handoff data gives status handoff", async () => {
   const { agents, toSub, toMains } = setup();
   await agents.start("do it", ARGS, []);
   agents.hello(ID);
@@ -84,13 +85,28 @@ test("usage at the token limit asks for a handoff once; the next settle gives st
   agents.event(ID, { kind: "message", text: "c", usage: { tokens: 5, cost: 1 } });
   assert.deepEqual(toSub.slice(1), [[ID, { type: "handoff" }]]);
   assert.equal(toMains.length, 0);
-  agents.event(ID, { kind: "settled", text: "done: a; open: b" });
+  agents.handoff(ID, HANDOFF, undefined);
   assert.equal(agents.entries()[0]?.status, "handoff");
   const message = toMains[0];
   assert.ok(message?.type === "result");
   assert.equal(message.status, "handoff");
-  assert.equal(message.text, "done: a; open: b");
+  assert.equal(message.text, "done: a; b\nopen: c\nnext: d\nfiles: f.ts, g.ts\nrisks: r\ntests: green");
+  assert.deepEqual(message.handoff, HANDOFF);
+  assert.equal(message.reason, undefined);
   assert.throws(() => agents.answer(ID, "go on"), /status "handoff"/);
+  assert.throws(() => agents.handoff(ID, HANDOFF, undefined), /status "handoff" and cannot send a handoff/);
+});
+
+test("a handoff with a gate reason has the gate line first and the reason in the result", async () => {
+  const { agents, toMains } = setup();
+  await agents.start("t", ARGS, []);
+  agents.hello(ID);
+  agents.handoff(ID, HANDOFF, "tests red");
+  const message = toMains[0];
+  assert.ok(message?.type === "result");
+  assert.equal(message.status, "handoff");
+  assert.equal(message.text.split("\n")[0], "gate red 3 times: tests red");
+  assert.equal(message.reason, "tests red");
 });
 
 test("start opens a window with the pi command, the env and a starting entry", async () => {
@@ -179,13 +195,19 @@ test("blocker then settle gives status blocked", async () => {
   const { agents, toMains } = setup();
   await agents.start("t", ARGS, []);
   agents.hello(ID);
-  agents.pending(ID, "blocked", "no access");
+  const blocker = { issue: "no access", files: ["a"], tried: ["b"] };
+  agents.pending(ID, "blocked", "no access\nfiles: a\ntried: b", blocker);
   agents.event(ID, { kind: "settled", text: "x" });
   assert.equal(agents.entries()[0]?.status, "blocked");
   assert.deepEqual(
-    toMains.map((message) => message.type === "result" && [message.status, message.text]),
-    [["blocked", "no access"]],
+    toMains.map((message) => message.type === "result" && [message.status, message.text, message.blocker]),
+    [["blocked", "no access\nfiles: a\ntried: b", blocker]],
   );
+  agents.answer(ID, "use the key");
+  agents.event(ID, { kind: "settled", text: "done" });
+  const last = toMains.at(-1);
+  assert.ok(last?.type === "result");
+  assert.equal(last.blocker, undefined);
 });
 
 test("an error event fails the agent with its text", async () => {

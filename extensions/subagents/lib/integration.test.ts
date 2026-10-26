@@ -110,6 +110,26 @@ test("real supervisor with a fake pi: ask gives question, answer gives idle", { 
   assert.equal(await tmux.hasSession(session), false);
 });
 
+test("real supervisor with a fake pi: blocker and handoff data reach main", { timeout: 30_000 }, async () => {
+  const id = randomUUID();
+  sessionIds.push(id);
+  const { session, socket: path } = await ensure(id, fakePi);
+  const client = await connectMain(path, timers);
+  const blocked = await client.start("BLOCK", ["--no-tools"], []);
+  assert.equal(blocked.status, "blocked");
+  assert.deepEqual(blocked.blocker, { issue: "no access", files: ["x.ts", "y.ts"], tried: ["a", "b"] });
+  assert.equal(shapeResult(blocked).content[0].text, `agent ${blocked.id}\nstatus: blocked\nno access\nfiles: x.ts, y.ts\ntried: a; b`);
+  const handed = await client.start("HANDOFF", ["--no-tools"], []);
+  assert.equal(handed.status, "handoff");
+  assert.deepEqual(handed.handoff, { done: ["a"], open: ["b"], next: "c", files: ["f.ts"], risks: [], tests: "green" });
+  assert.equal(handed.text, "done: a\nopen: b\nnext: c\nfiles: f.ts\nrisks: \ntests: green");
+  assert.deepEqual(shapeResult(handed).details.handoff, handed.handoff);
+  client.close();
+  const tmux = createTmux(exec, socket);
+  for (let i = 0; i < 100 && (await tmux.hasSession(session)); i++) await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(await tmux.hasSession(session), false);
+});
+
 test("real supervisor: a command that dies without a hello is reported as failed", { timeout: 30_000 }, async () => {
   const id = randomUUID();
   sessionIds.push(id);

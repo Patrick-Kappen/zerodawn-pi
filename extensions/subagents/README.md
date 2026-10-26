@@ -10,7 +10,13 @@ Status: work in progress. The tool `subagent` has three actions:
 
 The result that the model sees is small: agent id, status, final text (cut at 8000 characters) and one line with tokens and cost. The last 20 events (200 characters each) go to `details` only.
 
-Every subagent has two fixed tools, whatever its profile says: `ask { question }` and `blocker { reason }`. Both send the text to the supervisor and tell the model to stop and wait for a new message. The model uses `blocker` only after it tried to solve the problem within its task limits. When the agent settles, the result has status `question` or `blocked` and that text, not the final text. On `question`, the main agent answers with `answer`. On `blocked`, it first tries to solve the problem within its own limits, then sends the solution with `answer`. pi filters extension tools with `--tools` and `--no-tools`, so the main pi always adds `ask,blocker` to the `--tools` list.
+Every subagent has three fixed tools, whatever its profile says. All have strict schemas (TypeBox); pi validates the arguments and gives the model the error.
+
+- `ask { question }`: `question` max 500 characters. The text goes to the supervisor. The model stops and waits. The result has status `question` and the question as text. The main agent answers with `answer`.
+- `blocker { issue, files, tried }`: all required; `issue` not empty; `tried` has at least one entry. The model uses it only after it tried to solve the problem within its task limits. The result has status `blocked`, `details.blocker = {issue, files, tried}` and the short text `issue`, `files: a, b`, `tried: x; y`. The main agent first tries to solve the problem within its own limits, then sends the solution with `answer`.
+- `handoff { done, open, next, files, risks, tests }`: all required; `next` and `tests` not empty. The model never chooses it. The supervisor forces it, see "Handoff".
+
+pi filters extension tools with `--tools` and `--no-tools`, so the main pi always adds `ask,blocker,handoff` to the `--tools` list. The subagent extension removes `handoff` from the active tools at `session_start`.
 
 ## Design
 
@@ -46,9 +52,26 @@ The code for the test run (`changedFiles`, `plan`, `execute`, `verdict`) is in `
 
 The limits are constants in code. A later step moves them to the profile.
 
-- **Gate tries:** max 3 red gate results per task. On the third, the subagent does not get the failures. Its extension sends an `error` event "done gate red 3 times: <reason>", and the supervisor fails the agent. An `answer` or a new `task` message resets the count, and so does a green gate.
-- **Tokens:** max 100 000 tokens per agent (sum of the usage of its messages). When the sum reaches the limit while the agent runs, the supervisor sends `{type:"handoff"}`. The subagent extension steers the agent to stop and write a handoff: what is done, what is open, the next step, the changed files. The gate does not run. The result to the main agent has status `handoff` and the handoff text; the main agent starts a new agent with it. `answer` does not work on an agent with status `handoff`.
+- **Gate tries:** max 3 red gate results per task. On the third, the subagent does not get the failures. It does the forced handoff (see "Handoff") and the result has status `handoff`, `details.reason` with the gate reason, and "gate red 3 times: <reason>" as the first line of the text. An `answer` or a new `task` message resets the count, and so does a green gate.
+- **Tokens:** max 100 000 tokens per agent (sum of the usage of its messages). When the sum reaches the limit while the agent runs, the supervisor sends `{type:"handoff"}`. See "Handoff".
 - A failed agent is final: a later `settled`, `gate` or `message` event changes nothing.
+
+## Handoff
+
+The handoff is enforced in the subagent extension; the model cannot skip it. On `{type:"handoff"}` from the supervisor:
+
+1. `ctx.abort()` stops the run. The extension waits for `agent_settled`, because a prompt during the run fails. An idle agent goes on at once.
+2. `pi.setActiveTools(["handoff"])`: only the tool `handoff` is declared to the model.
+3. `pi.sendUserMessage("You reached the token limit. Call the tool handoff now.")` starts a new run.
+4. The `before_provider_request` handler replaces the payload with `forceTool(payload, "handoff")` (`lib/force.ts`). The shape comes from the declared tools, not from the model name:
+   - a tool with `name` and `input_schema` is the Anthropic messages API: `tool_choice: {type:"tool", name}`. An enabled `thinking` field is removed, because Anthropic rejects it with a forced tool.
+   - a tool `{type:"function", function:{name}}` is OpenAI chat completions: `tool_choice: {type:"function", function:{name}}`.
+   - a tool `{type:"function", name}` without `function` is OpenAI responses: `tool_choice: {type:"function", name}`.
+   - Else the subagent sends an error event "handoff: cannot force a tool for this provider payload: <keys>" and the supervisor fails the agent.
+5. The tool `handoff` sends `{type:"handoff", data}` to the supervisor and returns "Handoff sent. Stop.". Then the forcing ends.
+6. After 2 invalid calls of the tool (pi returns the validation error and the model tries again), the subagent sends an error event and the supervisor fails the agent. An agent that settles without a call fails the same way.
+
+The supervisor finishes the agent with status `handoff`, `details.handoff = data` and the text lines `done`, `open`, `next`, `files`, `risks`, `tests`. The gate does not run. The 3rd red gate does steps 2 to 6 (no abort: the agent settled already).
 
 ## What a subagent loads
 
@@ -64,7 +87,7 @@ The command is `pi -ne -ns -np -nc --no-themes -e <path> ... <profile arguments>
 The steps are in `TODO.md`, one at a time.
 
 - **Profiles:** `~/.pi/agent/agents/<name>.md` defines all that a subagent gets: models, tools, extensions, skills, MCP, system prompt, extra checks. Repositories hold no profiles. Later, nullspace delivers the same files through its layer kind `agents/`.
-- **Done description:** after a green gate, the subagent writes a short done description for the main agent. The format is open.
+- **Done description:** after a green gate, the subagent writes a short done description for the main agent. The format is open; the same pattern (strict tool, forced) can apply.
 - **Model ladder:** a profile lists models in order, for example a free model, then IBM, then Haiku, then Sonnet. The tool takes the first available one. Later, quota decide too.
 - **Isolation:** window 0 gives each subagent its own worktree or a copy without `.git`, in a jail. The work goes to a merge branch at the end.
 - **Retries:** max tries, and an agent reset with a handoff.

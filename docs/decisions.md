@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 16. Subagent handoff is enforced, not asked for (2026-10-27)
+
+A steer message did not make models write a usable handoff. The subagent extension now aborts the run, activates only the tool `handoff`, and forces it with the tool choice in `before_provider_request`. The payload shape comes from the declared tools, because the model name does not tell the API. An unknown shape fails the agent. `ask`, `blocker` and `handoff` have strict schemas so the main agent gets structured data.
+
 ## 15. The version level comes from a Change trailer per commit (2026-10-27)
 
 Every commit carries `Change: fix|feature|breaking`. `bump-changed` takes the highest change per component since its last tag: fix is patch, feature is minor, breaking is major (minor below 1.0, marked "(breaking)" in the changelog). Reason: a hand-picked level for the whole release gave a minor for each small fix. Commits from before the rule have no trailer; `bump-changed <change>` gives them a change on purpose, without it they fail. Releases happen for a deliverable or on request, not after every PR.
