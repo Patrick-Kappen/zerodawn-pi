@@ -17,7 +17,6 @@ jobs:
         with:
           fetch-depth: 0
       - uses: DeterminateSystems/nix-installer-action@v16
-      - uses: DeterminateSystems/magic-nix-cache-action@v9
       - name: "PR: commit subjects, checks for what changed, compat"
         if: github.event_name == 'pull_request'
         run: scripts/ci-checks.sh pr "${{ github.event.pull_request.base.sha }}"
