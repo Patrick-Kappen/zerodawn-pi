@@ -14,7 +14,7 @@ pi package with independent extensions in TypeScript. Nix flake with a Home Mana
 
 - Repository behaviour (`flake.nix` checks and dev shell, `.github/workflows/ci.yml`, `scripts/`, `justfile`, `biome.json`, `tsconfig.json`) is shared with [zerodawn-pi-private](https://github.com/Patrick-Kappen/zerodawn-pi-private). Change it in both and run `just sync-check`; CI of the private repository fails on drift.
 - Commit subject: `<scope>: what changed`, scope is an extension name, `shared`, `release`, `ci`, `docs`, `flake`, `repo` or `deps`. Max 72 characters. The subjects become the changelog.
-- Work on a branch and open a PR; `main` is protected by a hook. CI tests only what changed on a PR, everything on `main`.
+- Work on a branch and worktree add ~/.worktrees and open a PR; `main` is protected by a hook. CI tests only what changed on a PR, everything on `main`.
 - Do not edit `CHANGELOG.md` files or versions by hand. A release is `just bump-changed <level>` on a clean `main`, as its own PR.
 - Do not add a dependency. pi and its packages come from the `llm-agents` flake input; `nix flake update llm-agents` follows a new pi.
 - Fail loud: no fallback that hides a missing input. Errors name the file or the id and the next step.
