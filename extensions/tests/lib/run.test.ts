@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 import type { Recipes } from "./recipes.ts";
-import { cdOf, changedFiles, execute, plan, RunTests } from "./run.ts";
+import { ANOMALIES, cdOf, changedFiles, execute, plan, RunTests } from "./run.ts";
 
 const temp = (name: string) => mkdtempSync(join(tmpdir(), `run-tests-${name}-`));
 const dir = temp("repo");
@@ -110,12 +110,12 @@ test("a run longer than the inline time continues in the background; a message g
   const command = `cd ${dir} && sleep 0.3; echo done`;
   const first = await slow.check("call-6", command, ctx);
   assert.deepEqual(first.isError, false);
-  assert.match(first.text, /check "cd .* echo done" runs in the background \(more than 0\.05 s\)\. Continue with other work\. A message gives the result\./);
+  assert.match(first.text, /check \S+ runs in the background \(more than 0\.05 s\)\. Continue with other work\. A message gives the result\./);
   assert.match((await slow.check("call-7", command, ctx)).text, /still runs for this change/);
   await new Promise((resolve) => setTimeout(resolve, 600));
   assert.equal(notes.length, 1);
   assert.equal(notes[0].ok, true);
-  assert.match(notes[0].text, /^check "cd .* echo done": green: exit 0 · /);
+  assert.match(notes[0].text, /^check \S+: green: exit 0 · /);
   assert.match((await slow.check("call-8", command, ctx)).text, /same result/);
 });
 
@@ -138,6 +138,16 @@ test("a check command runs in place: green, red on a failure, red on a warning, 
   assert.match(await check("echo ok"), /green: exit 0 · .* · no file changed since the last run; same result \(add "# rerun" to run it again\)/);
   assert.doesNotMatch(await check("echo ok # rerun"), /same result/);
   assert.match((await checks.check("call-4", `cd ${plain} && echo outside`, ctx)).text, /green: exit 0/);
+});
+
+test("a red check that the parser does not understand is written to the anomalies file of the session", async () => {
+  const checks = new RunTests(notify);
+  await checks.check("call-6", `cd ${dir} && echo boom; exit 3`, ctx);
+  const file = readdirSync(session, { recursive: true, encoding: "utf8" }).find((f) => f.endsWith(ANOMALIES));
+  assert.ok(file, `no ${ANOMALIES} under ${session}`);
+  const last = JSON.parse(readFileSync(join(session, file), "utf8").trim().split("\n").at(-1) ?? "");
+  assert.deepEqual([last.signals, last.command, last.result], [["fallback"], `cd ${dir} && echo boom; exit 3`, "boom"]);
+  assert.match(last.log, /\.check\.log$/);
 });
 
 test("a stop by the user ends the command and its children at once", async () => {

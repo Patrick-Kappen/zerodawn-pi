@@ -116,9 +116,10 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       let toBackground!: () => void;
       const moved = new Promise<undefined>((r) => (toBackground = () => r(undefined)));
       waiting.set(id, toBackground);
-      const autoMove = setTimeout(toBackground, params.background ? 0 : INLINE_WAIT_S * 1000);
+      const autoMove = setTimeout(toBackground, INLINE_WAIT_S * 1000);
       ctx.ui.setStatus("bash-wait", ctx.ui.theme.fg("dim", "bash running · ctrl+shift+b: background"));
-      const inline = await Promise.race([done, moved]);
+      // background: true returns the job id also when the command ends at once; a race with a 0 ms timer gives the result inline.
+      const inline = params.background ? undefined : await Promise.race([done, moved]);
       clearTimeout(autoMove);
       clearInterval(stream);
       waiting.delete(id);

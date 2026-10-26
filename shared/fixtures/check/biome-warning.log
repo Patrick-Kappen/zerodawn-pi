@@ -1,0 +1,32 @@
+/tmp/nix-shell.Q3G85v: line 2397: scripts/shell-hook.sh: No such file or directory
+b.ts:1:1 lint/style/useConst  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ! This let declares a variable that is only assigned once.
+  
+  > 1 │ let x = 1;
+      │ ^^^
+    2 │ export { x };
+    3 │ 
+  
+  i 'x' is never reassigned.
+  
+  > 1 │ let x = 1;
+      │     ^
+    2 │ export { x };
+    3 │ 
+  
+  i Safe fix: Use const instead.
+  
+    1   │ - let·x·=·1;
+      1 │ + const·x·=·1;
+    2 2 │   export { x };
+    3 3 │   
+  
+
+Checked 1 file in 1184µs. No fixes applied.
+Found 1 warning.
+lint ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some warnings were emitted while running checks.
+  
+

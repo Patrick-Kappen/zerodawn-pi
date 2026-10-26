@@ -1,0 +1,21 @@
+error (ignored): SQLite database '/home/user/.cache/nix/eval-cache-v6/85287c2b5e3fa6402ab31096cd3e651566965585a236f3ed2612ef05a5bdd112.sqlite' is busy
+/tmp/nix-shell.220kz1: line 2397: scripts/shell-hook.sh: No such file or directory
+
+In s.sh line 2:
+echo $1
+     ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+
+Did you mean:
+echo "$1"
+
+
+In s.sh line 3:
+cd foo
+^----^ SC2164 (warning): Use 'cd ... || exit' or 'cd ... || return' in case cd fails.
+
+Did you mean:
+cd foo || exit
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2164 -- Use 'cd ... || exit' or 'cd ... |...
+  https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...

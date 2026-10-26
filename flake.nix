@@ -73,6 +73,7 @@
         fileset = lib.fileset.unions [
           ./package.json
           (lib.fileset.fileFilter (file: file.hasExt "ts") ./shared)
+          (lib.fileset.maybeMissing ./shared/fixtures)
         ];
       };
       # Every extension has a package.json with a version and at least one test; a missing one fails the evaluation.
@@ -105,6 +106,7 @@
           fileset = lib.fileset.unions [
             ./package.json
             (lib.fileset.fileFilter (file: file.hasExt "ts") ./shared)
+            (lib.fileset.maybeMissing ./shared/fixtures)
             (lib.fileset.fileFilter (
               file: file.hasExt "ts" || file.hasExt "txt" || file.name == "package.json"
             ) (./extensions + "/${name}"))
@@ -294,8 +296,16 @@
               detect-private-keys.enable = true;
               check-added-large-files.enable = true;
               check-merge-conflicts.enable = true;
-              end-of-file-fixer.enable = true;
-              trim-trailing-whitespace.enable = true;
+              # Fixtures are raw tool output: their whitespace is part of the test.
+              end-of-file-fixer = {
+                enable = true;
+                excludes = [ "^shared/fixtures/" ];
+              };
+              # Fixtures are raw tool output: their whitespace is part of the test.
+              trim-trailing-whitespace = {
+                enable = true;
+                excludes = [ "^shared/fixtures/" ];
+              };
               no-commit-to-branch.enable = true;
               nixfmt.enable = true;
               statix.enable = true;
@@ -382,7 +392,8 @@
             PRE_COMMIT_SHELL_HOOK = self.checks.${system}.pre-commit.shellHook;
             NODE_MODULES = "${piModules pkgs}/node_modules";
             PI_VERSION = (pi pkgs).version;
-            shellHook = "source scripts/shell-hook.sh";
+            # The hook links node_modules and installs git hooks in the current directory: only in this repository.
+            shellHook = "if [ -f scripts/shell-hook.sh ] && [ -f flake.nix ]; then source scripts/shell-hook.sh; fi";
             packages = [
               pkgs.nodejs_24
               pkgs.bun

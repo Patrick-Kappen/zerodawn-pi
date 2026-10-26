@@ -1,0 +1,6 @@
+error (ignored): SQLite database '/home/user/.cache/nix/eval-cache-v6/85287c2b5e3fa6402ab31096cd3e651566965585a236f3ed2612ef05a5bdd112.sqlite' is busy
+/tmp/nix-shell.tyC192: line 2397: scripts/shell-hook.sh: No such file or directory
+Warning: Unused declarations were found.
+   ╭─[d.nix:2:5]
+ 2 │let x = 1; in { a = pkgs.hello; }
+   │    ╰─ Unused let binding: x

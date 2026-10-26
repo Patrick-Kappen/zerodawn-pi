@@ -1,0 +1,36 @@
+building '/nix/store/xxa88rlkrsiq4h0sylfqvla4dh9xb44f-tests-ui.drv'...
+building '/nix/store/wzkwj4fnb26s88y7n5rgvg9cc3ia41f7-tests-watchdog.drv'...
+building '/nix/store/h7gdnpzq6mxi0z56x6jj44h5x0x89g57-types.drv'...
+error: failed to build attribute 'checks.x86_64-linux.pre-commit', build of '/nix/store/jbczhwd6xkb6cl1hfj8sz71igrkjh8aq-pre-commit-run.drv^*' failed: Cannot build '/nix/store/jbczhwd6xkb6cl1hfj8sz71igrkjh8aq-pre-commit-run.drv'.
+       Reason: builder failed with exit code 1.
+       Output paths:
+         /nix/store/zl23kqkz4dpdq8nir8706hvnng9pqrcv-pre-commit-run
+       Last 25 log lines:
+       >    > 1 │ let x = 1;
+       >        │     ^
+       >      2 │ export { x };
+       > -    3 │ 
+       > -  
+       > +    3 │
+       > +
+       >    i Safe fix: Use const instead.
+       > -  
+       > +
+       >      1   │ - let·x·=·1;
+       >        1 │ + const·x·=·1;
+       >      2 2 │   export { x };
+       > -    3 3 │   
+       > -  
+       > +    3 3 │
+       > +
+       >  
+       >  Checked 1 file in 1184µs. No fixes applied.
+       >  Found 1 warning.
+       >  lint ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       >  
+       >    × Some warnings were emitted while running checks.
+       > -  
+       >  
+       For full logs, run:
+         nix log /nix/store/jbczhwd6xkb6cl1hfj8sz71igrkjh8aq-pre-commit-run.drv
+error: recipe `check` failed on line 31 with exit code 1
