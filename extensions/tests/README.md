@@ -56,9 +56,13 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.0 — 2026-10-25
+## 0.2.0 — 2026-10-26
 
-- First release.
+- docs: AGENTS.md as short rules for the agent
+- run checks in place, a warning is red, recipe contract
+- run run_tests in place of a blocked bash test command
+- test the registration in index.ts
+- add run_tests tool, block test commands in bash
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

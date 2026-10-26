@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 — 2026-10-26
+
+- background after 15 s, status line result, errors only on failure
+- docs: AGENTS.md of each extension as rules, facts to README
+- mark a bash variable in a test string for biome
+
 ## 0.2.0 — 2026-10-26
 
 - run jobs without a terminal, like CI

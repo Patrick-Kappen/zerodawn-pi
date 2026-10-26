@@ -17,9 +17,9 @@ Registers pi's `read`, `grep`, `edit` and `write` tools again with shorter descr
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.0 — 2026-10-25
+## 0.2.0 — 2026-10-26
 
-- First release.
+- docs: AGENTS.md of each extension as rules, facts to README
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

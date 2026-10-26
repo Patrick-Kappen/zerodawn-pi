@@ -64,3 +64,13 @@ The main pi connects to the supervisor when the first subagent starts. At `sessi
 ## Needs
 
 - `tmux` and `pi` in `PATH`.
+
+## Changes
+
+<!-- changelog:start -->
+## 0.1.0 — 2026-10-26
+
+- First release.
+
+[All changes](CHANGELOG.md)
+<!-- changelog:end -->
