@@ -89,6 +89,26 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.11.0 — 2026-10-26
+
+### shared 0.5.0
+
+- keep diagnostics and warningCount as released
+
+- grouped diagnostics, nix noise, word-only warnings
+
+### bash 0.5.0
+
+- just check-findings shows unhelpful check results
+
+- background true always returns the job id
+
+### tests 0.4.0
+
+- shared: keep diagnostics and warningCount as released
+
+- anomalies file, nixfmt check, results by call number
+
 ## 0.10.0 — 2026-10-26
 
 ### subagents 0.6.0
@@ -101,12 +121,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 - read a tmux server that exits during a check as absent
 - max 3 gate tries, handoff at 100k tokens
-
-## 0.8.2 — 2026-10-26
-
-### shared 0.4.2
-
-- diagnostics shows a missing command, no echoed option or summary
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

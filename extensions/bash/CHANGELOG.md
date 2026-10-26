@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 — 2026-10-26
+
+- just check-findings shows unhelpful check results
+
+- background true always returns the job id
+
 ## 0.4.0 — 2026-10-26
 
 - guidelines say continue working while a job runs

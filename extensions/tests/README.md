@@ -58,9 +58,11 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 ## Changes
 
 <!-- changelog:start -->
-## 0.3.1 — 2026-10-26
+## 0.4.0 — 2026-10-26
 
-- short check result: diagnostics only, deduplicated
+- shared: keep diagnostics and warningCount as released
+
+- anomalies file, nixfmt check, results by call number
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
