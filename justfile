@@ -42,6 +42,10 @@ bump-changed legacy="":
 release-check:
     scripts/release-check.sh
 
+# Show check results that did not help the agent, from the pi sessions since a date (default: 7 days ago)
+check-findings since="":
+    bun extensions/bash/tool/findings.ts {{since}}
+
 # Write the changelog blocks into the README of each extension and the root README
 notes:
     scripts/notes.sh

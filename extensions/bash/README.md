@@ -34,6 +34,10 @@ Logs and job state live next to the session file: `<session>/out/<id>.bash.log` 
 
 Jobs survive a pi restart: `session_start` reads the job files, reports jobs that ended, and polls jobs that still run.
 
+## Check findings
+
+`just check-findings [since]` reads the pi sessions since a date (default: 7 days ago) and shows check results that did not help the agent: the agent read the check log, ran the same linter again with a pipe, or ran a linter that got the normal bash result. It also shows the `check-anomalies.jsonl` of the tests extension. Code: `tool/findings.ts`. Make a fixture in `shared/fixtures/check/` from each new case.
+
 ## Layout
 
 `tool/` the `bash` and `jobs` tools, the guard and the job process; `ui/` dashboard, follow view, transcript rendering, icons; `screen/` the screen model that turns raw output with escapes into lines.
