@@ -2,7 +2,7 @@ import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { Recipes } from "./recipes.ts";
-import { failures, warningCount, warnings } from "./report.ts";
+import { diagnostics, failures, warningCount } from "./report.ts";
 import { isCode, parseStatus, type Read, selectTests } from "./select.ts";
 
 export const TIMEOUT_MS = 10 * 60 * 1000;
@@ -142,6 +142,6 @@ export function verdict(run: Run): { ok: boolean; text: string } {
   const warned = warningCount(run.output);
   if (run.timedOut) return { ok: false, text: `stopped after ${TIMEOUT_MS / 60000} min\n${failures(run.output)}` };
   if (run.code !== 0) return { ok: false, text: failures(run.output) };
-  if (warned) return { ok: false, text: `${warned} warning lines. A warning is an error: fix each one.\n${warnings(run.output)}` };
+  if (warned) return { ok: false, text: `${warned} warning lines. A warning is an error: fix each one.\n${diagnostics(run.output)}` };
   return { ok: true, text: "" };
 }

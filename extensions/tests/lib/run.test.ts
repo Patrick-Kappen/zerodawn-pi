@@ -72,12 +72,12 @@ test("plan: only files that need no test; a JS config file runs every test", () 
   assert.deepEqual(plan(dir, undefined, "changed", ["tsconfig.json"]), { run: ALL, tests: [], uncovered: [] });
 });
 
-test("green: one line with the counts, the command and the log; the same result when no file changed", async () => {
+test("green: one line with the counts and the log; the same result when no file changed", async () => {
   write("a.ts", "export const a = 1; // changed\n");
   const r = await call({});
   assert.equal(r.isError, false);
-  assert.match(r.text, /^green: 1 pass, 0 fail · [\d.]+ s\ncommand: bun test --only-failures \.\/a\.test\.ts\nlog: .*\.tests\.log$/);
-  assert.match((await call({})).text, /^green: .* · no file changed since the last run; same result \(set rerun only for a flaky test\)\n/);
+  assert.match(r.text, /^green: 1 pass, 0 fail · [\d.]+ s · log: .*\.tests\.log$/);
+  assert.match((await call({})).text, /^green: .* · no file changed since the last run; same result \(set rerun only for a flaky test\)$/);
 });
 
 test("a warning makes a run red and shows the warning", async () => {
@@ -85,7 +85,7 @@ test("a warning makes a run red and shows the warning", async () => {
   const r = await call({});
   assert.equal(r.isError, true);
   assert.match(r.text, /^red: 1 pass, 0 fail · 1 warning lines · /);
-  assert.match(r.text, /A warning is an error here: fix each one\.\n\n(.*\n)*warning: a is deprecated/);
+  assert.match(r.text, /A warning is an error here: fix each one\.\nwarning: a is deprecated\nlog: /);
   write("a.test.ts", TEST_A);
 });
 
@@ -131,12 +131,9 @@ test("reset stops a background run without a message", async () => {
 test("a check command runs in place: green, red on a failure, red on a warning, the same result until a change or # rerun", async () => {
   const checks = new RunTests(notify);
   const check = async (command: string) => (await checks.check("call-3", `cd ${dir} && ${command}`, ctx)).text;
-  assert.match(
-    await check("echo ok"),
-    /^Check commands in bash give a short result\. .*\ngreen: exit 0 · [\d.]+ s\ncommand: cd .* && echo ok\nlog: .*\.check\.log$/,
-  );
+  assert.match(await check("echo ok"), /^Check commands in bash give a short result\. .*\ngreen: exit 0 · [\d.]+ s · log: .*\.check\.log$/);
   assert.equal((await checks.check("call-5", `cd ${dir} && exit 1`, ctx)).isError, true);
-  assert.match(await check("echo boom; exit 3"), /\nred: exit 3 · [\d.]+ s\ncommand: .*\n\nboom\n/);
+  assert.match(await check("echo boom; exit 3"), /\nred: exit 3 · [\d.]+ s\nboom\nlog: /);
   assert.match(await check("echo 'warning: unused x'"), /\nred: exit 0 · 1 warning lines · (.*\n)*warning: unused x/);
   assert.match(await check("echo ok"), /green: exit 0 · .* · no file changed since the last run; same result \(add "# rerun" to run it again\)/);
   assert.doesNotMatch(await check("echo ok # rerun"), /same result/);

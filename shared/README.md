@@ -18,7 +18,7 @@ Extensions are versioned and tagged on their own, and `just compat` runs the tes
 | `store.ts` | where tool output lives: `sessionDir`, `storeDir` (`<session>/out`, `<session>/jobs`), `callNumber` (`3.2-C1`), `freeId`, `outFile`, `callFileId` and `callOutFile` (also for a codemode call `<id>/<n>`), `shorten` (`$HOME` → `~`) | bash, files, git, tests |
 | `config.ts` | `CONFIG_FILE`, `CONFIG_ENV`, `configFile`, `readConfig`, `config`: reads and checks `config.json` next to `package.json`, or the file in `ZERODAWN_PI_CONFIG` | ast-grep, systemstate, subagents |
 | `select.ts` | `isCode`, `isTestFile`, `parseStatus` (paths of `git status`), `importers`, `selectTests` (tests for changed files, and the changed code files without a test) | tests |
-| `report.ts` | `counts`, `failures`, `warningCount`, `warnings`: the short parts of a test output | tests |
+| `report.ts` | `counts`, `diagnostics`, `failures`, `warningCount`, `warnings`: the short parts of a test output | tests |
 | `recipes.ts` | `Recipe`, `Recipes`, `parseJust`, `parseMake`, `loadRecipes` (justfile or Makefile of a directory) | tests |
 | `testrun.ts` | `changedFiles` (git working tree against HEAD, with untracked files), `inGit`, `uncoveredOf`, `plan` (what to run for scope `changed` or `all`), `execute` (run argv in its own process group), `verdict` (red for a failed run, a time-out or a warning), `reader`, `Run`, `Plan`, `NO_TEST`, `CHANGED_RECIPE`, `TIMEOUT_MS` | tests, subagents |
 

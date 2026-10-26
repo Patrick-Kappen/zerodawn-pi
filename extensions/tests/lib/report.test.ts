@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { counts, failures, warningCount, warnings } from "./report.ts";
+import { counts, diagnostics, failures, warningCount, warnings } from "./report.ts";
 
 const bun = `bun test v1.4.2
 
@@ -56,6 +56,25 @@ test("warningCount: warning lines and biome '!' lines; not '0 warnings' and not 
   assert.equal(warningCount("all good\nFound 0 warnings"), 0);
   assert.equal(warningCount("biome check --error-on-warnings .\nnix flake check --option warn-dirty false"), 0);
   assert.equal(warningCount("DeprecationWarning: x\nWARN y"), 2);
+});
+
+test("diagnostics: location, warning and error lines once; no summary, context or passed test names", () => {
+  assert.equal(
+    diagnostics(lint),
+    "extensions/bash/tool/jobproc.test.ts:37:45 lint/suspicious/noTemplateCurlyInString\n! Unexpected template string placeholder.",
+  );
+});
+
+test("diagnostics: a repeated line once with its count; nix dirty-tree noise left out", () => {
+  const nix =
+    " 3 pass\n 0 fail\nnix fmt\nwarning: Git tree '/w' is dirty\nsrc/a.ts(3,5): error TS2322: x\nsrc/a.ts(3,5): error TS2322: x\nwarning: Git tree '/w' is dirty\ntsc";
+  assert.equal(diagnostics(nix), "src/a.ts(3,5): error TS2322: x (×2)");
+  assert.equal(warningCount(nix), 0);
+});
+
+test("diagnostics: the last 20 lines when no line has a location, warning or error", () => {
+  const out = diagnostics(Array.from({ length: 50 }, (_, i) => `line ${i}`).join("\n")).split("\n");
+  assert.deepEqual([out.length, out[0], out.at(-1)], [20, "line 30", "line 49"]);
 });
 
 test("warnings: each warning line with two lines before it and its block after it", () => {

@@ -22,12 +22,10 @@ A changed JavaScript or TypeScript file without a test is an error, also with th
 The result:
 
 ```
-green: 38 pass, 0 fail · 1.2 s
-command: bun test --only-failures ./extensions/tests/lib/run.test.ts
-log: ~/.pi/agent/sessions/…/out/3.2-C1.tests.log
+green: 38 pass, 0 fail · 1.2 s · log: ~/.pi/agent/sessions/…/out/3.2-C1.tests.log
 ```
 
-`red` starts the line when a test fails, a changed file has no test, or the output has a warning. A failure shows the failures, without passed tests and runtime stack frames. A warning shows each warning line with its context. A warning line has "warn" in it (not in an option such as `--error-on-warnings`), or starts with `! ` (biome). The run stops after 10 minutes. A stop by the user ends the run and its child processes.
+`red` starts the line when a test fails, a changed file has no test, or the output has a warning. A failed test run shows the failures, without passed tests and runtime stack frames. A failed check and a warning show the diagnostics: each line with a location (`file:line:col`, `file(line,col)`), a warning or an error, once, with `(×n)` for a repeat. Summary lines (`Found 1 warning.`) and context lines do not show. When no line matches, the last 20 lines show. The nix line `warning: Git tree '…' is dirty` is not a warning. A warning line has "warn" in it (not in an option such as `--error-on-warnings`), or starts with `! ` (biome). The run stops after 10 minutes. A stop by the user ends the run and its child processes.
 
 A run that takes more than 15 s continues in the background. The tool result then says so, and the agent continues. When the run ends, a message gives the short result to the agent: during a run as a steer message, else it starts a new turn. A second call for the same change does not start a second run. A new session stops the background runs.
 
@@ -58,9 +56,9 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 ## Changes
 
 <!-- changelog:start -->
-## 0.3.0 — 2026-10-26
+## 0.2.2 — 2026-10-26
 
-- subagents: done gate runs the tests in the subagent
+- no block; replace the bash result, background after 15 s
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

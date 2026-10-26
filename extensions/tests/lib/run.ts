@@ -4,7 +4,7 @@ import { callOutFile, shorten } from "../../../shared/store.ts";
 import { CHANGED_RECIPE, changedFiles, execute, inGit, plan, type Run, reader, TIMEOUT_MS } from "../../../shared/testrun.ts";
 import { absolutePath } from "../../../shared/util.ts";
 import { loadRecipes } from "./recipes.ts";
-import { counts, failures, warningCount, warnings } from "./report.ts";
+import { counts, diagnostics, failures, warningCount } from "./report.ts";
 
 const INLINE_MS = 15 * 1000;
 const RERUN = "# rerun";
@@ -14,17 +14,19 @@ type Result = { content: { type: "text"; text: string }[]; details: Record<strin
 const noTest = (uncovered: string[]) =>
   `No test for: ${uncovered.join(", ")}. Add a test file that imports each of them, at the place and in the form that the AGENTS.md or README of the project gives, then run run_tests again.`;
 
-/** One line for green; the failures or the warnings for red; the full output in the log. A warning makes a run red. */
-function report(run: Run, shown: string, uncovered: string[], log: string): { text: string; ok: boolean } {
+/** One line for green; for red the failures of a test run, or the diagnostics of a check or a warning; the full output in the log. A warning makes a run red. */
+function report(run: Run, kind: "tests" | "check", uncovered: string[], log: string): { text: string; ok: boolean } {
   const warned = warningCount(run.output);
   const failed = run.code !== 0 || run.timedOut;
   const ok = !failed && !warned && !uncovered.length;
   const status = run.timedOut ? `stopped after ${TIMEOUT_MS / 60000} min` : (counts(run.output) ?? `exit ${run.code}`);
   const extra = [warned ? `${warned} warning lines` : "", uncovered.length ? `${uncovered.length} changed files without a test` : ""].filter(Boolean);
-  const lines = [`${ok ? "green" : "red"}: ${[status, ...extra, `${(run.ms / 1000).toFixed(1)} s`].join(" · ")}`, `command: ${shown}`];
+  const lines = [`${ok ? "green" : "red"}: ${[status, ...extra, `${(run.ms / 1000).toFixed(1)} s`].join(" · ")}`];
+  if (ok) return { text: `${lines[0]} · log: ${shorten(log)}`, ok };
   if (uncovered.length) lines.push(noTest(uncovered));
-  if (failed) lines.push("", failures(run.output), "");
-  else if (warned) lines.push("A warning is an error here: fix each one.", "", warnings(run.output), "");
+  if (warned) lines.push("A warning is an error here: fix each one.");
+  if (failed && kind === "tests") lines.push(failures(run.output));
+  else if (failed || warned) lines.push(diagnostics(run.output));
   lines.push(`log: ${shorten(log)}`);
   return { text: lines.join("\n"), ok };
 }
@@ -119,7 +121,7 @@ export class RunTests {
         const run = await execute(["bash", "-c", command], ctx.cwd, signal);
         const log = callOutFile(ctx, toolCallId, "check");
         writeFileSync(log, run.output);
-        const { text: t, ok } = report(run, command, [], log);
+        const { text: t, ok } = report(run, "check", [], log);
         return text(t, !ok, { log });
       });
       return { text: `${CHECK_HEAD}\n${r.content[0].text}`, isError: r.isError };
@@ -185,7 +187,7 @@ export class RunTests {
       const run = await execute(p.run, cwd, stop);
       const log = callOutFile(ctx, toolCallId, "tests");
       writeFileSync(log, run.output);
-      const { text: t, ok } = report(run, p.run.join(" "), p.uncovered, log);
+      const { text: t, ok } = report(run, "tests", p.uncovered, log);
       return text(t, !ok, { changed, tests: p.tests, uncovered: p.uncovered, log });
     });
   }
