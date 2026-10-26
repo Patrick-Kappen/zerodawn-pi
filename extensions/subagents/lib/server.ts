@@ -15,7 +15,7 @@ export interface SupervisorOptions {
   dir: string;
   id: string;
   pi: string;
-  extension: string;
+  extensions: string[];
   newId: () => string;
   runtimeDir: string | undefined;
   tmux: Tmux;
@@ -50,11 +50,12 @@ async function freeSocket(path: string): Promise<void> {
   await removeFile(path);
 }
 
-async function checkExtension(path: string): Promise<void> {
+async function checkExtension(path: string, index: number): Promise<void> {
+  const next = index === 0 ? "Give the absolute path of extensions/subagents/index.ts." : 'Fix "subagentExtensions" in config.json.';
   try {
     await stat(path);
   } catch (cause) {
-    throw new Error(`supervisor: extension "${path}" is not readable. Give the absolute path of extensions/subagents/index.ts.`, { cause });
+    throw new Error(`supervisor: extension "${path}" is not readable. ${next}`, { cause });
   }
 }
 
@@ -115,7 +116,7 @@ export async function startSupervisor(options: SupervisorOptions) {
     dir: options.dir,
     socket: path,
     piCommand: options.pi,
-    extension: options.extension,
+    extensions: options.extensions,
     tmux: options.tmux,
     timers: options.timers,
     newId: options.newId,
@@ -209,7 +210,7 @@ export async function startSupervisor(options: SupervisorOptions) {
     });
   }
 
-  await checkExtension(options.extension);
+  for (const [index, path] of options.extensions.entries()) await checkExtension(path, index);
   await freeSocket(path);
   persist();
   await writing;

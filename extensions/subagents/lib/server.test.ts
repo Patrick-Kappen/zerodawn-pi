@@ -13,7 +13,7 @@ const execFileAsync = promisify(execFile);
 const timers = { setTimeout, clearTimeout: (handle: unknown) => clearTimeout(handle as NodeJS.Timeout) };
 
 const ID = "abcdef12-0000-4000-8000-000000000000";
-const extra = { pi: "pi", extension: fileURLToPath(import.meta.url), newId: () => ID };
+const extra = { pi: "pi", extensions: [fileURLToPath(import.meta.url)], newId: () => ID };
 
 function setup() {
   const calls: string[][] = [];
@@ -213,6 +213,28 @@ test("supervisor: wrong roles and unknown ids get an error message", async () =>
   }
 });
 
+test("supervisor: a later extension path that does not exist names subagentExtensions", async () => {
+  const root = await mkdtemp(join(tmpdir(), "sup-"));
+  try {
+    const { tmux } = setup();
+    await assert.rejects(
+      startSupervisor({
+        session: "pi-sub-abcd1234",
+        dir: join(root, "d"),
+        id: "abcd1234",
+        ...extra,
+        extensions: [fileURLToPath(import.meta.url), "/nope/login.ts"],
+        runtimeDir: root,
+        tmux,
+        timers,
+      }),
+      /extension "\/nope\/login.ts" is not readable.*subagentExtensions/,
+    );
+  } finally {
+    await rm(root, { recursive: true });
+  }
+});
+
 test("supervisor: an extension path that does not exist fails at start", async () => {
   const root = await mkdtemp(join(tmpdir(), "sup-"));
   try {
@@ -223,7 +245,7 @@ test("supervisor: an extension path that does not exist fails at start", async (
         dir: join(root, "d"),
         id: "abcd1234",
         ...extra,
-        extension: "/nope/index.ts",
+        extensions: ["/nope/index.ts"],
         runtimeDir: root,
         tmux,
         timers,

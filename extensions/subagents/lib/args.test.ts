@@ -11,8 +11,12 @@ test("parseArgs reads session, dir, id, pi and extension", () => {
     dir: "/tmp/pi-sub-0199a1b2",
     id: "0199a1b2",
     pi: "pi",
-    extension: "/x/index.ts",
+    extensions: ["/x/index.ts"],
   });
+});
+
+test("parseArgs keeps several extensions in order", () => {
+  assert.deepEqual(parseArgs([...base, "--pi", "pi", "--extension", "/x/index.ts", "--extension", "/y/login.ts"]).extensions, ["/x/index.ts", "/y/login.ts"]);
 });
 
 test("parseArgs fails on missing, unknown, repeated and bad arguments", () => {
@@ -21,6 +25,7 @@ test("parseArgs fails on missing, unknown, repeated and bad arguments", () => {
   assert.throws(() => parseArgs(base), /--pi is missing/);
   assert.throws(() => parseArgs([...base, "--pi", "pi"]), /--extension is missing/);
   assert.throws(() => parseArgs([...base, "--pi", "pi", "--extension", "x/index.ts"]), /not absolute/);
+  assert.throws(() => parseArgs([...base, "--pi", "pi", "--extension", "/x/index.ts", "--extension", "y.ts"]), /"y.ts" is not absolute/);
   assert.throws(() => parseArgs(["--x", "1"]), /unknown argument/);
   assert.throws(() => parseArgs(["--session"]), /no value/);
   assert.throws(() => parseArgs(["--session", "a", "--session", "b"]), /twice/);

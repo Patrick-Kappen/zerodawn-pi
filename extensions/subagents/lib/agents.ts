@@ -14,7 +14,7 @@ export interface AgentsOptions {
   dir: string;
   socket: string;
   piCommand: string;
-  extension: string;
+  extensions: string[];
   tmux: Pick<Tmux, "openWindow" | "listWindows">;
   timers: Timers;
   newId: () => string;
@@ -126,7 +126,21 @@ export function createAgents(options: AgentsOptions) {
     };
     records.set(id, record);
     entries.push(record.entry);
-    const command = [options.piCommand, "--model", MODEL, "--session-id", id, "--session-dir", `${options.dir}/sessions`, "-e", options.extension];
+    const command = [
+      options.piCommand,
+      "-ne",
+      "-ns",
+      "-np",
+      "-nc",
+      "--no-themes",
+      ...options.extensions.flatMap((path) => ["-e", path]),
+      "--model",
+      MODEL,
+      "--session-id",
+      id,
+      "--session-dir",
+      `${options.dir}/sessions`,
+    ];
     try {
       record.entry.window = await options.tmux.openWindow(options.session, `sub-${id.slice(0, 4)}`, command, {
         PI_SUBAGENT_SOCKET: options.socket,

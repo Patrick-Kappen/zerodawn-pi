@@ -39,7 +39,7 @@ function ensure(id: string, piCommand: string) {
     supervisorPath,
     execPath: process.execPath,
     piCommand,
-    extensionPath,
+    extensionPaths: [extensionPath],
     runtimeRoot: "/tmp",
   });
 }

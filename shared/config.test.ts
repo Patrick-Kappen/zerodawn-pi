@@ -26,3 +26,31 @@ test("readConfig: missing file is empty, valid values pass, wrong values fail wi
     rmSync(dir, { recursive: true });
   }
 });
+
+test("readConfig: subagentExtensions accepts absolute paths and an empty list, rejects the rest", () => {
+  const dir = mkdtempSync(join(tmpdir(), "config-"));
+  const file = join(dir, "config.json");
+  try {
+    writeFileSync(file, JSON.stringify({ subagentExtensions: ["/a/index.ts", "/b/index.ts"] }));
+    assert.deepEqual(readConfig(file), { subagentExtensions: ["/a/index.ts", "/b/index.ts"] });
+    writeFileSync(file, JSON.stringify({ subagentExtensions: [] }));
+    assert.deepEqual(readConfig(file), { subagentExtensions: [] });
+    for (const bad of ["/a", ["a/index.ts"], [3], [""], {}]) {
+      writeFileSync(file, JSON.stringify({ subagentExtensions: bad }));
+      assert.throws(() => readConfig(file), new RegExp(`${file}: "subagentExtensions" must be an array of absolute paths`));
+    }
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test("readConfig: a config with only the old keys reads unchanged", () => {
+  const dir = mkdtempSync(join(tmpdir(), "config-"));
+  const file = join(dir, "config.json");
+  try {
+    writeFileSync(file, JSON.stringify({ astGrep: "/bin/ast-grep" }));
+    assert.deepEqual(readConfig(file), { astGrep: "/bin/ast-grep" });
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});

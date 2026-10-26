@@ -23,6 +23,17 @@ The result that the model sees is small: agent id, status, final text (cut at 80
 - Agent status: `starting`, `running`, `idle`, `failed`. An agent that does not connect within 30 s, or whose window is gone without a result, is `failed`. The supervisor checks the windows every 2 s.
 - Runtime files go to `/tmp/pi-sub-<id>/`: the register of the subagents (id, role, window, status) and their pi sessions. A reboot removes them.
 
+## What a subagent loads
+
+The command is `pi -ne -ns -np -nc --no-themes -e <path> ... --model ... --session-id ... --session-dir ...`. The flags turn off extension discovery, skills, prompt templates, context files and themes. Tools stay on.
+
+- The first `-e` is the subagents extension. It connects the subagent to the supervisor.
+- The other `-e` paths come from `subagentExtensions` in `config.json`, in order. Use it for a provider login extension.
+- Without `subagentExtensions`, the tool fails. Set `[]` to start with no extra extension.
+- Later, an agent file adds its own prompt, tools and extensions.
+
+`just dev` with Anthropic OAuth needs `PI_TEST_ARGS="-e <path of anthropic-oauth/index.ts>"` for the main pi. The sandbox reads the `config.json` of the worktree, so put `subagentExtensions` there.
+
 ## Lifecycle
 
 - When the main pi stops, the running subagents finish their task. When the last one ends, the supervisor closes the session at once.

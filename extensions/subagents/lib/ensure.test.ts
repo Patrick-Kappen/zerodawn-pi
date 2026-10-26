@@ -32,7 +32,7 @@ function setup(options: { has?: boolean[]; option: (string | undefined)[]; alive
     supervisorPath: "/x/supervisor.ts",
     execPath: "/bin/node",
     piCommand: "pi",
-    extensionPath: "/x/index.ts",
+    extensionPaths: ["/x/index.ts", "/y/login.ts"],
     runtimeRoot: "/tmp",
     pollMs: 50,
     timeoutMs: 200,
@@ -53,6 +53,8 @@ const SUPERVISOR_COMMAND = [
   "pi",
   "--extension",
   "/x/index.ts",
+  "--extension",
+  "/y/login.ts",
 ];
 
 test("ensure returns the socket of a running supervisor and opens nothing", async () => {

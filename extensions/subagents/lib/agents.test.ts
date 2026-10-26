@@ -47,7 +47,7 @@ function setup(options: { openFails?: boolean } = {}) {
     dir: "/tmp/pi-sub-abcd1234",
     socket: "/run/s.sock",
     piCommand: "pi",
-    extension: "/x/index.ts",
+    extensions: ["/x/index.ts", "/y/login.ts"],
     tmux: {
       openWindow: async (_session, name, command, env) => {
         if (options.openFails) throw new Error("tmux down");
@@ -77,7 +77,24 @@ test("start opens a window with the pi command, the env and a starting entry", a
   assert.deepEqual(opened, [
     {
       name: "sub-abcd",
-      command: ["pi", "--model", MODEL, "--session-id", ID, "--session-dir", "/tmp/pi-sub-abcd1234/sessions", "-e", "/x/index.ts"],
+      command: [
+        "pi",
+        "-ne",
+        "-ns",
+        "-np",
+        "-nc",
+        "--no-themes",
+        "-e",
+        "/x/index.ts",
+        "-e",
+        "/y/login.ts",
+        "--model",
+        MODEL,
+        "--session-id",
+        ID,
+        "--session-dir",
+        "/tmp/pi-sub-abcd1234/sessions",
+      ],
       env: { PI_SUBAGENT_SOCKET: "/run/s.sock", PI_SUBAGENT_ID: ID },
     },
   ]);
@@ -214,7 +231,7 @@ test("a listWindows error goes to onError", async () => {
     dir: "/d",
     socket: "/s",
     piCommand: "pi",
-    extension: "/x",
+    extensions: ["/x"],
     tmux: {
       openWindow: async () => "@1",
       listWindows: async () => {

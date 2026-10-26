@@ -14,7 +14,7 @@ export interface EnsureOptions {
   supervisorPath: string;
   execPath: string;
   piCommand: string;
-  extensionPath: string;
+  extensionPaths: string[];
   runtimeRoot: string;
   pollMs?: number;
   timeoutMs?: number;
@@ -56,8 +56,7 @@ export async function ensureSupervisor(options: EnsureOptions): Promise<{ sessio
       `${options.runtimeRoot}/${session}`,
       "--pi",
       options.piCommand,
-      "--extension",
-      options.extensionPath,
+      ...options.extensionPaths.flatMap((path) => ["--extension", path]),
     ]);
   }
 

@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { config } from "../../shared/config.ts";
 import { type Client, connectMain } from "./lib/client.ts";
 import { ensureSupervisor } from "./lib/ensure.ts";
 import type { Timers } from "./lib/lifecycle.ts";
@@ -47,6 +48,12 @@ export default function (pi: ExtensionAPI): void {
   async function connection(sessionId: string): Promise<Client> {
     const current = client === undefined ? undefined : await client.catch(() => undefined);
     if (current?.isOpen()) return current;
+    const { subagentExtensions } = config();
+    if (subagentExtensions === undefined) {
+      throw new Error(
+        'subagents: config.json has no "subagentExtensions". A subagent starts with no extensions, so it has no provider login. Add the path of your provider extension (see config.example.json), or [] to start without one.',
+      );
+    }
     const next = ensureSupervisor({
       tmux,
       timers,
@@ -54,7 +61,7 @@ export default function (pi: ExtensionAPI): void {
       supervisorPath: SUPERVISOR_PATH,
       execPath: process.execPath,
       piCommand: "pi",
-      extensionPath: EXTENSION_PATH,
+      extensionPaths: [EXTENSION_PATH, ...subagentExtensions],
       probe: answers,
       runtimeRoot: "/tmp",
     }).then(({ socket }) => connectMain(socket, timers));
@@ -84,13 +91,17 @@ export default function (pi: ExtensionAPI): void {
     description:
       "Delegate tasks to pi agents in a tmux session. start: run the task in a new agent and return its final answer. status: show the supervisor and its agents.",
     promptSnippet: "Delegate tasks to pi agents in tmux",
-    parameters: Type.Union([
-      Type.Object({ action: Type.Literal("status") }),
-      Type.Object({ action: Type.Literal("start"), task: Type.String({ description: "The complete task. The agent knows nothing else." }) }),
-    ]),
+    // One object at the root: a root anyOf made the model send empty arguments.
+    parameters: Type.Object({
+      action: Type.Union([Type.Literal("start"), Type.Literal("status")]),
+      task: Type.Optional(Type.String({ description: "Required for start. The complete task. The agent knows nothing else." })),
+    }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      if (params.action === "start" && (params.task === undefined || params.task.trim() === "")) {
+        throw new Error('subagent: action "start" needs a non-empty "task".');
+      }
       const connected = await connection(ctx.sessionManager.getSessionId());
-      if (params.action === "start") return shapeResult(await connected.start(params.task, signal));
+      if (params.action === "start") return shapeResult(await connected.start(params.task as string, signal));
       const status = await connected.status();
       return { content: [{ type: "text", text: JSON.stringify(status, null, 2) }], details: status };
     },

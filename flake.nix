@@ -173,6 +173,7 @@
           settings = lib.filterAttrs (_: v: v != null) {
             astGrep = lib.getExe cfg.astGrep;
             inherit (cfg) nixosRepo;
+            subagentExtensions = if cfg.subagentExtensions == [ ] then null else cfg.subagentExtensions;
           };
           # The extensions read config.json next to package.json, so it is copied into the package.
           configured = pkgs.runCommand "${cfg.package.name}-configured" { } ''
@@ -224,6 +225,11 @@
               type = lib.types.nullOr lib.types.str;
               default = null;
               description = "Checkout of the NixOS flake that built this system. systemstate reports the deployed revision against it.";
+            };
+            subagentExtensions = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [ ];
+              description = "Absolute paths of extensions that every subagent loads, for example a provider login extension.";
             };
             logCleanup = {
               enable = lib.mkOption {
