@@ -36,7 +36,7 @@ if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
   exit 0
 fi
 notes="$(section CHANGELOG.md "$version")"
-if [ -z "$notes" ]; then echo "$tag: no changelog section in CHANGELOG.md, not released ($tagged component tags)"; exit 0; fi
+[ -n "$notes" ] || fail "package $tag has an empty or missing section in CHANGELOG.md" "add the changes under \"## $version\" in CHANGELOG.md and merge again"
 untagged=()
 for manifest in shared/package.json extensions/*/package.json; do
   t="$(jq -r .name "$manifest")-v$(jq -r .version "$manifest")"
