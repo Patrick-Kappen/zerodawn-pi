@@ -35,9 +35,19 @@ export function readConfig(file: string): Config {
   }
 }
 
+export const CONFIG_ENV = "ZERODAWN_PI_CONFIG";
+
+// The dev sandbox runs the worktree code with the config of the installed package.
+export function configFile(env: NodeJS.ProcessEnv = process.env): string {
+  const value = env[CONFIG_ENV];
+  if (value === undefined) return CONFIG_FILE;
+  if (!value.startsWith("/")) throw new Error(`zerodawn-pi: ${CONFIG_ENV} must be an absolute path, got "${value}".`);
+  return value;
+}
+
 let loaded: Config | undefined;
 
 export function config(): Config {
-  loaded ??= readConfig(CONFIG_FILE);
+  loaded ??= readConfig(configFile());
   return loaded;
 }

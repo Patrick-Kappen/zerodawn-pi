@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { CONFIG_FILE, readConfig } from "./config.ts";
+import { CONFIG_ENV, CONFIG_FILE, configFile, readConfig } from "./config.ts";
 
 test("config.json lives next to package.json", () => {
   assert.equal(CONFIG_FILE, join(import.meta.dirname, "..", "config.json"));
@@ -53,4 +53,13 @@ test("readConfig: a config with only the old keys reads unchanged", () => {
   } finally {
     rmSync(dir, { recursive: true });
   }
+});
+
+test("configFile: without ZERODAWN_PI_CONFIG it is the file next to package.json", () => {
+  assert.equal(configFile({}), CONFIG_FILE);
+});
+
+test("configFile: ZERODAWN_PI_CONFIG points to another absolute file, a relative path fails", () => {
+  assert.equal(configFile({ [CONFIG_ENV]: "/etc/pi/config.json" }), "/etc/pi/config.json");
+  assert.throws(() => configFile({ [CONFIG_ENV]: "config.json" }), /must be an absolute path/);
 });

@@ -32,7 +32,7 @@ The command is `pi -ne -ns -np -nc --no-themes -e <path> ... --model ... --sessi
 - Without `subagentExtensions`, the tool fails. Set `[]` to start with no extra extension.
 - Later, an agent file adds its own prompt, tools and extensions.
 
-`just dev` with Anthropic OAuth needs `PI_TEST_ARGS="-e <path of anthropic-oauth/index.ts>"` for the main pi. The sandbox reads the `config.json` of the worktree, so put `subagentExtensions` there.
+`just dev` reads the `config.json` of the installed package (through `ZERODAWN_PI_CONFIG`) and loads its `subagentExtensions` in the sandbox pi too. Set the Home Manager option `subagentExtensions` to your provider login extension, for example `anthropic-oauth/index.ts`.
 
 ## Lifecycle
 
