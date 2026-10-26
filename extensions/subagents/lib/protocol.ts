@@ -9,7 +9,9 @@ export type SubEvent =
   | { kind: "tool_start"; name: string; args: string }
   | { kind: "tool_end"; name: string; isError: boolean }
   | { kind: "message"; text: string; usage: Usage }
-  | { kind: "settled"; text: string };
+  | { kind: "settled"; text: string }
+  | { kind: "gate"; ok: boolean; text: string }
+  | { kind: "error"; text: string };
 
 export type AgentStatus = "idle" | "failed" | "question" | "blocked";
 
@@ -25,7 +27,7 @@ export type ClientMessage =
   | { type: "hello"; role: "main" }
   | { type: "hello"; role: "sub"; id: string }
   | { type: "status" }
-  | { type: "start"; task: string; args: string[] }
+  | { type: "start"; task: string; args: string[]; checks: string[] }
   | { type: "answer"; id: string; text: string }
   | { type: "ask"; text: string }
   | { type: "blocker"; text: string }
@@ -85,8 +87,14 @@ function parseEvent(value: unknown): SubEvent {
       return { kind: "message", text: text(event, "text", "message"), usage: usage(event, "message") };
     case "settled":
       return { kind: "settled", text: text(event, "text", "settled") };
+    case "gate": {
+      if (typeof event.ok !== "boolean") throw new Error('protocol: field "ok" of "gate" must be a boolean. Fix the sender.');
+      return { kind: "gate", ok: event.ok, text: text(event, "text", "gate") };
+    }
+    case "error":
+      return { kind: "error", text: text(event, "text", "error") };
   }
-  throw new Error(`protocol: unknown event kind ${JSON.stringify(event.kind)}. Use "tool_start", "tool_end", "message" or "settled".`);
+  throw new Error(`protocol: unknown event kind ${JSON.stringify(event.kind)}. Use "tool_start", "tool_end", "message", "settled" or "gate".`);
 }
 
 export function parseClientLine(line: string): ClientMessage {
@@ -103,7 +111,10 @@ export function parseClientLine(line: string): ClientMessage {
       if (!Array.isArray(message.args) || message.args.some((arg) => typeof arg !== "string")) {
         throw new Error('protocol: field "args" of "start" must be a list of strings. Fix the sender.');
       }
-      return { type: "start", task, args: message.args as string[] };
+      if (!Array.isArray(message.checks) || message.checks.some((check) => typeof check !== "string")) {
+        throw new Error('protocol: field "checks" of "start" must be a list of strings. Fix the sender.');
+      }
+      return { type: "start", task, args: message.args as string[], checks: message.checks as string[] };
     }
     case "answer":
       return { type: "answer", id: text(message, "id", "answer"), text: text(message, "text", "answer") };

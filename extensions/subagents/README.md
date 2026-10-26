@@ -27,6 +27,21 @@ Every subagent has two fixed tools, whatever its profile says: `ask { question }
 - Agent status: `starting`, `running`, `idle`, `question`, `blocked`, `failed`. `question` and `blocked` count as not running. An agent that does not connect within 30 s, or whose window is gone without a result, is `failed`. The supervisor checks the windows every 2 s.
 - Runtime files go to `/tmp/pi-sub-<id>/`: the register of the subagents (id, role, window, status) and their pi sessions. A reboot removes them.
 
+## Done gate
+
+The gate runs in the subagent, in its extension, on `agent_settled`. It uses the working directory of the subagent.
+
+- A subagent with a pending `ask` or `blocker` skips the gate. Its question or blocker goes to the main agent.
+- No changed file (git working tree against HEAD, with untracked files): the gate is green at once. A scout passes this way.
+- A changed code file without a test: red. The subagent gets the file list and must add a test for each.
+- The whole repository test set runs (recipe `test`, else `bun test`). Red, or any warning line: the subagent gets only the failures.
+- Then each `checks` command of the profile runs in `bash -c`. The first red one goes back with its failures.
+- All green: the result goes to the main agent as before, the final text of the subagent.
+
+Red keeps the status `running`. The subagent sends a `gate` event with `green` or `red` and a one-line reason, so the event list shows it. There is no limit on tries yet. The main pi sends the `checks` of the profile in the `start` message; the supervisor gives them to the subagent in `PI_SUBAGENT_CHECKS`, a JSON list.
+
+The code for the test run (`changedFiles`, `plan`, `execute`, `verdict`) is in `shared/testrun.ts`, the same as `run_tests` uses.
+
 ## What a subagent loads
 
 The command is `pi -ne -ns -np -nc --no-themes -e <path> ... <profile arguments> --session-id ... --session-dir ...`. The flags turn off extension discovery, skills, prompt templates, context files and themes. The profile decides the rest.
@@ -34,14 +49,14 @@ The command is `pi -ne -ns -np -nc --no-themes -e <path> ... <profile arguments>
 - The first `-e` is the subagents extension. It connects the subagent to the supervisor.
 - The other `-e` paths come from `subagentExtensions` in `config.json`, in order. Use it for a provider login extension.
 - Without `subagentExtensions`, the tool fails. Set `[]` to start with no extra extension.
-- The profile `~/.pi/agent/agents/<name>.md` adds its tools, extensions, skills, system prompt and first model. See `PROFILES.md`. The ladder and the `checks` are later steps.
+- The profile `~/.pi/agent/agents/<name>.md` adds its tools, extensions, skills, system prompt and first model. See `PROFILES.md`. The ladder is a later step.
 
 ## Plan
 
 The steps are in `TODO.md`, one at a time.
 
 - **Profiles:** `~/.pi/agent/agents/<name>.md` defines all that a subagent gets: models, tools, extensions, skills, MCP, system prompt, extra checks. Repositories hold no profiles. Later, nullspace delivers the same files through its layer kind `agents/`.
-- **Done gate:** when a subagent stops, the repository tests and the checks of the profile run. Green: the subagent writes a short done description for the main agent. Red: the failures go back to the subagent.
+- **Done description:** after a green gate, the subagent writes a short done description for the main agent. The format is open.
 - **Model ladder:** a profile lists models in order, for example a free model, then IBM, then Haiku, then Sonnet. The tool takes the first available one. Later, quota decide too.
 - **Isolation:** window 0 gives each subagent its own worktree or a copy without `.git`, in a jail. The work goes to a merge branch at the end.
 - **Retries:** max tries, and an agent reset with a handoff.

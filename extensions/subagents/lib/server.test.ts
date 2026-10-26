@@ -129,7 +129,7 @@ test("supervisor: start, sub hello, task, events, one result to main, immediate 
     const supervisor = await startSupervisor({ session: "pi-sub-abcd1234", dir, id: "abcd1234", ...extra, runtimeDir: root, tmux, timers });
     const main = await connect(supervisor.path);
     const mainNext = lines(main);
-    main.write('{"type":"hello","role":"main"}\n{"type":"start","task":"do it","args":["--no-tools"]}\n');
+    main.write('{"type":"hello","role":"main"}\n{"type":"start","task":"do it","args":["--no-tools"],"checks":[]}\n');
     assert.deepEqual(await mainNext(), { type: "started", id: ID });
     assert.equal(calls.find((call) => call[0] === "open")?.[1]?.includes('"PI_SUBAGENT_ID"'), true);
     assert.equal(JSON.parse(await readFile(join(dir, "register.json"), "utf8")).agents[0].status, "starting");
@@ -169,7 +169,7 @@ test("supervisor: main gone while an agent runs; the supervisor ends when the ag
     const supervisor = await startSupervisor({ session: "pi-sub-abcd1234", dir: join(root, "d"), id: "abcd1234", ...extra, runtimeDir: root, tmux, timers });
     const main = await connect(supervisor.path);
     const mainNext = lines(main);
-    main.write('{"type":"hello","role":"main"}\n{"type":"start","task":"t","args":[]}\n');
+    main.write('{"type":"hello","role":"main"}\n{"type":"start","task":"t","args":[],"checks":[]}\n');
     await mainNext();
     const sub = await connect(supervisor.path);
     const subNext = lines(sub);
@@ -197,7 +197,7 @@ test("supervisor: wrong roles and unknown ids get an error message", async () =>
     const client = await connect(supervisor.path);
     const next = lines(client);
     for (const [line, pattern] of [
-      ['{"type":"start","task":"t","args":[]}', /only a connection with hello role "main"/],
+      ['{"type":"start","task":"t","args":[],"checks":[]}', /only a connection with hello role "main"/],
       ['{"type":"event","event":{"kind":"settled","text":""}}', /only a connection with hello role "sub"/],
       ['{"type":"hello","role":"sub","id":"nope"}', /no subagent with id "nope"/],
     ] as const) {
