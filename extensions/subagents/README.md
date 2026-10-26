@@ -38,9 +38,17 @@ The gate runs in the subagent, in its extension, on `agent_settled`. It uses the
 - Then each `checks` command of the profile runs in `bash -c`. The first red one goes back with its failures.
 - All green: the result goes to the main agent as before, the final text of the subagent.
 
-Red keeps the status `running`. The subagent sends a `gate` event with `green` or `red` and a one-line reason, so the event list shows it. There is no limit on tries yet. The main pi sends the `checks` of the profile in the `start` message; the supervisor gives them to the subagent in `PI_SUBAGENT_CHECKS`, a JSON list.
+Red keeps the status `running`. The subagent sends a `gate` event with `green` or `red` and a one-line reason, so the event list shows it. Limits: see "Limits". The main pi sends the `checks` of the profile in the `start` message; the supervisor gives them to the subagent in `PI_SUBAGENT_CHECKS`, a JSON list.
 
 The code for the test run (`changedFiles`, `plan`, `execute`, `verdict`) is in `shared/testrun.ts`, the same as `run_tests` uses.
+
+## Limits
+
+The limits are constants in code. A later step moves them to the profile.
+
+- **Gate tries:** max 3 red gate results per task. On the third, the subagent does not get the failures. Its extension sends an `error` event "done gate red 3 times: <reason>", and the supervisor fails the agent. An `answer` or a new `task` message resets the count, and so does a green gate.
+- **Tokens:** max 100 000 tokens per agent (sum of the usage of its messages). When the sum reaches the limit while the agent runs, the supervisor sends `{type:"handoff"}`. The subagent extension steers the agent to stop and write a handoff: what is done, what is open, the next step, the changed files. The gate does not run. The result to the main agent has status `handoff` and the handoff text; the main agent starts a new agent with it. `answer` does not work on an agent with status `handoff`.
+- A failed agent is final: a later `settled`, `gate` or `message` event changes nothing.
 
 ## What a subagent loads
 

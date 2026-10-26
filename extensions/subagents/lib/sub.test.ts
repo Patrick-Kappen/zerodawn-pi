@@ -2,22 +2,25 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GateResult } from "./gate.ts";
 import type { ClientMessage } from "./protocol.ts";
-import { createSubHandlers, readSubEnv, shorten } from "./sub.ts";
+import { createSubHandlers, HANDOFF_PROMPT, readSubEnv, shorten } from "./sub.ts";
 
 function setup(result: GateResult | Error = { ok: true, reason: "tests and checks green" }) {
   const sent: ClientMessage[] = [];
   const user: string[] = [];
   let gates = 0;
+  const steers: string[] = [];
   const handlers = createSubHandlers({
     send: (message) => sent.push(message),
     sendUserMessage: (text) => user.push(text),
-    gate: async () => {
+    steer: (text) => steers.push(text),
+    gate: async (send) => {
       gates++;
       if (result instanceof Error) throw result;
+      if (!result.ok) send("fix it");
       return result;
     },
   });
-  return { sent, user, handlers, gates: () => gates };
+  return { sent, user, handlers, gates: () => gates, steers };
 }
 
 const usage = { totalTokens: 10, cost: { total: 0.02 } };
@@ -118,6 +121,44 @@ test("ask and blocker send their text and tell the model to stop", () => {
     { type: "ask", text: "which db?" },
     { type: "blocker", text: "no access" },
   ]);
+});
+
+test("the third red gate sends an error event and no failure message", async () => {
+  const { sent, user, handlers } = setup({ ok: false, reason: "the repository tests are red" });
+  await handlers.settled();
+  await handlers.settled();
+  assert.deepEqual(user, ["fix it", "fix it"]);
+  sent.length = 0;
+  await handlers.settled();
+  assert.deepEqual(user, ["fix it", "fix it"]);
+  assert.deepEqual(sent, [
+    { type: "event", event: { kind: "gate", ok: false, text: "the repository tests are red" } },
+    { type: "event", event: { kind: "error", text: "done gate red 3 times: the repository tests are red" } },
+  ]);
+});
+
+test("a new task resets the red gate count", async () => {
+  const { user, sent, handlers } = setup({ ok: false, reason: "red" });
+  await handlers.settled();
+  await handlers.settled();
+  handlers.onServerMessage({ type: "task", task: "again" });
+  await handlers.settled();
+  await handlers.settled();
+  assert.deepEqual(user, ["fix it", "fix it", "again", "fix it", "fix it"]);
+  assert.ok(!sent.some((message) => message.type === "event" && message.event.kind === "error"));
+});
+
+test("a handoff message steers the agent; the next settle sends the handoff without a gate", async () => {
+  const { handlers, gates, steers, sent } = setup();
+  handlers.onServerMessage({ type: "handoff" });
+  assert.deepEqual(steers, [HANDOFF_PROMPT]);
+  handlers.messageEnd({ role: "assistant", content: [{ type: "text", text: "done: a; open: b" }], usage });
+  await handlers.settled();
+  assert.equal(gates(), 0);
+  assert.deepEqual(sent.at(-1), { type: "event", event: { kind: "settled", text: "done: a; open: b" } });
+  handlers.onServerMessage({ type: "task", task: "x" });
+  await handlers.settled();
+  assert.equal(gates(), 1);
 });
 
 test("shorten keeps short text", () => {

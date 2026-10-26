@@ -9,7 +9,7 @@ One step at a time. Each step is its own PR.
 4. Model ladder: take the first available model of `models`; check availability.
 5. Isolation through window 0: a worktree and branch, or a copy without `.git`, plus needed files; the agent in a jail; merge into a merge branch at the end.
 6. Quota: use left this week, part of the week gone, forecast, reset close (use it up), IBM on or off. The ladder obeys it.
-7. Retries: max tries, agent reset with a handoff.
+7. Retries: agent reset with a handoff. Move the limits (gate tries, tokens) from code to the profile.
 8. Profile choice: the main agent knows which profile fits which task.
 9. Stop rules for a hung agent (no progress timeout, max turns).
 10. Overview in window 0.

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createAgents, MAX_EVENTS } from "./agents.ts";
+import { createAgents, MAX_EVENTS, MAX_TOKENS } from "./agents.ts";
 import type { Timers } from "./lifecycle.ts";
 import type { ServerMessage } from "./protocol.ts";
 
@@ -71,6 +71,27 @@ function setup(options: { openFails?: boolean } = {}) {
 const ID = "abcdef12-0000-4000-8000-000000000000";
 const ARGS = ["--no-tools", "--no-mcp", "--model", "m/x:off", "--system-prompt", "You are a test."];
 const usage = { tokens: 10, cost: 0.5 };
+
+test("usage at the token limit asks for a handoff once; the next settle gives status handoff", async () => {
+  const { agents, toSub, toMains } = setup();
+  await agents.start("do it", ARGS, []);
+  agents.hello(ID);
+  toMains.length = 0;
+  agents.event(ID, { kind: "message", text: "a", usage: { tokens: MAX_TOKENS - 1, cost: 1 } });
+  assert.deepEqual(toSub, [[ID, { type: "task", task: "do it" }]]);
+  assert.equal(toMains.length, 0);
+  agents.event(ID, { kind: "message", text: "b", usage: { tokens: 1, cost: 1 } });
+  agents.event(ID, { kind: "message", text: "c", usage: { tokens: 5, cost: 1 } });
+  assert.deepEqual(toSub.slice(1), [[ID, { type: "handoff" }]]);
+  assert.equal(toMains.length, 0);
+  agents.event(ID, { kind: "settled", text: "done: a; open: b" });
+  assert.equal(agents.entries()[0]?.status, "handoff");
+  const message = toMains[0];
+  assert.ok(message?.type === "result");
+  assert.equal(message.status, "handoff");
+  assert.equal(message.text, "done: a; open: b");
+  assert.throws(() => agents.answer(ID, "go on"), /status "handoff"/);
+});
 
 test("start opens a window with the pi command, the env and a starting entry", async () => {
   const { agents, opened } = setup();

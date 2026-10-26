@@ -65,6 +65,7 @@ test("parseServerLine reads every server message and rejects the rest", () => {
   assert.deepEqual(parseServerLine('{"type":"error","message":"x"}'), { type: "error", message: "x" });
   assert.deepEqual(parseServerLine('{"type":"started","id":"a"}'), { type: "started", id: "a" });
   assert.deepEqual(parseServerLine('{"type":"task","task":"t"}'), { type: "task", task: "t" });
+  assert.deepEqual(parseServerLine('{"type":"handoff"}'), { type: "handoff" });
   const result = { type: "result" as const, id: "a", status: "idle" as const, text: "t", usage, events: ["e"] };
   assert.deepEqual(parseServerLine(formatServerMessage(result)), result);
   for (const status of ["question", "blocked"] as const) {

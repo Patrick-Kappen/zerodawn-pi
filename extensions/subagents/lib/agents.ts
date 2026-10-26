@@ -7,6 +7,7 @@ export const HELLO_TIMEOUT_MS = 30_000;
 export const POLL_MS = 2000;
 export const MAX_EVENTS = 20;
 export const MAX_LINE = 200;
+export const MAX_TOKENS = 100_000;
 
 export interface AgentsOptions {
   session: string;
@@ -33,6 +34,7 @@ interface AgentRecord {
   usage: Usage;
   helloTimer: unknown;
   pending?: { kind: "question" | "blocked"; text: string };
+  handingOff?: boolean;
 }
 
 function line(text: string): string {
@@ -77,7 +79,7 @@ export function createAgents(options: AgentsOptions) {
   function result(record: AgentRecord): AgentResult {
     return {
       id: record.entry.id,
-      status: record.entry.status === "failed" || record.entry.status === "question" || record.entry.status === "blocked" ? record.entry.status : "idle",
+      status: record.entry.status === "starting" || record.entry.status === "running" ? "idle" : record.entry.status,
       text: record.text,
       usage: record.usage,
       events: record.events,
@@ -187,12 +189,18 @@ export function createAgents(options: AgentsOptions) {
     if (record.events.length > MAX_EVENTS) record.events.shift();
     if (value.kind === "message") {
       record.usage = { tokens: record.usage.tokens + value.usage.tokens, cost: record.usage.cost + value.usage.cost };
+      if (record.usage.tokens >= MAX_TOKENS && record.entry.status === "running" && !record.handingOff) {
+        record.handingOff = true;
+        record.events.push(line(`token limit ${MAX_TOKENS} reached (${record.usage.tokens} tokens): handoff`));
+        options.sendToSub(id, { type: "handoff" });
+      }
     } else if (value.kind === "error") {
       fail(record, value.text);
     } else if (value.kind === "settled" && record.entry.status === "running") {
       const pending = record.pending;
       record.pending = undefined;
-      if (pending === undefined) finish(record, "idle", value.text);
+      if (record.handingOff) finish(record, "handoff", value.text);
+      else if (pending === undefined) finish(record, "idle", value.text);
       else finish(record, pending.kind, pending.text);
     }
   }
