@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
-SANDBOX=/tmp/pi-sandbox
-SESSION=pi-dev
+# One sandbox and session per checkout: two worktrees must not share one, or a test runs the other's code.
+name="$(basename "$root")"
+SANDBOX="/tmp/pi-sandbox-${name}"
+SESSION="pi-dev-${name}"
 MODEL="${PI_TEST_MODEL:-anthropic/claude-sonnet-5-5}"
 case "${1:-start}" in
   stop) exec tmux kill-session -t "${SESSION}" ;;
@@ -40,7 +42,7 @@ medium:
 slow:
     for i in $(seq 1 60); do echo "tick $i"; sleep 1; done
 EOF
-if tmux has-session -t ${SESSION} 2>/dev/null; then
+if tmux has-session -t "${SESSION}" 2>/dev/null; then
   echo "session ${SESSION} already runs; attach with: tmux attach -t ${SESSION}"
   exit 0
 fi
@@ -57,7 +59,7 @@ while IFS= read -r index; do
   [ -f "$index" ] || { echo "dev.sh: $index from subagentExtensions in $config does not exist" >&2; exit 1; }
   exts="$exts -e '$index'"
 done < <(jq -r '.subagentExtensions[]' "$config")
-tmux new-session -d -s ${SESSION} -x 160 -y 45 -c ${SANDBOX}
-tmux send-keys -t ${SESSION} -l -- "ZERODAWN_PI_CONFIG='$config' pi -ne -e builtin:codemode$exts --model '${MODEL}' ${PI_TEST_ARGS:-}"
-tmux send-keys -t ${SESSION} Enter
+tmux new-session -d -s "${SESSION}" -x 160 -y 45 -c "${SANDBOX}"
+tmux send-keys -t "${SESSION}" -l -- "ZERODAWN_PI_CONFIG='$config' pi -ne -e builtin:codemode$exts --model '${MODEL}' ${PI_TEST_ARGS:-}"
+tmux send-keys -t "${SESSION}" Enter
 echo "started session ${SESSION} in ${SANDBOX}; attach with: tmux attach -t ${SESSION}"
