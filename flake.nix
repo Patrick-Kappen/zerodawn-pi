@@ -36,6 +36,8 @@
       own = fileset: lib.fileset.difference fileset (lib.fileset.maybeMissing ./node_modules);
       # node_modules for tsc and the editor: pi and its dependencies (pi-ai, pi-tui, typebox, @types/node) from
       # the pi package of llm-agents, at the version the user runs. No lock file of its own, nothing to update by hand.
+      # The packages are in $out/node_modules, not in $out: bun resolves a dependency of a package from its real
+      # path, and finds typebox for pi-ai only in a parent directory named node_modules.
       pi = pkgs: llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.pi;
       piModules =
         pkgs:
@@ -50,9 +52,9 @@
           dontBuild = true;
           dontFixup = true;
           installPhase = ''
-            cp -r node_modules $out
-            mkdir -p $out/@earendil-works/pi-coding-agent
-            cp -r package.json dist $out/@earendil-works/pi-coding-agent/
+            mkdir -p $out/node_modules/@earendil-works/pi-coding-agent
+            cp -r node_modules/. $out/node_modules/
+            cp -r package.json dist $out/node_modules/@earendil-works/pi-coding-agent/
           '';
         };
       allSources = lib.fileset.toSource {
@@ -124,6 +126,7 @@
           ''
             cp -r "$src" src
             chmod -R u+w src
+            ln -s ${piModules pkgs}/node_modules src/node_modules
             cd src
             HOME="$TMPDIR" bun test
             touch "$out"
@@ -324,7 +327,7 @@
               ''
                 cp -r "$src" src
                 chmod -R u+w src
-                ln -s ${piModules pkgs} src/node_modules
+                ln -s ${piModules pkgs}/node_modules src/node_modules
                 cd src
                 tsc
                 touch "$out"
@@ -345,7 +348,7 @@
         {
           default = pkgs.mkShell {
             PRE_COMMIT_SHELL_HOOK = self.checks.${system}.pre-commit.shellHook;
-            NODE_MODULES = piModules pkgs;
+            NODE_MODULES = "${piModules pkgs}/node_modules";
             PI_VERSION = (pi pkgs).version;
             shellHook = "source scripts/shell-hook.sh";
             packages = [
