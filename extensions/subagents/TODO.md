@@ -1,0 +1,4 @@
+- Design: the control channel from the tool to the extension in the subagent (task, abort, steer), and the events back to the main pi UI.
+- Design: the stop rules for a hung agent (no progress timeout, max turns).
+- Design: the fixed flows and their steps.
+- Agent definitions: which agents, which tools, which model (first test: Haiku 5.5, no thinking).
