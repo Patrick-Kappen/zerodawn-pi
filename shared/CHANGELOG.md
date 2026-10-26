@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2 — 2026-10-26
+
+- diagnostics shows a missing command, no echoed option or summary
+
 ## 0.4.1 — 2026-10-26
 
 - tests: short check result: diagnostics only, deduplicated
