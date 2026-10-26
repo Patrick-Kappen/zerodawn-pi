@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2 — 2026-10-26
+
+### tests 0.2.2
+
+- no block; replace the bash result, background after 15 s
+
 ## 0.5.1 — 2026-10-26
 
 ### tests 0.2.1
