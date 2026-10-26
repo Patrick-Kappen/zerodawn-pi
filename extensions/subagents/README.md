@@ -31,7 +31,18 @@ The command is `pi -ne -ns -np -nc --no-themes -e <path> ... --model ... --sessi
 - The first `-e` is the subagents extension. It connects the subagent to the supervisor.
 - The other `-e` paths come from `subagentExtensions` in `config.json`, in order. Use it for a provider login extension.
 - Without `subagentExtensions`, the tool fails. Set `[]` to start with no extra extension.
-- Later, an agent file adds its own prompt, tools and extensions.
+- Later, an agent profile adds its own prompt, tools and extensions. See `PROFILES.md`.
+
+## Plan
+
+The steps are in `TODO.md`, one at a time.
+
+- **Profiles:** `~/.pi/agent/agents/<name>.md` defines all that a subagent gets: models, tools, extensions, skills, MCP, system prompt, extra checks. Repositories hold no profiles. Later, nullspace delivers the same files through its layer kind `agents/`.
+- **Done gate:** when a subagent stops, the repository tests and the checks of the profile run. Green: the subagent writes a short done description for the main agent. Red: the failures go back to the subagent.
+- **Model ladder:** a profile lists models in order, for example a free model, then IBM, then Haiku, then Sonnet. The tool takes the first available one. Later, quota decide too.
+- **Isolation:** window 0 gives each subagent its own worktree or a copy without `.git`, in a jail. The work goes to a merge branch at the end.
+- **Retries:** max tries, and an agent reset with a handoff.
+- **UI:** last.
 
 `just dev` reads the `config.json` of the installed package (through `ZERODAWN_PI_CONFIG`) and loads its `subagentExtensions` in the sandbox pi too. Set the Home Manager option `subagentExtensions` to your provider login extension, for example `anthropic-oauth/index.ts`.
 

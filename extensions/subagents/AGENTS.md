@@ -1,6 +1,6 @@
 # subagents
 
-The `subagent` tool: the main agent gives a task to a pi agent that runs in tmux. Read `README.md` for the design, `docs/decisions.md` entry 9 for the reasons.
+The `subagent` tool: the main agent gives a task to a pi agent that runs in tmux. Read `README.md` for the design and the plan, `PROFILES.md` for the profile format, `docs/decisions.md` entry 9 for the reasons.
 
 ## Rules
 
