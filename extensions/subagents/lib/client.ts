@@ -12,7 +12,7 @@ export interface Status {
 
 export interface Client {
   status(): Promise<Status>;
-  start(task: string, signal?: AbortSignal): Promise<AgentResult>;
+  start(task: string, args: string[], signal?: AbortSignal): Promise<AgentResult>;
   isOpen(): boolean;
   close(): void;
 }
@@ -87,7 +87,7 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
       });
     }
 
-    function start(task: string, signal?: AbortSignal): Promise<AgentResult> {
+    function start(task: string, args: string[], signal?: AbortSignal): Promise<AgentResult> {
       return new Promise<AgentResult>((resolve, reject) => {
         if (!open) {
           reject(new Error(`subagents: the connection to "${path}" is closed. Call the tool again to reconnect.`));
@@ -125,7 +125,7 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
           };
         }
         starts.push(waiter);
-        write({ type: "start", task });
+        write({ type: "start", task, args });
       });
     }
 

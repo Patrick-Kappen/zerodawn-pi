@@ -8,12 +8,12 @@ test: pi-version
 test-changed *files: pi-version
     scripts/test-changed.sh {{files}}
 
-# Fail when the pi of flake.lock (used by tests and types) is not the installed pi
+# Link node_modules to the pi packages of flake.lock; fail when the installed pi is another version
 pi-version:
     scripts/pi-version.sh
 
 # Type-check all TypeScript
-types:
+types: pi-version
     tsc
 
 # Lint and check the format

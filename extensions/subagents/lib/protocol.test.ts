@@ -8,7 +8,7 @@ test("parseClientLine accepts hello, status, start and events", () => {
   assert.deepEqual(parseClientLine('{"type":"hello","role":"main"}'), { type: "hello", role: "main" });
   assert.deepEqual(parseClientLine('{"type":"hello","role":"sub","id":"a"}'), { type: "hello", role: "sub", id: "a" });
   assert.deepEqual(parseClientLine('{"type":"status","extra":1}'), { type: "status" });
-  assert.deepEqual(parseClientLine('{"type":"start","task":"t"}'), { type: "start", task: "t" });
+  assert.deepEqual(parseClientLine('{"type":"start","task":"t","args":["--a","b c"]}'), { type: "start", task: "t", args: ["--a", "b c"] });
   for (const event of [
     { kind: "tool_start", name: "bash", args: "{}" },
     { kind: "tool_end", name: "bash", isError: false },
@@ -27,6 +27,8 @@ test("parseClientLine rejects bad lines with a reason", () => {
   assert.throws(() => parseClientLine('{"type":"hello"}'), /Use "main" or "sub"/);
   assert.throws(() => parseClientLine('{"type":"hello","role":"sub"}'), /field "id"/);
   assert.throws(() => parseClientLine('{"type":"start"}'), /field "task"/);
+  assert.throws(() => parseClientLine('{"type":"start","task":"t"}'), /field "args"/);
+  assert.throws(() => parseClientLine('{"type":"start","task":"t","args":[1]}'), /field "args"/);
   assert.throws(() => parseClientLine('{"type":"event"}'), /field "event"/);
   assert.throws(() => parseClientLine('{"type":"event","event":{"kind":"x"}}'), /unknown event kind/);
   assert.throws(() => parseClientLine('{"type":"event","event":{"kind":"tool_end","name":"a"}}'), /"isError"/);

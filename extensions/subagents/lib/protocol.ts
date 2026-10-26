@@ -23,7 +23,7 @@ export type ClientMessage =
   | { type: "hello"; role: "main" }
   | { type: "hello"; role: "sub"; id: string }
   | { type: "status" }
-  | { type: "start"; task: string }
+  | { type: "start"; task: string; args: string[] }
   | { type: "event"; event: SubEvent };
 
 export type ServerMessage =
@@ -93,8 +93,13 @@ export function parseClientLine(line: string): ClientMessage {
       if (message.role === "main") return { type: "hello", role: "main" };
       if (message.role === "sub") return { type: "hello", role: "sub", id: text(message, "id", "hello") };
       throw new Error(`protocol: hello has role ${JSON.stringify(message.role)}. Use "main" or "sub".`);
-    case "start":
-      return { type: "start", task: text(message, "task", "start") };
+    case "start": {
+      const task = text(message, "task", "start");
+      if (!Array.isArray(message.args) || message.args.some((arg) => typeof arg !== "string")) {
+        throw new Error('protocol: field "args" of "start" must be a list of strings. Fix the sender.');
+      }
+      return { type: "start", task, args: message.args as string[] };
+    }
     case "event":
       return { type: "event", event: parseEvent(message.event) };
   }

@@ -4,7 +4,7 @@ Delegate tasks to pi agents. Each agent runs as a normal interactive pi in a win
 
 Status: work in progress. The tool `subagent` has two actions:
 
-- `start` with `task`: the supervisor starts a pi agent (`anthropic/claude-haiku-5-5:off`) in a new window `sub-<first 4 characters of its id>`. The tool waits and returns the final answer.
+- `start` with `profile` and `task`: the supervisor starts a pi agent with that profile in a new window `sub-<first 4 characters of its id>`. The tool waits and returns the final answer.
 - `status`: starts or finds the supervisor, connects, and shows the agents.
 
 The result that the model sees is small: agent id, status, final text (cut at 8000 characters) and one line with tokens and cost. The last 20 events (200 characters each) go to `details` only.
@@ -26,12 +26,23 @@ The result that the model sees is small: agent id, status, final text (cut at 80
 
 ## What a subagent loads
 
-The command is `pi -ne -ns -np -nc --no-themes -e <path> ... --model ... --session-id ... --session-dir ...`. The flags turn off extension discovery, skills, prompt templates, context files and themes. Tools stay on.
+The command is `pi -ne -ns -np -nc --no-themes -e <path> ... <profile arguments> --session-id ... --session-dir ...`. The flags turn off extension discovery, skills, prompt templates, context files and themes. The profile decides the rest.
 
 - The first `-e` is the subagents extension. It connects the subagent to the supervisor.
 - The other `-e` paths come from `subagentExtensions` in `config.json`, in order. Use it for a provider login extension.
 - Without `subagentExtensions`, the tool fails. Set `[]` to start with no extra extension.
-- Later, an agent file adds its own prompt, tools and extensions.
+- The profile `~/.pi/agent/agents/<name>.md` adds its tools, extensions, skills, system prompt and first model. See `PROFILES.md`. The ladder and the `checks` are later steps.
+
+## Plan
+
+The steps are in `TODO.md`, one at a time.
+
+- **Profiles:** `~/.pi/agent/agents/<name>.md` defines all that a subagent gets: models, tools, extensions, skills, MCP, system prompt, extra checks. Repositories hold no profiles. Later, nullspace delivers the same files through its layer kind `agents/`.
+- **Done gate:** when a subagent stops, the repository tests and the checks of the profile run. Green: the subagent writes a short done description for the main agent. Red: the failures go back to the subagent.
+- **Model ladder:** a profile lists models in order, for example a free model, then IBM, then Haiku, then Sonnet. The tool takes the first available one. Later, quota decide too.
+- **Isolation:** window 0 gives each subagent its own worktree or a copy without `.git`, in a jail. The work goes to a merge branch at the end.
+- **Retries:** max tries, and an agent reset with a handoff.
+- **UI:** last.
 
 `just dev` reads the `config.json` of the installed package (through `ZERODAWN_PI_CONFIG`) and loads its `subagentExtensions` in the sandbox pi too. Set the Home Manager option `subagentExtensions` to your provider login extension, for example `anthropic-oauth/index.ts`.
 

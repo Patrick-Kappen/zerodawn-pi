@@ -73,7 +73,7 @@ test("real supervisor with a fake pi: one small result reaches main, the session
   const tmux = createTmux(exec, socket);
   const { session, socket: path } = await ensure(id, fakePi);
   const client = await connectMain(path, timers);
-  const result = await client.start("say hi");
+  const result = await client.start("say hi", ["--no-tools"]);
   assert.equal(result.status, "idle");
   assert.equal(result.text, "answer to: say hi");
   assert.deepEqual(result.usage, { tokens: 7, cost: 0.01 });
@@ -96,7 +96,7 @@ test("real supervisor: a command that dies without a hello is reported as failed
   sessionIds.push(id);
   const { session, socket: path } = await ensure(id, "false");
   const client = await connectMain(path, timers);
-  const result = await client.start("t");
+  const result = await client.start("t", ["--no-tools"]);
   assert.equal(result.status, "failed");
   assert.match(result.text, /window .* is gone.*tmux attach -t/);
   client.close();

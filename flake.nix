@@ -322,7 +322,7 @@
               };
               sync-branch = {
                 enable = true;
-                name = "repository behaviour matches the sibling branch of the same name";
+                name = "repository behaviour matches a sibling branch";
                 entry = "${pkgs.writeShellScript "sync-branch" ''
                   export PATH=${
                     pkgs.lib.makeBinPath [

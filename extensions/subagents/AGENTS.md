@@ -1,6 +1,6 @@
 # subagents
 
-The `subagent` tool: the main agent gives a task to a pi agent that runs in tmux. Read `README.md` for the design, `docs/decisions.md` entry 9 for the reasons.
+The `subagent` tool: the main agent gives a task to a pi agent that runs in tmux. Read `README.md` for the design and the plan, `PROFILES.md` for the profile format, `docs/decisions.md` entry 9 for the reasons.
 
 ## Rules
 
@@ -10,8 +10,8 @@ The `subagent` tool: the main agent gives a task to a pi agent that runs in tmux
 - The supervisor owns the subagents. The main pi and the subagents are clients only.
 - The same `index.ts` runs in the subagent. `PI_SUBAGENT_SOCKET` and `PI_SUBAGENT_ID` select that mode; setting only one fails. The subagent does not register the tool.
 - Small results: the tool result content has only id, status, final text, and one tokens/cost line. Never add events or tool calls to it. Events go to `details`, max 20 entries of 200 characters.
-- Tests pass `lib/fixtures/fake-pi.mjs` as `--pi`. Never start a real pi in a test.
-- A subagent starts with `-ne -ns -np -nc --no-themes` and loads only `-e` paths: this extension and `subagentExtensions` from `config.json`. Do not add `--no-tools` yet.
+- Tests pass a wrapper of `lib/fixtures/fake-pi.ts` as `--pi`. Never start a real pi in a test.
+- A subagent starts with `-ne -ns -np -nc --no-themes` and loads only `-e` paths: this extension and `subagentExtensions` from `config.json`. The profile arguments follow: the main pi reads and resolves the profile (it has HOME), and the supervisor only gets `args` in the `start` message.
 - Runtime files go to `/tmp/pi-sub-<id>/` only. Nothing in the project or in `~/.pi`.
 - Tests that need tmux use their own server with `tmux -L <socket>`. Never touch the user's tmux server.
 
@@ -20,4 +20,4 @@ The `subagent` tool: the main agent gives a task to a pi agent that runs in tmux
 - Make sure `--session-id`, `--session-dir` and `--append-system-prompt` still exist.
 - Make sure the event names that the subagent forwards still exist: `tool_execution_start`, `tool_execution_end`, `message_end`, `agent_settled`, and `pi.sendUserMessage`.
 - Make sure `-ne -ns -np -nc --no-themes` still exist.
-- Make sure `--model anthropic/claude-haiku-5-5:off` and `-e` still work.
+- Make sure `--model`, `--tools`, `--no-tools`, `--no-mcp`, `--skill`, `--system-prompt` and `-e` still work, and that `-e builtin:<name>` loads a builtin extension.
