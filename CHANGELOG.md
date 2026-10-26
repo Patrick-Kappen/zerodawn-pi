@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1 — 2026-10-26
+
+### tests 0.2.1
+
+- an option such as --error-on-warnings is not a warning
+
 ## 0.5.0 — 2026-10-26
 
 ### shared 0.3.0
