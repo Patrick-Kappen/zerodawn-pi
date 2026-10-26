@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 — 2026-10-26
+
+- guidelines say continue working while a job runs
+- guide a wait as one chained command, block a bare sleep
+- short messages, no prose in reports
+
 ## 0.3.0 — 2026-10-26
 
 - background after 15 s, status line result, errors only on failure
