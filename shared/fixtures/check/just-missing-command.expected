@@ -1,0 +1,2 @@
+sh: line 1: biome: command not found
+error: recipe `lint` failed on line 21 with exit code 127

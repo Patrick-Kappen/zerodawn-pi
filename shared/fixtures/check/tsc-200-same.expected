@@ -1,0 +1,2 @@
+/tmp/nix-shell.63kk59: line 2397: scripts/shell-hook.sh: No such file or directory
+many.ts(1,7), (2,7), (3,7), (4,7), (5,7), (6,7), (7,7), (8,7), (9,7), (10,7), +190 more: error TS2322: Type 'string' is not assignable to type 'number'.

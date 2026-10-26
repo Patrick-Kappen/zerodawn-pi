@@ -1,0 +1,3 @@
+/tmp/nix-shell.tyC192: line 2397: scripts/shell-hook.sh: No such file or directory
+Warning: Unused declarations were found.
+d.nix:2:5: Unused let binding: x

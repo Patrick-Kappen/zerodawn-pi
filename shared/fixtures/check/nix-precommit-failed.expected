@@ -1,0 +1,4 @@
+error: failed to build attribute 'checks.x86_64-linux.pre-commit', build of '/nix/store/jbczhwd6xkb6cl1hfj8sz71igrkjh8aq-pre-commit-run.drv^*' failed: Cannot build '/nix/store/jbczhwd6xkb6cl1hfj8sz71igrkjh8aq-pre-commit-run.drv'.
+Reason: builder failed with exit code 1.
+nix log /nix/store/jbczhwd6xkb6cl1hfj8sz71igrkjh8aq-pre-commit-run.drv
+error: recipe `check` failed on line 31 with exit code 1
