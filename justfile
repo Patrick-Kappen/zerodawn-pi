@@ -54,7 +54,7 @@ sync-check other=("../" + sibling):
 bump version extension="":
     scripts/bump.sh {{version}} {{extension}}
 
-# Start pi with all extensions in a detached tmux session, in a sandbox project; PI_TEST_ARGS adds pi arguments
+# Start pi with all extensions in a detached tmux session, in a sandbox project; PI_TEST_ARGS adds pi arguments, PI_DEV=<name> a separate session
 dev:
     scripts/dev.sh
 

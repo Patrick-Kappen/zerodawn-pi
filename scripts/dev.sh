@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
-# One sandbox and session per checkout: two worktrees must not share one, or a test runs the other's code.
-name="$(basename "$root")"
-SANDBOX="/tmp/pi-sandbox-${name}"
-SESSION="pi-dev-${name}"
+# PI_DEV=<name> gives a separate tmux session and sandbox, so two testers do not share one pi.
+suffix=""
+if [ -n "${PI_DEV:-}" ]; then
+  [[ "${PI_DEV}" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "dev.sh: PI_DEV='${PI_DEV}' is not a valid name; use letters, digits, - and _" >&2; exit 2; }
+  suffix="-${PI_DEV}"
+fi
+SANDBOX="/tmp/pi-sandbox${suffix}"
+SESSION="pi-dev${suffix}"
 MODEL="${PI_TEST_MODEL:-anthropic/claude-sonnet-5-5}"
 case "${1:-start}" in
   stop) exec tmux kill-session -t "${SESSION}" ;;
