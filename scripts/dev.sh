@@ -49,10 +49,14 @@ config="${HOME}/.pi/agent/packages/$(jq -r .name "$root/package.json")/config.js
 [ -f "$config" ] || { echo "dev.sh: $config does not exist; install the package with the Home Manager module first" >&2; exit 1; }
 exts=""
 for index in "$root"/extensions/*/index.ts; do exts="$exts -e '$index'"; done
+if ! jq -e '.subagentExtensions | type == "array"' "$config" >/dev/null; then
+  echo "dev.sh: $config has no subagentExtensions list; set the Home Manager option subagentExtensions" >&2
+  exit 1
+fi
 while IFS= read -r index; do
   [ -f "$index" ] || { echo "dev.sh: $index from subagentExtensions in $config does not exist" >&2; exit 1; }
   exts="$exts -e '$index'"
-done < <(jq -r '.subagentExtensions // [] | .[]' "$config")
+done < <(jq -r '.subagentExtensions[]' "$config")
 tmux new-session -d -s ${SESSION} -x 160 -y 45 -c ${SANDBOX}
 tmux send-keys -t ${SESSION} -l -- "ZERODAWN_PI_CONFIG='$config' pi -ne -e builtin:codemode$exts --model '${MODEL}' ${PI_TEST_ARGS:-}"
 tmux send-keys -t ${SESSION} Enter
