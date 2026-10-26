@@ -200,9 +200,17 @@ The main pi connects to the supervisor when the first subagent starts. At `sessi
 ## Changes
 
 <!-- changelog:start -->
-## 0.6.0 — 2026-10-26
+## 0.7.0 — 2026-10-26
 
-- strict ask and blocker, enforced handoff tool
+- merge action with a merge agent on a conflict
+
+- the subagent commits with its own subject
+
+- a git worktree and branch per subagent
+
+- agent calls done, gate runs, green forces a handoff
+
+- enforced done tool with a git check of the changes
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

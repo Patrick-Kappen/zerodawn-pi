@@ -58,11 +58,11 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 ## Changes
 
 <!-- changelog:start -->
-## 0.4.0 — 2026-10-26
+## 0.4.1 — 2026-10-26
 
-- shared: keep diagnostics and warningCount as released
+- bash: a command that moves to the background ends the turn
 
-- anomalies file, nixfmt check, results by call number
+- bash: end the turn when only jobs are left, not jobs wait
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

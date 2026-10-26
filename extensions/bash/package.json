@@ -1,6 +1,6 @@
 {
   "name": "bash",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "`bash` tool in a PTY, job dashboard, background jobs with reports, `jobs` tool",
   "type": "module"
 }
