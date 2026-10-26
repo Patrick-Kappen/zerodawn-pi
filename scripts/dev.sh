@@ -44,9 +44,16 @@ if tmux has-session -t ${SESSION} 2>/dev/null; then
   echo "session ${SESSION} already runs; attach with: tmux attach -t ${SESSION}"
   exit 0
 fi
-tmux new-session -d -s ${SESSION} -x 160 -y 45 -c ${SANDBOX}
+# The sandbox uses the config of the installed package, so it gets the same login extensions as the user's pi.
+config="${HOME}/.pi/agent/packages/$(jq -r .name "$root/package.json")/config.json"
+[ -f "$config" ] || { echo "dev.sh: $config does not exist; install the package with the Home Manager module first" >&2; exit 1; }
 exts=""
 for index in "$root"/extensions/*/index.ts; do exts="$exts -e '$index'"; done
-tmux send-keys -t ${SESSION} -l -- "pi -ne -e builtin:codemode$exts --model '${MODEL}' ${PI_TEST_ARGS:-}"
+while IFS= read -r index; do
+  [ -f "$index" ] || { echo "dev.sh: $index from subagentExtensions in $config does not exist" >&2; exit 1; }
+  exts="$exts -e '$index'"
+done < <(jq -r '.subagentExtensions // [] | .[]' "$config")
+tmux new-session -d -s ${SESSION} -x 160 -y 45 -c ${SANDBOX}
+tmux send-keys -t ${SESSION} -l -- "ZERODAWN_PI_CONFIG='$config' pi -ne -e builtin:codemode$exts --model '${MODEL}' ${PI_TEST_ARGS:-}"
 tmux send-keys -t ${SESSION} Enter
 echo "started session ${SESSION} in ${SANDBOX}; attach with: tmux attach -t ${SESSION}"

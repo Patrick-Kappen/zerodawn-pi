@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { CONFIG_FILE, readConfig } from "./config.ts";
+import { CONFIG_ENV, CONFIG_FILE, configFile, readConfig } from "./config.ts";
 
 test("config.json lives next to package.json", () => {
   assert.equal(CONFIG_FILE, join(import.meta.dirname, "..", "config.json"));
@@ -25,4 +25,41 @@ test("readConfig: missing file is empty, valid values pass, wrong values fail wi
   } finally {
     rmSync(dir, { recursive: true });
   }
+});
+
+test("readConfig: subagentExtensions accepts absolute paths and an empty list, rejects the rest", () => {
+  const dir = mkdtempSync(join(tmpdir(), "config-"));
+  const file = join(dir, "config.json");
+  try {
+    writeFileSync(file, JSON.stringify({ subagentExtensions: ["/a/index.ts", "/b/index.ts"] }));
+    assert.deepEqual(readConfig(file), { subagentExtensions: ["/a/index.ts", "/b/index.ts"] });
+    writeFileSync(file, JSON.stringify({ subagentExtensions: [] }));
+    assert.deepEqual(readConfig(file), { subagentExtensions: [] });
+    for (const bad of ["/a", ["a/index.ts"], [3], [""], {}]) {
+      writeFileSync(file, JSON.stringify({ subagentExtensions: bad }));
+      assert.throws(() => readConfig(file), new RegExp(`${file}: "subagentExtensions" must be an array of absolute paths`));
+    }
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test("readConfig: a config with only the old keys reads unchanged", () => {
+  const dir = mkdtempSync(join(tmpdir(), "config-"));
+  const file = join(dir, "config.json");
+  try {
+    writeFileSync(file, JSON.stringify({ astGrep: "/bin/ast-grep" }));
+    assert.deepEqual(readConfig(file), { astGrep: "/bin/ast-grep" });
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test("configFile: without ZERODAWN_PI_CONFIG it is the file next to package.json", () => {
+  assert.equal(configFile({}), CONFIG_FILE);
+});
+
+test("configFile: ZERODAWN_PI_CONFIG points to another absolute file, a relative path fails", () => {
+  assert.equal(configFile({ [CONFIG_ENV]: "/etc/pi/config.json" }), "/etc/pi/config.json");
+  assert.throws(() => configFile({ [CONFIG_ENV]: "config.json" }), /must be an absolute path/);
 });

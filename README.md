@@ -13,6 +13,7 @@ Extensions for [pi](https://pi.dev), the terminal coding agent, packaged as one 
 | [ui](extensions/ui/README.md) | `/view` (normal, compact, text, silent), `/messages` (row, rule), a one-line footer, code blocks without fences, a working indicator without tool names. |
 | [ast-grep](extensions/ast-grep/README.md) | `ast_grep` tool: structural search by code pattern with `$NAME` and `$$$`; `rewrite` previews, never writes. |
 | [opencode](extensions/opencode/README.md) | `opencode` tool: hands one task to an OpenCode agent in the same project and returns its report. |
+| [subagents](extensions/subagents/README.md) | Work in progress. Delegates tasks to pi agents in a detached tmux session per main agent; a supervisor in window 0 owns them. |
 | [systemstate](extensions/systemstate/README.md) | Puts the active NixOS system and, inside your flake checkout, the deployed revision against `HEAD` in the system prompt; updates them during the session. |
 | [watchdog](extensions/watchdog/README.md) | Detects a run that hangs, asks a classifier model to confirm, aborts, goes back to the last good point and continues. `/unstick` does it by hand. |
 | [gateway](extensions/gateway/README.md) | Sends the pi session id to agentgateway so its logs group requests by session. |
@@ -59,7 +60,7 @@ Clone the repository and add it to `~/.pi/agent/settings.json`:
 { "packages": ["/path/to/zerodawn-pi"] }
 ```
 
-Some extensions read `config.json` next to `package.json`; copy `config.example.json`. All keys are optional: `astGrep` (path of the binary; default from `PATH`), `nixosRepo` (checkout of your NixOS flake). A key with a wrong type fails at load with the file path.
+Some extensions read `config.json` next to `package.json`; copy `config.example.json`. All keys are optional: `astGrep` (path of the binary; default from `PATH`), `nixosRepo` (checkout of your NixOS flake), `subagentExtensions` (absolute paths of extensions that every subagent loads, for example a provider login). `ZERODAWN_PI_CONFIG` points to another `config.json`; `just dev` uses it for the config of the installed package. A key with a wrong type fails at load with the file path.
 
 ## Docs
 

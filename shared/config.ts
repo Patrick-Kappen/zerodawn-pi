@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-export type Config = { astGrep?: string; nixosRepo?: string };
+export type Config = { astGrep?: string; nixosRepo?: string; subagentExtensions?: string[] };
 
 export const CONFIG_FILE = fileURLToPath(new URL("../config.json", import.meta.url));
 
@@ -12,6 +12,10 @@ function check(raw: unknown, file: string): Config {
   const r = raw as Record<string, unknown>;
   for (const key of ["astGrep", "nixosRepo"] as const) {
     if (r[key] !== undefined && !isString(r[key])) throw new Error(`${file}: "${key}" must be a non-empty string.`);
+  }
+  const list = r.subagentExtensions;
+  if (list !== undefined && !(Array.isArray(list) && list.every((p) => isString(p) && p.startsWith("/")))) {
+    throw new Error(`${file}: "subagentExtensions" must be an array of absolute paths.`);
   }
   return r as Config;
 }
@@ -31,9 +35,19 @@ export function readConfig(file: string): Config {
   }
 }
 
+export const CONFIG_ENV = "ZERODAWN_PI_CONFIG";
+
+// The dev sandbox runs the worktree code with the config of the installed package.
+export function configFile(env: NodeJS.ProcessEnv = process.env): string {
+  const value = env[CONFIG_ENV];
+  if (value === undefined) return CONFIG_FILE;
+  if (!value.startsWith("/")) throw new Error(`zerodawn-pi: ${CONFIG_ENV} must be an absolute path, got "${value}".`);
+  return value;
+}
+
 let loaded: Config | undefined;
 
 export function config(): Config {
-  loaded ??= readConfig(CONFIG_FILE);
+  loaded ??= readConfig(configFile());
   return loaded;
 }

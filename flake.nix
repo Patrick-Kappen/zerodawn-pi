@@ -106,7 +106,7 @@
             ) (./extensions + "/${name}"))
           ];
         };
-      # The job tests spawn bash and script in a PTY; the sandbox has /dev/pts.
+      # The job tests spawn bash and script in a PTY; the sandbox has /dev/pts. The subagents tests start their own tmux server.
       runTests =
         pkgs: name: src:
         pkgs.runCommand "tests-${name}"
@@ -114,6 +114,7 @@
             inherit src;
             nativeBuildInputs = [
               pkgs.bun
+              pkgs.tmux
               pkgs.bashInteractive
               pkgs.util-linux
               pkgs.coreutils
@@ -173,6 +174,7 @@
           settings = lib.filterAttrs (_: v: v != null) {
             astGrep = lib.getExe cfg.astGrep;
             inherit (cfg) nixosRepo;
+            subagentExtensions = if cfg.subagentExtensions == [ ] then null else cfg.subagentExtensions;
           };
           # The extensions read config.json next to package.json, so it is copied into the package.
           configured = pkgs.runCommand "${cfg.package.name}-configured" { } ''
@@ -224,6 +226,11 @@
               type = lib.types.nullOr lib.types.str;
               default = null;
               description = "Checkout of the NixOS flake that built this system. systemstate reports the deployed revision against it.";
+            };
+            subagentExtensions = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [ ];
+              description = "Absolute paths of extensions that every subagent loads, for example a provider login extension.";
             };
             logCleanup = {
               enable = lib.mkOption {
