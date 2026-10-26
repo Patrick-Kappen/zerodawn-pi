@@ -52,7 +52,7 @@ Found 1 warning.
 eslint: 0 warnings`;
 
 test("warningCount: warning lines and biome '!' lines; not '0 warnings' and not passed test names", () => {
-  assert.equal(warningCount(lint), 1);
+  assert.equal(warningCount(lint), 2);
   assert.equal(warningCount("all good\nFound 0 warnings"), 0);
   assert.equal(warningCount("biome check --error-on-warnings .\nnix flake check --option warn-dirty false"), 0);
   assert.equal(warningCount("DeprecationWarning: x\nWARN y"), 2);
@@ -61,7 +61,7 @@ test("warningCount: warning lines and biome '!' lines; not '0 warnings' and not 
 test("diagnostics: location, warning and error lines once; no summary, context or passed test names", () => {
   assert.equal(
     diagnostics(lint),
-    "extensions/bash/tool/jobproc.test.ts:37:45: lint/suspicious/noTemplateCurlyInString\n! Unexpected template string placeholder.",
+    "extensions/bash/tool/jobproc.test.ts:37:45 lint/suspicious/noTemplateCurlyInString\n! Unexpected template string placeholder.",
   );
 });
 

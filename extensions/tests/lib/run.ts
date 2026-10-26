@@ -5,7 +5,7 @@ import { callFileId, callOutFile, shorten } from "../../../shared/store.ts";
 import { CHANGED_RECIPE, changedFiles, execute, inGit, plan, type Run, reader, TIMEOUT_MS } from "../../../shared/testrun.ts";
 import { absolutePath } from "../../../shared/util.ts";
 import { loadRecipes } from "./recipes.ts";
-import { counts, type Diagnosis, diagnose, failures, warningCount } from "./report.ts";
+import { counts, type Diagnosis, diagnose, failures, warningLines } from "./report.ts";
 
 const INLINE_MS = 15 * 1000;
 const RERUN = "# rerun";
@@ -28,7 +28,7 @@ function noteAnomaly(d: Diagnosis, command: string, log: string): void {
 
 /** One line for green; for red the failures of a test run, or the diagnostics of a check or a warning; the full output in the log. A warning makes a run red. */
 function report(run: Run, kind: "tests" | "check", command: string, uncovered: string[], log: string): { text: string; ok: boolean } {
-  const warned = warningCount(run.output);
+  const warned = warningLines(run.output);
   const failed = run.code !== 0 || run.timedOut;
   const ok = !failed && !warned && !uncovered.length;
   const status = run.timedOut ? `stopped after ${TIMEOUT_MS / 60000} min` : (counts(run.output) ?? `exit ${run.code}`);

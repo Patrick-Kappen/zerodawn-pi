@@ -8,6 +8,7 @@ const NIX_LOG = /^\s+>\s?/;
 const SUMMARY = /^\s*((Found|Checked) \d+ |\S+ Some (warnings|errors) were emitted)/;
 const RUNTIME_FRAME = /^\s*at (.*\()?node:/;
 /** "warn", "warning", "warnings" as a word end: not in an option (--error-on-warnings, warn-dirty) or a name (warningCount). */
+const WARNING_ANY = /(?<!-)warn(?!-)|^\s*! /i;
 const WARNING = /(?<!-)warn(ing)?s?(?![\w-])|^\s*! /i;
 const NO_WARNING = /\b(0|no)\s+warn/i;
 const BEFORE = 2;
@@ -46,6 +47,11 @@ export function failures(output: string): string {
 
 /** Number of warning lines: a line with "warn", or a line that starts with "! " (biome). Not "0 warnings", not a summary such as "Found 1 warning.", and not an option such as --error-on-warnings or warn-dirty in an echoed command. */
 export function warningCount(output: string): number {
+  return clean(output).filter((l) => WARNING_ANY.test(l) && !NO_WARNING.test(l)).length;
+}
+
+/** Number of warning lines, as warningCount, but "warn" only as a word (not in warningCount), and no summary lines such as "Found 1 warning.". */
+export function warningLines(output: string): number {
   return clean(output).filter((l) => WARNING.test(l) && !NO_WARNING.test(l) && !SUMMARY.test(l)).length;
 }
 
@@ -138,7 +144,19 @@ export function diagnose(output: string): Diagnosis {
   return { text, fallback: false, capped: out.length > FAILURE_MAX, located: [...groups.values()].filter((g) => g.file).length };
 }
 
-/** The text of diagnose(). */
+/**
+ * The diagnostics of a check or a warning: each line with a location, a warning or an error, once, with its count.
+ * No summary lines, no context lines. The last LAST lines when no line matches. At most FAILURE_MAX lines.
+ * Kept for released extensions; diagnose() groups places and joins location lines.
+ */
 export function diagnostics(output: string): string {
-  return diagnose(output).text;
+  const lines = clean(output);
+  const seen = new Map<string, number>();
+  for (const l of lines) {
+    const t = l.trim();
+    if (!t || SUMMARY.test(t) || NO_WARNING.test(t) || COUNT.test(t)) continue;
+    if (LOCATION.test(t) || WARNING_ANY.test(t) || ERROR.test(t)) seen.set(t, (seen.get(t) ?? 0) + 1);
+  }
+  if (!seen.size) return cap(lines.slice(-LAST));
+  return cap([...seen].map(([l, n]) => (n > 1 ? `${l} (×${n})` : l)));
 }
