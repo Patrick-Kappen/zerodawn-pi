@@ -154,21 +154,8 @@
         };
     in
     {
-      # nix fmt: format every .nix file of the tree; bare nixfmt would wait on stdin.
-      formatter = forAll (
-        { pkgs, ... }:
-        pkgs.writeShellApplication {
-          name = "fmt-nix";
-          runtimeInputs = [
-            pkgs.nixfmt
-            pkgs.findutils
-          ];
-          text = ''
-            if [ $# -gt 0 ]; then exec nixfmt "$@"; fi
-            find . -name '*.nix' -not -path './node_modules/*' -not -path './.direnv/*' -print0 | xargs -0 nixfmt
-          '';
-        }
-      );
+      # treefmt, so nix fmt -- --fail-on-change FILES checks the staged files in the git pre-commit hook.
+      formatter = forAll ({ pkgs, ... }: pkgs.nixfmt-tree);
 
       packages = forAll (
         { pkgs, ... }: rec {
