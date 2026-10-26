@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0 — 2026-10-26
+
+- done gate runs the tests in the subagent
+
 ## 0.3.0 — 2026-10-26
 
 - ask and blocker tools, answer action

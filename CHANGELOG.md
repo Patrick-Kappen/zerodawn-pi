@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.0 — 2026-10-26
+
+### shared 0.4.0
+
+- subagents: done gate runs the tests in the subagent
+
+### subagents 0.4.0
+
+- done gate runs the tests in the subagent
+
+### tests 0.3.0
+
+- subagents: done gate runs the tests in the subagent
+
 ## 0.7.0 — 2026-10-26
 
 ### subagents 0.3.0

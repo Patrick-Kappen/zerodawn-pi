@@ -27,11 +27,9 @@ Tests: `util.test.ts`, `store.test.ts`, `config.test.ts`, `testrun.test.ts`. The
 ## Changes
 
 <!-- changelog:start -->
-## 0.3.0 — 2026-10-26
+## 0.4.0 — 2026-10-26
 
-- tests: add run_tests tool, block test commands in bash
-- subagents: dev sandbox uses the config of the installed package
-- subagents: start subagents with nothing but explicit extensions
+- subagents: done gate runs the tests in the subagent
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
