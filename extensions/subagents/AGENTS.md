@@ -1,23 +1,15 @@
 # subagents
 
-The `subagent` tool: the main agent gives a task to a pi agent. Each agent runs as a separate pi process in a window of one dedicated tmux session.
+The `subagent` tool: the main agent gives a task to a pi agent that runs in tmux. Read `README.md` for the design, `docs/decisions.md` entry 9 for the reasons.
 
-Reference: the pi example `examples/extensions/subagent` (single, parallel and chain modes, agents as markdown with frontmatter).
+## Need to know
 
-## Design
-
-- The tool does all tmux work in TypeScript (`lib/tmux.ts`), through `pi.exec` without a shell. No shell scripts.
-- tmux is the register. No agent writes files to register itself.
-- Each main agent gets one detached tmux session `pi-sub-<first 8 characters of its pi session id>`. Each subagent gets one window in that session.
-- The tool controls a subagent through the extension, not by typing into its chat (no `tmux send-keys`).
-
-## Requirements
-
-- Each agent runs in the tmux session, so the user can attach and watch it.
-- The tool calls of the agent show in the pi UI of the main agent, live.
-- A hung agent stops: a timeout on no progress, and a limit on turns. The tool reports which limit stopped it.
-- Agents do the task and nothing more: narrow system prompts and narrow tool sets per agent.
-- Fixed flows (for example scout, plan, work, review) run as defined steps, not as free choices of the main agent.
+- No shell scripts. All tmux work is TypeScript in `lib/tmux.ts`, through an exec function with an argument list.
+- Never use `tmux send-keys` to control an agent. Control goes through the supervisor socket.
+- The supervisor (`supervisor.ts`) runs under `process.execPath` of pi: node 24 or bun. Use only `node:` modules and erasable TypeScript (no enum, no namespace, no parameter properties).
+- The supervisor owns the subagents. The main pi and the subagents are clients only.
+- Runtime files go to `/tmp/pi-sub-<id>/` only. Nothing in the project or in `~/.pi`.
+- Tests that need tmux use their own server with `tmux -L <socket>`. Never touch the user's tmux server.
 
 ## Needs
 
@@ -25,4 +17,5 @@ Reference: the pi example `examples/extensions/subagent` (single, parallel and c
 
 ## After a pi upgrade
 
-- Make sure the JSON event format of `pi --mode json` did not change.
+- Make sure `--session-id`, `--session-dir` and `--append-system-prompt` still exist.
+- Make sure the event names that the subagent forwards still exist.

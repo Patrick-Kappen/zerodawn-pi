@@ -2,13 +2,13 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 9. Subagents run as pi processes in tmux, owned by a supervisor (2026-10-26)
+
+The `subagents` extension starts each subagent as a normal interactive pi in a window of a detached tmux session `pi-sub-<first 8 characters of the pi session id>`, one session per main agent. The user can attach and watch the real pi UI, and a hung subagent cannot block the main pi. A supervisor in window 0 owns the subagents; the main pi and the subagents are clients of its Unix socket. Reason: neither agent owns the lifecycle, so a subagent can finish after the main pi stops, and a 2 hour timer cleans up after a crash. Runtime state and subagent sessions go to `/tmp/pi-sub-<id>/`, so a reboot removes them. The supervisor runs under the runtime of pi (`process.execPath`), so it needs no extra dependency. No shell scripts and no `tmux send-keys`. Rejected: the SDK inside the main pi process (no own UI, a hang blocks the main agent), and `--mode json` or `--mode rpc` in tmux (the pane shows JSON, not the pi UI).
+
 ## 8. Release workflow: feature PRs do not bump, one release PR bumps what changed (2026-10-25)
 
 Feature PRs merge continuously. `just bump-changed` bumps every extension that changed since its last tag, and the package, and writes the changelog sections from the commit subjects. CI runs `release-check` only on a PR that changes the package version, and tags only on its merge. Reason: several PRs can land between releases without version conflicts, and the tags still mark what was tested together.
-
-## 8. Subagents run as pi processes in tmux, with tmux as the register (2026-10-26)
-
-The `subagents` extension starts each subagent as a normal interactive pi in a window of a detached tmux session `pi-sub-<first 8 characters of the pi session id>`, one session per main agent. The user can attach and watch the real pi UI, and a hung subagent cannot block the main pi. tmux holds the register: no agent writes files to register itself. The tool calls tmux from TypeScript through `pi.exec`, without a shell. The tool controls a subagent through the extension, not by typing into its chat. Rejected: the SDK inside the main pi process (no own UI, a hang blocks the main agent), and `--mode json` or `--mode rpc` in tmux (the pane shows JSON, not the pi UI).
 
 ## 7. Changelog from commit subjects (2026-10-25)
 
