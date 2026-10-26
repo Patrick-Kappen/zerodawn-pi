@@ -15,6 +15,11 @@ socket.on("data", (chunk) => {
     const message = JSON.parse(buffer.slice(0, i));
     buffer = buffer.slice(i + 1);
     if (message.type !== "task") continue;
+    if (message.task === "ASK") {
+      send({ type: "ask", text: "which db?" });
+      send({ type: "event", event: { kind: "settled", text: "asked" } });
+      continue;
+    }
     send({ type: "event", event: { kind: "tool_start", name: "bash", args: "x".repeat(200) } });
     send({ type: "event", event: { kind: "tool_end", name: "bash", isError: false } });
     send({ type: "event", event: { kind: "message", text: "working", usage: { tokens: 7, cost: 0.01 } } });

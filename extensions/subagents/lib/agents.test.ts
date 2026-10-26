@@ -136,6 +136,65 @@ test("hello sends the task and sets running; settle sets idle and sends one resu
   ]);
 });
 
+test("ask then settle gives status question with the text, then clears it", async () => {
+  const { agents, toMains } = setup();
+  await agents.start("t", ARGS);
+  agents.hello(ID);
+  agents.pending(ID, "question", "which db?");
+  assert.equal(agents.entries()[0]?.status, "running");
+  agents.event(ID, { kind: "settled", text: "final text" });
+  assert.equal(agents.entries()[0]?.status, "question");
+  assert.equal(agents.running(), false);
+  assert.deepEqual(
+    toMains.map((message) => message.type === "result" && [message.status, message.text]),
+    [["question", "which db?"]],
+  );
+  agents.answer(ID, "sqlite");
+  agents.event(ID, { kind: "settled", text: "done" });
+  assert.deepEqual(toMains.map((message) => message.type === "result" && [message.status, message.text]).at(-1), ["idle", "done"]);
+});
+
+test("blocker then settle gives status blocked", async () => {
+  const { agents, toMains } = setup();
+  await agents.start("t", ARGS);
+  agents.hello(ID);
+  agents.pending(ID, "blocked", "no access");
+  agents.event(ID, { kind: "settled", text: "x" });
+  assert.equal(agents.entries()[0]?.status, "blocked");
+  assert.deepEqual(
+    toMains.map((message) => message.type === "result" && [message.status, message.text]),
+    [["blocked", "no access"]],
+  );
+});
+
+test("answer sends the text as a task and sets running, from idle, question and blocked", async () => {
+  const { agents, toSub } = setup();
+  await agents.start("t", ARGS);
+  agents.hello(ID);
+  agents.event(ID, { kind: "settled", text: "x" });
+  agents.answer(ID, "more");
+  assert.deepEqual(toSub.at(-1), [ID, { type: "task", task: "more" }]);
+  assert.equal(agents.entries()[0]?.status, "running");
+  assert.equal(agents.running(), true);
+  agents.pending(ID, "blocked", "r");
+  agents.event(ID, { kind: "settled", text: "x" });
+  agents.answer(ID, "fixed");
+  assert.equal(agents.entries()[0]?.status, "running");
+});
+
+test("answer and pending errors: unknown id, wrong status, empty text", async () => {
+  const { agents } = setup();
+  await agents.start("t", ARGS);
+  assert.throws(() => agents.answer(ID, "x"), /status "starting"/);
+  agents.hello(ID);
+  assert.throws(() => agents.answer(ID, "x"), /status "running"/);
+  assert.throws(() => agents.answer("nope", "x"), /no subagent/);
+  assert.throws(() => agents.answer(ID, "  "), /non-empty/);
+  assert.throws(() => agents.pending("nope", "question", "q"), /no subagent/);
+  agents.event(ID, { kind: "settled", text: "x" });
+  assert.throws(() => agents.pending(ID, "question", "q"), /status "idle"/);
+});
+
 test("only the last 20 events are kept, each at most 200 characters", async () => {
   const { agents, toMains } = setup();
   await agents.start("t", ARGS);

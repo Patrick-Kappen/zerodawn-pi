@@ -39,7 +39,7 @@ test("builtin, package extension, skill, tools, first model and prompt as one ar
     "--skill",
     join(home, ".pi/agent/skills/lint"),
     "--tools",
-    "read,mcp__gh__*",
+    "read,mcp__gh__*,ask,blocker",
     "--model",
     "m/one:off",
     "--system-prompt",
@@ -48,13 +48,13 @@ test("builtin, package extension, skill, tools, first model and prompt as one ar
   assert.deepEqual(loaded.models, ["m/one:off", "m/two"]);
 });
 
-test("empty tools give --no-tools and --no-mcp; a tool list without mcp__ gives --no-mcp", async () => {
+test("--tools always has ask and blocker; a tool list without mcp__ gives --no-mcp", async () => {
   await profile("none", "tools: []");
-  assert.deepEqual((await resolveProfile(home, "none", nodeFiles)).args.slice(0, 2), ["--no-tools", "--no-mcp"]);
+  assert.deepEqual((await resolveProfile(home, "none", nodeFiles)).args.slice(0, 3), ["--tools", "ask,blocker", "--no-mcp"]);
   await profile("some", "tools: [read]");
-  assert.deepEqual((await resolveProfile(home, "some", nodeFiles)).args.slice(0, 3), ["--tools", "read", "--no-mcp"]);
+  assert.deepEqual((await resolveProfile(home, "some", nodeFiles)).args.slice(0, 3), ["--tools", "read,ask,blocker", "--no-mcp"]);
   await profile("absent", "");
-  assert.deepEqual((await resolveProfile(home, "absent", nodeFiles)).args.slice(0, 2), ["--no-tools", "--no-mcp"]);
+  assert.deepEqual((await resolveProfile(home, "absent", nodeFiles)).args.slice(0, 3), ["--tools", "ask,blocker", "--no-mcp"]);
 });
 
 test("missing extension and missing skill are errors with names and paths", async () => {

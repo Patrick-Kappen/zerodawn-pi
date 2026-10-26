@@ -25,6 +25,12 @@ test("details keep at most 20 events of at most 200 characters", () => {
   assert.ok(shaped.details.events[0]?.startsWith("10"));
 });
 
+test("question and blocked results have only id, status and text", () => {
+  for (const status of ["question", "blocked"] as const) {
+    assert.equal(shapeResult({ ...base, status, text: "which db?" }).content[0]?.text, `agent abc\nstatus: ${status}\nwhich db?`);
+  }
+});
+
 test("a failed result shows its status", () => {
   assert.match(shapeResult({ ...base, status: "failed", text: "boom" }).content[0]?.text ?? "", /status: failed\nboom/);
 });

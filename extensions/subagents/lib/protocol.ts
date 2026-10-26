@@ -11,9 +11,11 @@ export type SubEvent =
   | { kind: "message"; text: string; usage: Usage }
   | { kind: "settled"; text: string };
 
+export type AgentStatus = "idle" | "failed" | "question" | "blocked";
+
 export interface AgentResult {
   id: string;
-  status: "idle" | "failed";
+  status: AgentStatus;
   text: string;
   usage: Usage;
   events: string[];
@@ -24,6 +26,9 @@ export type ClientMessage =
   | { type: "hello"; role: "sub"; id: string }
   | { type: "status" }
   | { type: "start"; task: string; args: string[] }
+  | { type: "answer"; id: string; text: string }
+  | { type: "ask"; text: string }
+  | { type: "blocker"; text: string }
   | { type: "event"; event: SubEvent };
 
 export type ServerMessage =
@@ -100,10 +105,16 @@ export function parseClientLine(line: string): ClientMessage {
       }
       return { type: "start", task, args: message.args as string[] };
     }
+    case "answer":
+      return { type: "answer", id: text(message, "id", "answer"), text: text(message, "text", "answer") };
+    case "ask":
+      return { type: "ask", text: text(message, "text", "ask") };
+    case "blocker":
+      return { type: "blocker", text: text(message, "text", "blocker") };
     case "event":
       return { type: "event", event: parseEvent(message.event) };
   }
-  throw new Error(`protocol: unknown message type ${JSON.stringify(message.type)}. Use "hello", "status", "start" or "event".`);
+  throw new Error(`protocol: unknown message type ${JSON.stringify(message.type)}. Use "hello", "status", "start", "answer", "ask", "blocker" or "event".`);
 }
 
 export function formatServerMessage(message: ServerMessage): string {
@@ -129,7 +140,7 @@ export function parseServerLine(line: string): ServerMessage {
       }
       break;
     case "result": {
-      if (message.status !== "idle" && message.status !== "failed") break;
+      if (message.status !== "idle" && message.status !== "failed" && message.status !== "question" && message.status !== "blocked") break;
       if (!Array.isArray(message.events) || message.events.some((event) => typeof event !== "string")) break;
       return {
         type: "result",

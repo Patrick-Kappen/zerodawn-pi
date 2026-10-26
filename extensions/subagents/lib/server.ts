@@ -175,6 +175,17 @@ export async function startSupervisor(options: SupervisorOptions) {
           (error: Error) => send(socket, { type: "error", message: error.message }),
         );
         return;
+      case "answer":
+        if (connection.role !== "main") throw new Error('supervisor: only a connection with hello role "main" can answer a subagent.');
+        agents.answer(message.id, message.text);
+        send(socket, { type: "started", id: message.id });
+        return;
+      case "ask":
+      case "blocker":
+        if (connection.role !== "sub" || connection.id === undefined)
+          throw new Error(`supervisor: only a connection with hello role "sub" can send "${message.type}".`);
+        agents.pending(connection.id, message.type === "ask" ? "question" : "blocked", message.text);
+        return;
       case "event":
         if (connection.role !== "sub" || connection.id === undefined) throw new Error('supervisor: only a connection with hello role "sub" can send events.');
         agents.event(connection.id, message.event);

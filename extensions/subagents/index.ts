@@ -31,6 +31,25 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
   pi.on("session_start", async (_event, ctx) => {
     connection = await connectSub(env, handlers.onServerMessage, (error) => ctx.ui.notify(error.message, "error"));
   });
+  pi.registerTool({
+    name: "ask",
+    label: "ask",
+    description: "Ask the main agent a question. Use it when you need an answer to go on. After the call, stop and wait for a new message.",
+    parameters: Type.Object({ question: Type.String({ description: "The question for the main agent." }) }),
+    async execute(_toolCallId, params) {
+      return { content: [{ type: "text", text: handlers.ask(params.question) }], details: {} };
+    },
+  });
+  pi.registerTool({
+    name: "blocker",
+    label: "blocker",
+    description:
+      "Report that you cannot go on within the limits of your task: missing access, information or a decision. Use it only after you tried to solve the problem within the task limits. After the call, stop and wait for a new message.",
+    parameters: Type.Object({ reason: Type.String({ description: "What blocks you and what you tried." }) }),
+    async execute(_toolCallId, params) {
+      return { content: [{ type: "text", text: handlers.blocker(params.reason) }], details: {} };
+    },
+  });
   pi.on("session_shutdown", () => connection?.close());
   pi.on("tool_execution_start", (event) => handlers.toolStart(event));
   pi.on("tool_execution_end", (event) => handlers.toolEnd(event));
@@ -91,15 +110,23 @@ export default function (pi: ExtensionAPI): void {
     name: "subagent",
     label: "subagent",
     description:
-      "Delegate tasks to pi agents in a tmux session. start: run the task in a new agent and return its final answer. status: show the supervisor and its agents.",
+      "Delegate tasks to pi agents in a tmux session. start: run the task in a new agent and return its final answer. answer: send text to an agent by id and wait for its next result. status: show the supervisor and its agents. A result has status idle, failed, question or blocked. On question, answer it with answer. On blocked, first try to solve the problem within your own limits, then send the solution with answer.",
     promptSnippet: "Delegate tasks to pi agents in tmux",
     // One object at the root: a root anyOf made the model send empty arguments.
     parameters: Type.Object({
-      action: Type.Union([Type.Literal("start"), Type.Literal("status")]),
+      action: Type.Union([Type.Literal("start"), Type.Literal("answer"), Type.Literal("status")]),
       profile: Type.Optional(Type.String({ description: "Required for start. Name of a profile in ~/.pi/agent/agents/<name>.md." })),
       task: Type.Optional(Type.String({ description: "Required for start. The complete task. The agent knows nothing else." })),
+      id: Type.Optional(Type.String({ description: "Required for answer. The id of the agent." })),
+      text: Type.Optional(Type.String({ description: "Required for answer. The answer for the agent." })),
     }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      if (params.action === "answer") {
+        if (params.id === undefined || params.id.trim() === "") throw new Error('subagent: action "answer" needs an "id".');
+        if (params.text === undefined || params.text.trim() === "") throw new Error('subagent: action "answer" needs a non-empty "text".');
+        const connected = await connection(ctx.sessionManager.getSessionId());
+        return shapeResult(await connected.answer(params.id, params.text, signal));
+      }
       if (params.action === "start" && (params.task === undefined || params.task.trim() === "")) {
         throw new Error('subagent: action "start" needs a non-empty "task".');
       }

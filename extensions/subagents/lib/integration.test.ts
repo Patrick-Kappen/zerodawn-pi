@@ -91,6 +91,25 @@ test("real supervisor with a fake pi: one small result reaches main, the session
   assert.equal(await tmux.hasSession(session), false);
 });
 
+test("real supervisor with a fake pi: ask gives question, answer gives idle", { timeout: 30_000 }, async () => {
+  const id = randomUUID();
+  sessionIds.push(id);
+  const { session, socket: path } = await ensure(id, fakePi);
+  const client = await connectMain(path, timers);
+  const asked = await client.start("ASK", ["--no-tools"]);
+  assert.equal(asked.status, "question");
+  assert.equal(asked.text, "which db?");
+  assert.equal(shapeResult(asked).content[0].text, `agent ${asked.id}\nstatus: question\nwhich db?`);
+  await assert.rejects(client.answer("nope", "x"), /no subagent/);
+  const answered = await client.answer(asked.id, "sqlite");
+  assert.equal(answered.status, "idle");
+  assert.equal(answered.text, "answer to: sqlite");
+  client.close();
+  const tmux = createTmux(exec, socket);
+  for (let i = 0; i < 100 && (await tmux.hasSession(session)); i++) await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(await tmux.hasSession(session), false);
+});
+
 test("real supervisor: a command that dies without a hello is reported as failed", { timeout: 30_000 }, async () => {
   const id = randomUUID();
   sessionIds.push(id);

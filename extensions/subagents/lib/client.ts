@@ -13,6 +13,7 @@ export interface Status {
 export interface Client {
   status(): Promise<Status>;
   start(task: string, args: string[], signal?: AbortSignal): Promise<AgentResult>;
+  answer(id: string, text: string, signal?: AbortSignal): Promise<AgentResult>;
   isOpen(): boolean;
   close(): void;
 }
@@ -88,6 +89,15 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
     }
 
     function start(task: string, args: string[], signal?: AbortSignal): Promise<AgentResult> {
+      return run({ type: "start", task, args }, signal);
+    }
+
+    function answer(id: string, text: string, signal?: AbortSignal): Promise<AgentResult> {
+      return run({ type: "answer", id, text }, signal);
+    }
+
+    // The supervisor accepts a start or an answer with "started"; the result follows.
+    function run(message: ClientMessage, signal?: AbortSignal): Promise<AgentResult> {
       return new Promise<AgentResult>((resolve, reject) => {
         if (!open) {
           reject(new Error(`subagents: the connection to "${path}" is closed. Call the tool again to reconnect.`));
@@ -125,7 +135,7 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
           };
         }
         starts.push(waiter);
-        write({ type: "start", task, args });
+        write(message);
       });
     }
 
@@ -163,7 +173,7 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
       timers.clearTimeout(connectTimer);
       open = true;
       write({ type: "hello", role: "main" });
-      resolveConnect({ isOpen: () => open, close: () => socket.destroy(), status, start });
+      resolveConnect({ isOpen: () => open, close: () => socket.destroy(), status, start, answer });
     });
     socket.on("data", (chunk: string) => {
       buffer += chunk;

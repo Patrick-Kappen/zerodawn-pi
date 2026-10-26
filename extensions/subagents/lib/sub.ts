@@ -64,6 +64,14 @@ export function createSubHandlers(options: SubHandlerOptions) {
         event: { kind: "message", text: shorten(lastText), usage: { tokens: message.usage.totalTokens, cost: message.usage.cost.total } },
       });
     },
+    ask(question: string): string {
+      options.send({ type: "ask", text: question });
+      return "Your question went to the main agent. Stop now and wait for a new message with the answer.";
+    },
+    blocker(reason: string): string {
+      options.send({ type: "blocker", text: reason });
+      return "Your blocker went to the main agent. Stop now and wait for a new message.";
+    },
     settled(): void {
       options.send({ type: "event", event: { kind: "settled", text: lastText } });
       lastText = "";
