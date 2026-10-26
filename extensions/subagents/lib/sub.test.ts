@@ -8,6 +8,7 @@ const GREEN: GateResult = { ok: true, reason: "tests and checks green", files: [
 const SCOUT_GREEN: GateResult = { ok: true, reason: "no changed files", files: [], tests: "not run: no changed files" };
 const HANDOFF = {
   summary: "It works.",
+  change: "fix" as const,
   changes: [
     { file: "a.ts", what: "w" },
     { file: "a.test.ts", what: "t" },

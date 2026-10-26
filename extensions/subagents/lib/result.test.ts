@@ -13,7 +13,7 @@ test("the content has only id, status, text and one usage line", () => {
 
 test("details carry handoff and gate", () => {
   const gate = { ok: true as const, files: [], tests: "t" };
-  const handoff = { summary: "s", changes: [], tests: [], findings: ["a.ts:1 x"], decisions: [], open: [], next: "", risks: [] };
+  const handoff = { summary: "s", change: "fix" as const, changes: [], tests: [], findings: ["a.ts:1 x"], decisions: [], open: [], next: "", risks: [] };
   const shaped = shapeResult({ ...base, handoff, gate });
   assert.deepEqual([shaped.details.handoff, shaped.details.gate], [handoff, gate]);
 });

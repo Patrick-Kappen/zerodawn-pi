@@ -158,3 +158,9 @@ test("getOption reads the option with an exact session target", async () => {
   assert.equal(await createTmux(exec).getOption("pi-sub-x", "@pi-sub-socket"), "/run/x.sock");
   assert.deepEqual(calls[1], ["tmux", "show-options", "-qv", "-t", "=pi-sub-x:", "@pi-sub-socket"]);
 });
+
+test("openWindow passes the cwd as -c before the env", async () => {
+  const { exec, calls } = fake([{}, { stdout: "@4" }]);
+  await createTmux(exec).openWindow("pi-sub-x", "sub-ab12", ["pi"], { A: "1" }, "/w/tree");
+  assert.deepEqual(calls[1]?.slice(5), ["-P", "-F", "#{window_id}", "-n", "sub-ab12", "-c", "/w/tree", "-e", "A=1", "pi"]);
+});

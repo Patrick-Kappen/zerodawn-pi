@@ -63,6 +63,7 @@ test("client rejects an error reply and a missing socket", async () => {
   await assert.rejects(connectMain("/tmp/pi-sub-nonexistent.sock", timers, 100), /connection to .* failed/);
 });
 
+const SOURCE = { repo: "/r", sha: "a".repeat(40) };
 const result = '{"type":"result","id":"a1","status":"idle","text":"done","usage":{"tokens":2,"cost":0.1},"events":["e"]}';
 
 test("client start sends the task and waits for the result of its agent, even in one chunk", async () => {
@@ -77,7 +78,7 @@ test("client start sends the task and waits for the result of its agent, even in
     },
     async (path) => {
       const client = await connectMain(path, timers, 1000);
-      assert.deepEqual(await client.start("do it", ["--no-tools"], []), {
+      assert.deepEqual(await client.start("do it", ["--no-tools"], [], SOURCE), {
         type: "result",
         id: "a1",
         status: "idle",
@@ -96,7 +97,7 @@ test("client start rejects an error reply, a closed connection and a missing sta
     (_data, write) => write('{"type":"error","message":"no tmux"}\n'),
     async (path) => {
       const client = await connectMain(path, timers, 1000);
-      await assert.rejects(client.start("t", ["--no-tools"], []), /refused the request: no tmux/);
+      await assert.rejects(client.start("t", ["--no-tools"], [], SOURCE), /refused the request: no tmux/);
       client.close();
     },
   );
@@ -104,7 +105,7 @@ test("client start rejects an error reply, a closed connection and a missing sta
     () => {},
     async (path) => {
       const client = await connectMain(path, timers, 100);
-      await assert.rejects(client.start("t", ["--no-tools"], []), /did not start the subagent within 100 ms/);
+      await assert.rejects(client.start("t", ["--no-tools"], [], SOURCE), /did not start the subagent within 100 ms/);
       client.close();
     },
   );
@@ -112,7 +113,7 @@ test("client start rejects an error reply, a closed connection and a missing sta
     (_data, write) => write('{"type":"started","id":"a1"}\n'),
     async (path) => {
       const client = await connectMain(path, timers, 1000);
-      const waiting = client.start("t", ["--no-tools"], []);
+      const waiting = client.start("t", ["--no-tools"], [], SOURCE);
       setTimeout(() => client.close(), 50);
       await assert.rejects(waiting, /closed the connection/);
     },
@@ -125,9 +126,21 @@ test("client start stops waiting on abort", async () => {
     async (path) => {
       const client = await connectMain(path, timers, 1000);
       const controller = new AbortController();
-      const waiting = client.start("t", ["--no-tools"], [], controller.signal);
+      const waiting = client.start("t", ["--no-tools"], [], SOURCE, controller.signal);
       setTimeout(() => controller.abort(), 50);
       await assert.rejects(waiting, /subagent a1 was aborted/);
+      client.close();
+    },
+  );
+});
+
+test("client discard returns the text and rejects an error", async () => {
+  await withServer(
+    (data, write) => write(data.includes('"id":"bad"') ? '{"type":"error","message":"runs"}\n' : '{"type":"discarded","id":"a1","text":"removed"}\n'),
+    async (path) => {
+      const client = await connectMain(path, timers, 1000);
+      assert.equal(await client.discard("a1"), "removed");
+      await assert.rejects(client.discard("bad"), /refused the request: runs/);
       client.close();
     },
   );

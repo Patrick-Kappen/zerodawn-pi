@@ -1,4 +1,4 @@
-import type { Blocker, GateInfo, Handoff } from "./format.ts";
+import type { Blocker, Change, GateInfo, Handoff } from "./format.ts";
 import type { AgentEntry } from "./register.ts";
 
 export interface Usage {
@@ -26,13 +26,16 @@ export interface AgentResult {
   handoff?: Handoff;
   reason?: string;
   gate?: GateInfo;
+  worktree?: string;
+  branch?: string;
 }
 
 export type ClientMessage =
   | { type: "hello"; role: "main" }
   | { type: "hello"; role: "sub"; id: string }
   | { type: "status" }
-  | { type: "start"; task: string; args: string[]; checks: string[] }
+  | { type: "start"; task: string; args: string[]; checks: string[]; repo: string; sha: string }
+  | { type: "discard"; id: string }
   | { type: "answer"; id: string; text: string }
   | { type: "ask"; text: string }
   | { type: "blocker"; data: Blocker }
@@ -43,6 +46,7 @@ export type ServerMessage =
   | { type: "status"; agents: AgentEntry[]; main: "connected" | "gone" }
   | { type: "error"; message: string }
   | { type: "started"; id: string }
+  | { type: "discarded"; id: string; text: string }
   | { type: "task"; task: string }
   | { type: "handoff" }
   | ({ type: "result" } & AgentResult);
@@ -88,9 +92,18 @@ function parseBlocker(fields: Fields, type: string): Blocker {
   return { issue: text(fields, "issue", type), files: strings(fields, "files", type), tried: strings(fields, "tried", type) };
 }
 
+function change(fields: Fields, type: string): Change {
+  const value = fields.change;
+  if (value !== "fix" && value !== "feature" && value !== "breaking") {
+    throw new Error(`protocol: field "change" of "${type}" must be "fix", "feature" or "breaking". Fix the sender.`);
+  }
+  return value;
+}
+
 function parseHandoff(fields: Fields, type: string): Handoff {
   return {
     summary: text(fields, "summary", type),
+    change: change(fields, type),
     changes: objects(fields, "changes", type, ["file", "what"]) as Handoff["changes"],
     tests: objects(fields, "tests", type, ["file", "covers"]) as Handoff["tests"],
     findings: strings(fields, "findings", type),
@@ -170,8 +183,14 @@ export function parseClientLine(line: string): ClientMessage {
       if (!Array.isArray(message.checks) || message.checks.some((check) => typeof check !== "string")) {
         throw new Error('protocol: field "checks" of "start" must be a list of strings. Fix the sender.');
       }
-      return { type: "start", task, args: message.args as string[], checks: message.checks as string[] };
+      const repo = text(message, "repo", "start");
+      if (!repo.startsWith("/")) throw new Error('protocol: field "repo" of "start" must be an absolute path. Fix the sender.');
+      const sha = text(message, "sha", "start");
+      if (!/^[0-9a-f]{40,64}$/.test(sha)) throw new Error('protocol: field "sha" of "start" must be a full commit hash. Fix the sender.');
+      return { type: "start", task, args: message.args as string[], checks: message.checks as string[], repo, sha };
     }
+    case "discard":
+      return { type: "discard", id: text(message, "id", "discard") };
     case "answer":
       return { type: "answer", id: text(message, "id", "answer"), text: text(message, "text", "answer") };
     case "ask":
@@ -191,7 +210,7 @@ export function parseClientLine(line: string): ClientMessage {
       return { type: "event", event: parseEvent(message.event) };
   }
   throw new Error(
-    `protocol: unknown message type ${JSON.stringify(message.type)}. Use "hello", "status", "start", "answer", "ask", "blocker", "handoff" or "event".`,
+    `protocol: unknown message type ${JSON.stringify(message.type)}. Use "hello", "status", "start", "discard", "answer", "ask", "blocker", "handoff" or "event".`,
   );
 }
 
@@ -210,6 +229,8 @@ export function parseServerLine(line: string): ServerMessage {
       return { type: "error", message: text(message, "message", "error") };
     case "started":
       return { type: "started", id: text(message, "id", "started") };
+    case "discarded":
+      return { type: "discarded", id: text(message, "id", "discarded"), text: text(message, "text", "discarded") };
     case "task":
       return { type: "task", task: text(message, "task", "task") };
     case "handoff":
@@ -240,6 +261,8 @@ export function parseServerLine(line: string): ServerMessage {
         ...(message.handoff === undefined ? {} : { handoff: parseHandoff(object(message, "handoff", "result"), "result.handoff") }),
         ...(message.reason === undefined ? {} : { reason: text(message, "reason", "result") }),
         ...(message.gate === undefined ? {} : { gate: parseGate(object(message, "gate", "result"), "result.gate") }),
+        ...(message.worktree === undefined ? {} : { worktree: text(message, "worktree", "result") }),
+        ...(message.branch === undefined ? {} : { branch: text(message, "branch", "result") }),
       };
     }
   }

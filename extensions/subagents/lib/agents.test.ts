@@ -33,7 +33,21 @@ function fakeClock() {
   return { timers, advance, pending };
 }
 
-function setup(options: { openFails?: boolean } = {}) {
+const SOURCE = { repo: "/r/proj", sha: "a".repeat(40) };
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+function fakeGit(dirty: boolean, log: string[]) {
+  return {
+    addWorktree: async (spec: { path: string; branch: string; sha: string }) => void log.push(`add ${spec.path} ${spec.branch} ${spec.sha}`),
+    state: async () => ({ dirty, moved: false }),
+    commitAll: async (path: string, spec: { subject: string; body: string[]; change: string }) =>
+      void log.push(`commit ${path} ${spec.subject} | ${spec.body.join("/")} | ${spec.change}`),
+    removeWorktree: async (_repo: string, path: string, branch: string) => void log.push(`remove ${path} ${branch}`),
+  };
+}
+
+function setup(options: { openFails?: boolean; dirty?: boolean } = {}) {
+  const gitLog: string[] = [];
   const clock = fakeClock();
   const opened: { name: string; command: string[]; env: Record<string, string> | undefined }[] = [];
   const toSub: [string, ServerMessage][] = [];
@@ -47,6 +61,8 @@ function setup(options: { openFails?: boolean } = {}) {
     dir: "/tmp/pi-sub-abcd1234",
     socket: "/run/s.sock",
     piCommand: "pi",
+    home: "/h",
+    git: fakeGit(options.dirty ?? false, gitLog),
     extensions: ["/x/index.ts", "/y/login.ts"],
     tmux: {
       openWindow: async (_session, name, command, env) => {
@@ -65,19 +81,19 @@ function setup(options: { openFails?: boolean } = {}) {
     onChange: () => changes++,
     onError: (error) => errors.push(error),
   });
-  return { agents, clock, opened, toSub, toMains, errors, changes: () => changes, setWindows: (list: typeof windows) => (windows = list) };
+  return { agents, gitLog, clock, opened, toSub, toMains, errors, changes: () => changes, setWindows: (list: typeof windows) => (windows = list) };
 }
 
 const ID = "abcdef12-0000-4000-8000-000000000000";
 const ARGS = ["--no-tools", "--no-mcp", "--model", "m/x:off", "--system-prompt", "You are a test."];
 const usage = { tokens: 10, cost: 0.5 };
-const SCOUT = { summary: "s", changes: [], tests: [], findings: ["a.ts:1 x"], decisions: [], open: [], next: "", risks: [] };
+const SCOUT = { summary: "s", change: "fix" as const, changes: [], tests: [], findings: ["a.ts:1 x"], decisions: [], open: [], next: "", risks: [] };
 const GATE = { ok: true as const, files: [], tests: "not run: no changed files" };
 const HANDOFF = { ...SCOUT, summary: "partly", findings: [], changes: [{ file: "f.ts", what: "w" }], open: ["c"], next: "d", risks: ["r"] };
 
 test("usage at the token limit asks for a handoff once; the handoff data gives status handoff", async () => {
   const { agents, toSub, toMains } = setup();
-  await agents.start("do it", ARGS, []);
+  await agents.start("do it", ARGS, [], SOURCE);
   agents.hello(ID);
   toMains.length = 0;
   agents.event(ID, { kind: "message", text: "a", usage: { tokens: MAX_TOKENS - 1, cost: 1 } });
@@ -87,7 +103,7 @@ test("usage at the token limit asks for a handoff once; the handoff data gives s
   agents.event(ID, { kind: "message", text: "c", usage: { tokens: 5, cost: 1 } });
   assert.deepEqual(toSub.slice(1), [[ID, { type: "handoff" }]]);
   assert.equal(toMains.length, 0);
-  agents.handoff(ID, HANDOFF, undefined, undefined);
+  await agents.handoff(ID, HANDOFF, undefined, undefined);
   assert.equal(agents.entries()[0]?.status, "handoff");
   const message = toMains[0];
   assert.ok(message?.type === "result");
@@ -101,9 +117,9 @@ test("usage at the token limit asks for a handoff once; the handoff data gives s
 
 test("a handoff with a gate reason has the reason line and the reason in the result", async () => {
   const { agents, toMains } = setup();
-  await agents.start("t", ARGS, []);
+  await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
-  agents.handoff(ID, HANDOFF, "tests red", undefined);
+  await agents.handoff(ID, HANDOFF, "tests red", undefined);
   const message = toMains[0];
   assert.ok(message?.type === "result");
   assert.equal(message.status, "handoff");
@@ -113,7 +129,7 @@ test("a handoff with a gate reason has the reason line and the reason in the res
 
 test("start opens a window with the pi command, the env and a starting entry", async () => {
   const { agents, opened } = setup();
-  assert.equal(await agents.start("do it", ARGS, []), ID);
+  assert.equal(await agents.start("do it", ARGS, [], SOURCE), ID);
   assert.deepEqual(opened, [
     {
       name: "sub-abcd",
@@ -137,14 +153,16 @@ test("start opens a window with the pi command, the env and a starting entry", a
       env: { PI_SUBAGENT_SOCKET: "/run/s.sock", PI_SUBAGENT_ID: ID, PI_SUBAGENT_CHECKS: "[]" },
     },
   ]);
-  assert.deepEqual(agents.entries(), [{ id: ID, role: "sub", window: "@1", status: "starting" }]);
+  assert.deepEqual(agents.entries(), [
+    { id: ID, role: "sub", window: "@1", status: "starting", base: SOURCE.sha, worktree: `/h/.worktrees/proj/sub-abcdef12`, branch: "sub/abcdef12" },
+  ]);
   assert.equal(agents.running(), true);
 });
 
 test("a failed window start leaves no entry and names the cause", async () => {
   const { agents } = setup({ openFails: true });
   await assert.rejects(
-    agents.start("t", ARGS, []),
+    agents.start("t", ARGS, [], SOURCE),
     (error: Error) => /could not start subagent/.test(error.message) && /tmux down/.test((error.cause as Error).message),
   );
   assert.deepEqual(agents.entries(), []);
@@ -153,14 +171,14 @@ test("a failed window start leaves no entry and names the cause", async () => {
 
 test("hello sends the task and sets running; settle sets idle and sends one result", async () => {
   const { agents, toSub, toMains } = setup();
-  await agents.start("do it", ARGS, []);
+  await agents.start("do it", ARGS, [], SOURCE);
   agents.hello(ID);
   assert.deepEqual(toSub, [[ID, { type: "task", task: "do it" }]]);
   assert.equal(agents.entries()[0]?.status, "running");
   agents.event(ID, { kind: "tool_start", name: "bash", args: "{}" });
   agents.event(ID, { kind: "message", text: "m", usage });
   agents.event(ID, { kind: "message", text: "n", usage });
-  agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE);
   assert.equal(agents.entries()[0]?.status, "idle");
   assert.equal(agents.running(), false);
   assert.deepEqual(toMains, [
@@ -179,12 +197,12 @@ test("hello sends the task and sets running; settle sets idle and sends one resu
 
 test("a handoff with a gate gives status idle with the text, the data and the gate; a second handoff fails", async () => {
   const { agents, toMains } = setup();
-  await agents.start("t", ARGS, []);
+  await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
   const data = { ...SCOUT, changes: [{ file: "a.ts", what: "w" }], tests: [{ file: "a.test.ts", covers: "c" }], findings: [], open: ["o"] };
   const gate = { ok: true as const, files: ["a.ts", "a.test.ts"], tests: "green: 2 pass, 0 fail" };
   agents.pending(ID, "question", "q");
-  agents.handoff(ID, data, undefined, gate);
+  await agents.handoff(ID, data, undefined, gate);
   const message = toMains[0];
   assert.ok(message?.type === "result");
   assert.equal(message.status, "idle");
@@ -195,9 +213,10 @@ test("a handoff with a gate gives status idle with the text, the data and the ga
 
 test("a settle without a handoff, a question or a blocker fails the agent", async () => {
   const { agents, toMains } = setup();
-  await agents.start("t", ARGS, []);
+  await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
   agents.event(ID, { kind: "settled", text: "" });
+  await flush();
   const message = toMains[0];
   assert.ok(message?.type === "result");
   assert.equal(message.status, "failed");
@@ -205,8 +224,8 @@ test("a settle without a handoff, a question or a blocker fails the agent", asyn
 });
 
 test("ask then settle gives status question with the text, then clears it", async () => {
-  const { agents, toMains } = setup();
-  await agents.start("t", ARGS, []);
+  const { agents, toMains } = setup({ dirty: true });
+  await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
   agents.pending(ID, "question", "which db?");
   assert.equal(agents.entries()[0]?.status, "running");
@@ -218,7 +237,7 @@ test("ask then settle gives status question with the text, then clears it", asyn
     [["question", "which db?"]],
   );
   agents.answer(ID, "sqlite");
-  agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE);
   assert.deepEqual(toMains.map((message) => message.type === "result" && [message.status, message.text]).at(-1), [
     "idle",
     "s\na.ts:1 x\ntests: not run: no changed files",
@@ -226,8 +245,8 @@ test("ask then settle gives status question with the text, then clears it", asyn
 });
 
 test("blocker then settle gives status blocked", async () => {
-  const { agents, toMains } = setup();
-  await agents.start("t", ARGS, []);
+  const { agents, toMains } = setup({ dirty: true });
+  await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
   const blocker = { issue: "no access", files: ["a"], tried: ["b"] };
   agents.pending(ID, "blocked", "no access\nfiles: a\ntried: b", blocker);
@@ -238,7 +257,7 @@ test("blocker then settle gives status blocked", async () => {
     [["blocked", "no access\nfiles: a\ntried: b", blocker]],
   );
   agents.answer(ID, "use the key");
-  agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE);
   const last = toMains.at(-1);
   assert.ok(last?.type === "result");
   assert.equal(last.blocker, undefined);
@@ -246,9 +265,10 @@ test("blocker then settle gives status blocked", async () => {
 
 test("an error event fails the agent with its text", async () => {
   const { agents, toMains } = setup();
-  await agents.start("t", ARGS, []);
+  await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
   agents.event(ID, { kind: "error", text: "done gate failed in the subagent: boom" });
+  await flush();
   assert.equal(agents.entries()[0]?.status, "failed");
   assert.deepEqual(
     toMains.map((message) => message.type === "result" && [message.status, message.text]),
@@ -257,10 +277,10 @@ test("an error event fails the agent with its text", async () => {
 });
 
 test("answer sends the text as a task and sets running, from idle, question and blocked", async () => {
-  const { agents, toSub } = setup();
-  await agents.start("t", ARGS, []);
+  const { agents, toSub } = setup({ dirty: true });
+  await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
-  agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE);
   agents.answer(ID, "more");
   assert.deepEqual(toSub.at(-1), [ID, { type: "task", task: "more" }]);
   assert.equal(agents.entries()[0]?.status, "running");
@@ -273,23 +293,23 @@ test("answer sends the text as a task and sets running, from idle, question and 
 
 test("answer and pending errors: unknown id, wrong status, empty text", async () => {
   const { agents } = setup();
-  await agents.start("t", ARGS, []);
+  await agents.start("t", ARGS, [], SOURCE);
   assert.throws(() => agents.answer(ID, "x"), /status "starting"/);
   agents.hello(ID);
   assert.throws(() => agents.answer(ID, "x"), /status "running"/);
   assert.throws(() => agents.answer("nope", "x"), /no subagent/);
   assert.throws(() => agents.answer(ID, "  "), /non-empty/);
   assert.throws(() => agents.pending("nope", "question", "q"), /no subagent/);
-  agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE);
   assert.throws(() => agents.pending(ID, "question", "q"), /status "idle"/);
 });
 
 test("only the last 20 events are kept, each at most 200 characters", async () => {
   const { agents, toMains } = setup();
-  await agents.start("t", ARGS, []);
+  await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
   for (let i = 0; i < 30; i++) agents.event(ID, { kind: "tool_start", name: `t${i}`, args: "a".repeat(500) });
-  agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE);
   const result = toMains[0];
   assert.ok(result?.type === "result");
   assert.equal(result.events.length, MAX_EVENTS);
@@ -299,7 +319,7 @@ test("only the last 20 events are kept, each at most 200 characters", async () =
 
 test("no hello within 30 s fails the agent and tells main", async () => {
   const { agents, clock, toMains } = setup();
-  await agents.start("t", ARGS, []);
+  await agents.start("t", ARGS, [], SOURCE);
   await clock.advance(29_000);
   assert.equal(agents.entries()[0]?.status, "starting");
   await clock.advance(1000);
@@ -318,7 +338,7 @@ test("no hello within 30 s fails the agent and tells main", async () => {
 
 test("a hello cancels the hello timeout", async () => {
   const { agents, clock, toMains } = setup();
-  await agents.start("t", ARGS, []);
+  await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
   await clock.advance(60_000);
   assert.equal(agents.entries()[0]?.status, "running");
@@ -327,25 +347,27 @@ test("a hello cancels the hello timeout", async () => {
 
 test("a window that is gone without a settle fails the agent at the next check", async () => {
   const { agents, clock, toMains, setWindows, errors } = setup();
-  await agents.start("t", ARGS, []);
+  await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
   await clock.advance(2000);
   assert.equal(agents.entries()[0]?.status, "running");
   setWindows([]);
   await clock.advance(2000);
+  await flush();
   assert.equal(agents.entries()[0]?.status, "failed");
   const result = toMains[0];
   assert.ok(result?.type === "result" && result.status === "failed");
   assert.match(result.text, /window @1 is gone.*tmux attach -t pi-sub-abcd1234/);
   assert.deepEqual(errors, []);
+  agents.dispose();
   assert.equal(clock.pending.size, 0);
 });
 
 test("a settled agent whose window is gone stays idle", async () => {
   const { agents, clock, setWindows } = setup();
-  await agents.start("t", ARGS, []);
+  await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
-  agents.handoff(ID, SCOUT, undefined, GATE);
+  await agents.handoff(ID, SCOUT, undefined, GATE);
   setWindows([]);
   await clock.advance(10_000);
   assert.equal(agents.entries()[0]?.status, "idle");
@@ -353,14 +375,14 @@ test("a settled agent whose window is gone stays idle", async () => {
 
 test("late events of a failed agent are ignored; a second settle does not send a second result", async () => {
   const { agents, clock, toMains } = setup();
-  await agents.start("t", ARGS, []);
+  await agents.start("t", ARGS, [], SOURCE);
   await clock.advance(30_000);
   agents.event(ID, { kind: "message", text: "late", usage });
   assert.equal(toMains.length, 1);
   const second = setup();
-  await second.agents.start("t", ARGS, []);
+  await second.agents.start("t", ARGS, [], SOURCE);
   second.agents.hello(ID);
-  second.agents.handoff(ID, SCOUT, undefined, GATE);
+  await second.agents.handoff(ID, SCOUT, undefined, GATE);
   second.agents.event(ID, { kind: "settled", text: "b" });
   assert.equal(second.toMains.length, 1);
 });
@@ -369,7 +391,7 @@ test("hello and events of an unknown agent fail loud; a second hello fails", asy
   const { agents } = setup();
   assert.throws(() => agents.hello("nope"), /no subagent with id "nope"/);
   assert.throws(() => agents.event("nope", { kind: "settled", text: "" }), /no subagent/);
-  await agents.start("t", ARGS, []);
+  await agents.start("t", ARGS, [], SOURCE);
   agents.hello(ID);
   assert.throws(() => agents.hello(ID), /cannot say hello again/);
 });
@@ -382,6 +404,8 @@ test("a listWindows error goes to onError", async () => {
     dir: "/d",
     socket: "/s",
     piCommand: "pi",
+    home: "/h",
+    git: fakeGit(false, []),
     extensions: ["/x"],
     tmux: {
       openWindow: async () => "@1",
@@ -396,7 +420,7 @@ test("a listWindows error goes to onError", async () => {
     onChange: () => {},
     onError: (error) => errors.push(error),
   });
-  await agents.start("t", ARGS, []);
+  await agents.start("t", ARGS, [], SOURCE);
   await clock.advance(2000);
   assert.equal(errors.length, 1);
   assert.match(errors[0]?.message ?? "", /could not list the windows/);
@@ -405,8 +429,129 @@ test("a listWindows error goes to onError", async () => {
 
 test("dispose clears every timer", async () => {
   const { agents, clock } = setup();
-  await agents.start("t", ARGS, []);
+  await agents.start("t", ARGS, [], SOURCE);
   assert.ok(clock.pending.size > 0);
   agents.dispose();
   assert.equal(clock.pending.size, 0);
+});
+
+const WORKTREE = "/h/.worktrees/proj/sub-abcdef12";
+
+test("start creates the worktree on the base before the window and gives it as the window cwd", async () => {
+  const { agents, gitLog } = setup();
+  await agents.start("t", ARGS, [], SOURCE);
+  assert.deepEqual(gitLog, [`add ${WORKTREE} sub/abcdef12 ${SOURCE.sha}`]);
+});
+
+test("a failed window start removes the worktree; a failed worktree start leaves no entry", async () => {
+  const failed = setup({ openFails: true });
+  await assert.rejects(failed.agents.start("t", ARGS, [], SOURCE), /could not start subagent/);
+  assert.deepEqual(failed.gitLog, [`add ${WORKTREE} sub/abcdef12 ${SOURCE.sha}`, `remove ${WORKTREE} sub/abcdef12`]);
+  const clock = fakeClock();
+  const agents = createAgents({
+    session: "pi-sub-abcd1234",
+    dir: "/d",
+    socket: "/s",
+    piCommand: "pi",
+    home: "/h",
+    git: {
+      ...fakeGit(false, []),
+      addWorktree: async () => {
+        throw new Error("git said no");
+      },
+    },
+    extensions: ["/x"],
+    tmux: { openWindow: async () => "@1", listWindows: async () => [] },
+    timers: clock.timers,
+    newId: () => ID,
+    sendToSub: () => {},
+    sendToMains: () => {},
+    onChange: () => {},
+    onError: () => {},
+  });
+  await assert.rejects(agents.start("t", ARGS, [], SOURCE), /git said no/);
+  assert.deepEqual(agents.entries(), []);
+});
+
+test("a green handoff with changes commits, keeps the worktree and reports it", async () => {
+  const { agents, gitLog, toMains } = setup({ dirty: true });
+  await agents.start("t", ARGS, [], SOURCE);
+  agents.hello(ID);
+  const data = { ...SCOUT, change: "feature" as const, changes: [{ file: "a.ts", what: "w" }], findings: [] };
+  await agents.handoff(ID, data, undefined, { ok: true, files: ["a.ts"], tests: "green" });
+  assert.deepEqual(gitLog.slice(1), [`commit ${WORKTREE} subagent abcdef12: s | a.ts: w | feature`]);
+  const message = toMains[0];
+  assert.ok(message?.type === "result");
+  assert.deepEqual([message.status, message.worktree, message.branch], ["idle", WORKTREE, "sub/abcdef12"]);
+  assert.equal(agents.entries()[0]?.worktree, WORKTREE);
+});
+
+test("an unfinished handoff commits with the unfinished subject, cut to 72 characters", async () => {
+  const { agents, gitLog, toMains } = setup({ dirty: true });
+  await agents.start("t", ARGS, [], SOURCE);
+  agents.hello(ID);
+  await agents.handoff(ID, { ...SCOUT, summary: "x".repeat(150) }, undefined, undefined);
+  const subject = gitLog[1]?.split(" | ")[0]?.replace(`commit ${WORKTREE} `, "") ?? "";
+  assert.equal(subject.length, 72);
+  assert.match(subject, /^subagent abcdef12 \(unfinished\): x+…$/);
+  assert.equal(toMains[0]?.type === "result" && toMains[0].status, "handoff");
+});
+
+test("a commit that the hooks refuse gives status failed and keeps the worktree", async () => {
+  const clock = fakeClock();
+  const toMains: ServerMessage[] = [];
+  const agents = createAgents({
+    session: "pi-sub-abcd1234",
+    dir: "/d",
+    socket: "/s",
+    piCommand: "pi",
+    home: "/h",
+    git: {
+      ...fakeGit(true, []),
+      commitAll: async () => {
+        throw new Error("hook lint failed");
+      },
+    },
+    extensions: ["/x"],
+    tmux: { openWindow: async () => "@1", listWindows: async () => [{ id: "@1", name: "x" }] },
+    timers: clock.timers,
+    newId: () => ID,
+    sendToSub: () => {},
+    sendToMains: (message) => toMains.push(message),
+    onChange: () => {},
+    onError: () => {},
+  });
+  await agents.start("t", ARGS, [], SOURCE);
+  agents.hello(ID);
+  await agents.handoff(ID, SCOUT, undefined, GATE);
+  const message = toMains[0];
+  assert.ok(message?.type === "result");
+  assert.equal(message.status, "failed");
+  assert.match(message.text, /hook lint failed/);
+  assert.equal(message.worktree, WORKTREE);
+});
+
+test("an agent without changes loses its worktree and branch at the end", async () => {
+  const { agents, gitLog, toMains } = setup();
+  await agents.start("t", ARGS, [], SOURCE);
+  agents.hello(ID);
+  await agents.handoff(ID, SCOUT, undefined, GATE);
+  assert.equal(gitLog.at(-1), `remove ${WORKTREE} sub/abcdef12`);
+  const message = toMains[0];
+  assert.ok(message?.type === "result");
+  assert.equal(message.worktree, undefined);
+  assert.equal(agents.entries()[0]?.worktree, undefined);
+  assert.throws(() => agents.answer(ID, "more"), /has no worktree/);
+});
+
+test("discard refuses a running agent, removes the worktree of an ended one, and refuses twice", async () => {
+  const { agents, gitLog } = setup({ dirty: true });
+  await agents.start("t", ARGS, [], SOURCE);
+  agents.hello(ID);
+  await assert.rejects(agents.discard(ID), /runs/);
+  await agents.handoff(ID, SCOUT, undefined, GATE);
+  assert.equal(await agents.discard(ID), `removed worktree ${WORKTREE} and branch sub/abcdef12`);
+  assert.equal(gitLog.at(-1), `remove ${WORKTREE} sub/abcdef12`);
+  await assert.rejects(agents.discard(ID), /has no worktree/);
+  await assert.rejects(agents.discard("nope"), /no subagent/);
 });

@@ -1,6 +1,8 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { homedir } from "node:os";
 import { parseArgs } from "./lib/args.ts";
+import { createGit } from "./lib/git.ts";
 import { startSupervisor } from "./lib/server.ts";
 import { createTmux, type Exec } from "./lib/tmux.ts";
 
@@ -17,6 +19,8 @@ try {
   const supervisor = await startSupervisor({
     ...args,
     newId: randomUUID,
+    home: homedir(),
+    git: createGit(exec),
     runtimeDir: process.env.XDG_RUNTIME_DIR,
     tmux: createTmux(exec),
     timers: { setTimeout: (callback, ms) => setTimeout(callback, ms), clearTimeout: (handle) => clearTimeout(handle as NodeJS.Timeout) },

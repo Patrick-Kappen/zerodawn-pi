@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 19. A git worktree per subagent (2026-10-27)
+
+Each subagent works in its own git worktree and branch `sub/<id8>` under `~/.worktrees/<repo>/`, and the supervisor commits its work at the end. A copy or a clone was rejected: a worktree shares the object store, so the history stays and a branch is ready to merge with no fetch. A failed or unfinished agent keeps its worktree and its commit, so its data is not lost; only an agent without changes leaves nothing behind. The main pi resolves `base` to a commit hash because it knows the cwd; the supervisor only gets a repo and a hash. The supervisor commits, not the agent, so the `Change:` trailer and the repository hooks always apply; a hook that refuses the commit fails the agent and the main agent decides. `--no-verify` is not allowed. Cost: `answer` fails for an agent whose empty worktree was removed.
+
 ## 18. The subagent chooses `done`; one `handoff` is the only result (2026-10-27)
 
 Replaces 17. A forced `done` after a green gate made the model write the result at a moment it did not choose, and two tools (`done`, `done_findings`) split one result in two. Now the model says "the task is finished" with `done {}`, always active. Each settle without `done`, `ask` or `blocker` forces a choice (`continue`, `done`, `ask`, `blocker`) with "any tool" in the provider request (`forceAnyTool`); there is no count, the token limit ends a loop. `done` starts the gate. A green gate, the 3rd red gate and the token limit all force the same `handoff` schema. It has `findings`, so a task without changes needs no second tool, and a git check of `changes` and `findings` at call time keeps the data true. After a valid handoff nothing goes to the agent. The supervisor gives status `idle` for a green gate and `handoff` otherwise. The tools are restored at the next `answer`, which fixes a handoff after the token limit that left only `handoff` active.

@@ -50,7 +50,7 @@ test("the fake pi says hello and answers a task with a settle", async () => {
   assert.deepEqual(lines[0], { type: "hello", role: "sub", id: "id-1" });
   assert.deepEqual(lines.at(-1), {
     type: "handoff",
-    data: { summary: "answer to: x", changes: [], tests: [], findings: ["a.ts:1 fact"], decisions: [], open: [], next: "", risks: [] },
+    data: { summary: "answer to: x", change: "fix", changes: [], tests: [], findings: ["a.ts:1 fact"], decisions: [], open: [], next: "", risks: [] },
     gate: { ok: true, files: [], tests: "not run: no changed files" },
   });
 });

@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { connectMain } from "./client.ts";
 import { ensureSupervisor } from "./ensure.ts";
+import { resolveBase } from "./git.ts";
 import { answers } from "./probe.ts";
 import { shapeResult } from "./result.ts";
 import { createTmux, type Exec, sessionName } from "./tmux.ts";
@@ -27,6 +28,27 @@ const fakePiScript = fileURLToPath(new URL("./fixtures/fake-pi.ts", import.meta.
 // and start the fake pi through /bin/sh with the runtime of this test.
 const work = await mkdtemp(join(tmpdir(), "pi-subagents-it-"));
 process.env.XDG_RUNTIME_DIR = work;
+// The supervisor puts worktrees under ~/.worktrees: a temp HOME keeps them in the temp dir.
+process.env.HOME = work;
+const repo = join(await realpath(work), "proj");
+await mkdir(repo);
+async function git(...args: string[]): Promise<string> {
+  const result = await exec("git", ["-C", repo, ...args]);
+  assert.equal(result.code, 0, result.stderr);
+  return result.stdout.trim();
+}
+await git("init", "-q", "-b", "main");
+await git("config", "user.email", "t@example.com");
+await git("config", "user.name", "T");
+await writeFile(join(repo, "a.txt"), "a\n");
+await git("add", "-A");
+await git("commit", "-q", "-m", "first");
+await git("branch", "base-branch");
+await writeFile(join(repo, "b.txt"), "b\n");
+await git("add", "-A");
+await git("commit", "-q", "-m", "second");
+const source = await resolveBase(exec, repo);
+const tree = (id: string) => join(work, ".worktrees", "proj", `sub-${id.slice(0, 8)}`);
 const fakePi = join(work, "fake-pi");
 await writeFile(fakePi, `#!/bin/sh\nexec "${process.execPath}" "${fakePiScript}" "$@"\n`);
 await chmod(fakePi, 0o755);
@@ -73,7 +95,7 @@ test("real supervisor with a fake pi: one small result reaches main, the session
   const tmux = createTmux(exec, socket);
   const { session, socket: path } = await ensure(id, fakePi);
   const client = await connectMain(path, timers);
-  const result = await client.start("say hi", ["--no-tools"], []);
+  const result = await client.start("say hi", ["--no-tools"], [], source);
   assert.equal(result.status, "idle");
   assert.equal(result.text, "answer to: say hi\na.ts:1 fact\ntests: not run: no changed files");
   assert.deepEqual(result.usage, { tokens: 7, cost: 0.01 });
@@ -96,10 +118,13 @@ test("real supervisor with a fake pi: ask gives question, answer gives idle", { 
   sessionIds.push(id);
   const { session, socket: path } = await ensure(id, fakePi);
   const client = await connectMain(path, timers);
-  const asked = await client.start("ASK", ["--no-tools"], []);
+  const asked = await client.start("ASK", ["--no-tools"], [], source);
   assert.equal(asked.status, "question");
   assert.equal(asked.text, "which db?");
-  assert.equal(shapeResult(asked).content[0].text, `agent ${asked.id}\nstatus: question\nwhich db?`);
+  assert.equal(
+    shapeResult(asked).content[0].text,
+    `agent ${asked.id}\nstatus: question\nwhich db?\nworktree: ${tree(asked.id)}\nbranch: sub/${asked.id.slice(0, 8)}`,
+  );
   await assert.rejects(client.answer("nope", "x"), /no subagent/);
   const answered = await client.answer(asked.id, "sqlite");
   assert.equal(answered.status, "idle");
@@ -115,11 +140,14 @@ test("real supervisor with a fake pi: blocker and handoff data reach main", { ti
   sessionIds.push(id);
   const { session, socket: path } = await ensure(id, fakePi);
   const client = await connectMain(path, timers);
-  const blocked = await client.start("BLOCK", ["--no-tools"], []);
+  const blocked = await client.start("BLOCK", ["--no-tools"], [], source);
   assert.equal(blocked.status, "blocked");
   assert.deepEqual(blocked.blocker, { issue: "no access", files: ["x.ts", "y.ts"], tried: ["a", "b"] });
-  assert.equal(shapeResult(blocked).content[0].text, `agent ${blocked.id}\nstatus: blocked\nno access\nfiles: x.ts, y.ts\ntried: a; b`);
-  const handed = await client.start("HANDOFF", ["--no-tools"], []);
+  assert.equal(
+    shapeResult(blocked).content[0].text,
+    `agent ${blocked.id}\nstatus: blocked\nno access\nfiles: x.ts, y.ts\ntried: a; b\nworktree: ${tree(blocked.id)}\nbranch: sub/${blocked.id.slice(0, 8)}`,
+  );
+  const handed = await client.start("HANDOFF", ["--no-tools"], [], source);
   assert.equal(handed.status, "handoff");
   assert.equal(handed.handoff?.summary, "token limit");
   assert.equal(handed.gate, undefined);
@@ -136,7 +164,7 @@ test("real supervisor with a fake pi: handoff data and gate reach main", { timeo
   sessionIds.push(id);
   const { session, socket: path } = await ensure(id, fakePi);
   const client = await connectMain(path, timers);
-  const result = await client.start("CHANGES", ["--no-tools"], []);
+  const result = await client.start("CHANGES", ["--no-tools"], [], source);
   assert.equal(result.status, "idle");
   assert.equal(result.text, "It works.\na.ts: w\ntests: green: 2 pass, 0 fail; added: a.test.ts\ndecisions: d");
   assert.deepEqual(result.gate, { ok: true, files: ["a.ts", "a.test.ts"], tests: "green: 2 pass, 0 fail" });
@@ -153,9 +181,51 @@ test("real supervisor: a command that dies without a hello is reported as failed
   sessionIds.push(id);
   const { session, socket: path } = await ensure(id, "false");
   const client = await connectMain(path, timers);
-  const result = await client.start("t", ["--no-tools"], []);
+  const result = await client.start("t", ["--no-tools"], [], source);
   assert.equal(result.status, "failed");
   assert.match(result.text, /window .* is gone.*tmux attach -t/);
+  client.close();
+  const tmux = createTmux(exec, socket);
+  for (let i = 0; i < 100 && (await tmux.hasSession(session)); i++) await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(await tmux.hasSession(session), false);
+});
+
+test("real supervisor with a fake pi: worktree on the base, commit with trailer, discard", { timeout: 30_000 }, async () => {
+  const id = randomUUID();
+  sessionIds.push(id);
+  const { session, socket: path } = await ensure(id, fakePi);
+  const client = await connectMain(path, timers);
+  const base = await resolveBase(exec, repo, "base-branch");
+  const result = await client.start("WRITE", ["--no-tools"], [], base);
+  const short = result.id.slice(0, 8);
+  const worktree = join(work, ".worktrees", "proj", `sub-${short}`);
+  assert.equal(result.status, "idle");
+  assert.deepEqual([result.worktree, result.branch], [worktree, `sub/${short}`]);
+  assert.match(shapeResult(result).content[0].text, new RegExp(`worktree: ${worktree}\nbranch: sub/${short}\n`));
+  assert.equal((await readFile(join(worktree, "new.txt"), "utf8")).trim(), "hello");
+  assert.equal(await git("rev-parse", `sub/${short}~1`), base.sha);
+  assert.equal(await git("log", "-1", "--format=%B", `sub/${short}`), `subagent ${short}: wrote a file\n\nnew.txt: new\n\nChange: feature`);
+  const register = JSON.parse(await readFile(`/tmp/${session}/register.json`, "utf8"));
+  assert.deepEqual([register.agents[0].worktree, register.agents[0].branch, register.agents[0].base], [worktree, `sub/${short}`, base.sha]);
+  assert.equal(await client.discard(result.id), `removed worktree ${worktree} and branch sub/${short}`);
+  await assert.rejects(stat(worktree), /ENOENT/);
+  assert.equal(await git("branch", "--list", `sub/${short}`), "");
+  await assert.rejects(client.discard(result.id), /has no worktree/);
+  client.close();
+  const tmux = createTmux(exec, socket);
+  for (let i = 0; i < 100 && (await tmux.hasSession(session)); i++) await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(await tmux.hasSession(session), false);
+});
+
+test("real supervisor with a fake pi: an agent without changes loses its worktree and branch", { timeout: 30_000 }, async () => {
+  const id = randomUUID();
+  sessionIds.push(id);
+  const { session, socket: path } = await ensure(id, fakePi);
+  const client = await connectMain(path, timers);
+  const result = await client.start("say hi", ["--no-tools"], [], source);
+  assert.equal(result.worktree, undefined);
+  assert.equal(await git("branch", "--list", `sub/${result.id.slice(0, 8)}`), "");
+  await assert.rejects(stat(join(work, ".worktrees", "proj", `sub-${result.id.slice(0, 8)}`)), /ENOENT/);
   client.close();
   const tmux = createTmux(exec, socket);
   for (let i = 0; i < 100 && (await tmux.hasSession(session)); i++) await new Promise((resolve) => setTimeout(resolve, 50));

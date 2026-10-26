@@ -16,6 +16,9 @@ export const MAX_SUMMARY = 200;
 
 export const handoffSchema = Type.Object({
   summary: Type.String({ minLength: 1, maxLength: MAX_SUMMARY, description: `What works now, in one sentence. Max ${MAX_SUMMARY} characters.` }),
+  change: Type.Union([Type.Literal("fix"), Type.Literal("feature"), Type.Literal("breaking")], {
+    description: "The kind of change for the commit trailer: fix (no new behaviour), feature (new behaviour, old use works), breaking (old use stops working).",
+  }),
   changes: Type.Array(Type.Object({ file: Type.String({ minLength: 1 }), what: Type.String({ minLength: 1 }) }), {
     description: "One entry for each changed file, as git shows it: the file and what changed in it. Empty when no file changed.",
   }),

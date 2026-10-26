@@ -13,7 +13,13 @@ const execFileAsync = promisify(execFile);
 const timers = { setTimeout, clearTimeout: (handle: unknown) => clearTimeout(handle as NodeJS.Timeout) };
 
 const ID = "abcdef12-0000-4000-8000-000000000000";
-const extra = { pi: "pi", extensions: [fileURLToPath(import.meta.url)], newId: () => ID };
+const git = {
+  addWorktree: async () => {},
+  state: async () => ({ dirty: false, moved: false }),
+  commitAll: async () => {},
+  removeWorktree: async () => {},
+};
+const extra = { pi: "pi", home: "/h", git, extensions: [fileURLToPath(import.meta.url)], newId: () => ID };
 
 function setup() {
   const calls: string[][] = [];
@@ -129,7 +135,9 @@ test("supervisor: start, sub hello, task, events, one result to main, immediate 
     const supervisor = await startSupervisor({ session: "pi-sub-abcd1234", dir, id: "abcd1234", ...extra, runtimeDir: root, tmux, timers });
     const main = await connect(supervisor.path);
     const mainNext = lines(main);
-    main.write('{"type":"hello","role":"main"}\n{"type":"start","task":"do it","args":["--no-tools"],"checks":[]}\n');
+    main.write(
+      '{"type":"hello","role":"main"}\n{"type":"start","task":"do it","args":["--no-tools"],"checks":[],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}\n',
+    );
     assert.deepEqual(await mainNext(), { type: "started", id: ID });
     assert.equal(calls.find((call) => call[0] === "open")?.[1]?.includes('"PI_SUBAGENT_ID"'), true);
     assert.equal(JSON.parse(await readFile(join(dir, "register.json"), "utf8")).agents[0].status, "starting");
@@ -144,7 +152,7 @@ test("supervisor: start, sub hello, task, events, one result to main, immediate 
     const status = (await mainNext()) as { agents: { status: string }[] };
     assert.equal(status.agents[0]?.status, "running");
     sub.write(
-      '{"type":"handoff","data":{"summary":"s","changes":[],"tests":[],"findings":["a.ts:1 x"],"decisions":[],"open":[],"next":"","risks":[]},"gate":{"ok":true,"files":[],"tests":"none"}}\n',
+      '{"type":"handoff","data":{"summary":"s","change":"fix","changes":[],"tests":[],"findings":["a.ts:1 x"],"decisions":[],"open":[],"next":"","risks":[]},"gate":{"ok":true,"files":[],"tests":"none"}}\n',
     );
     assert.deepEqual(await mainNext(), {
       type: "result",
@@ -153,7 +161,7 @@ test("supervisor: start, sub hello, task, events, one result to main, immediate 
       text: "s\na.ts:1 x\ntests: none",
       usage: { tokens: 3, cost: 0.1 },
       events: ["tool bash {}", "message m"],
-      handoff: { summary: "s", changes: [], tests: [], findings: ["a.ts:1 x"], decisions: [], open: [], next: "", risks: [] },
+      handoff: { summary: "s", change: "fix", changes: [], tests: [], findings: ["a.ts:1 x"], decisions: [], open: [], next: "", risks: [] },
       gate: { ok: true, files: [], tests: "none" },
     });
 
@@ -173,7 +181,9 @@ test("supervisor: main gone while an agent runs; the supervisor ends when the ag
     const supervisor = await startSupervisor({ session: "pi-sub-abcd1234", dir: join(root, "d"), id: "abcd1234", ...extra, runtimeDir: root, tmux, timers });
     const main = await connect(supervisor.path);
     const mainNext = lines(main);
-    main.write('{"type":"hello","role":"main"}\n{"type":"start","task":"t","args":[],"checks":[]}\n');
+    main.write(
+      '{"type":"hello","role":"main"}\n{"type":"start","task":"t","args":[],"checks":[],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}\n',
+    );
     await mainNext();
     const sub = await connect(supervisor.path);
     const subNext = lines(sub);
@@ -186,7 +196,7 @@ test("supervisor: main gone while an agent runs; the supervisor ends when the ag
       false,
     );
     sub.write(
-      '{"type":"handoff","data":{"summary":"s","changes":[],"tests":[],"findings":["a.ts:1 x"],"decisions":[],"open":[],"next":"","risks":[]},"gate":{"ok":true,"files":[],"tests":"none"}}\n',
+      '{"type":"handoff","data":{"summary":"s","change":"fix","changes":[],"tests":[],"findings":["a.ts:1 x"],"decisions":[],"open":[],"next":"","risks":[]},"gate":{"ok":true,"files":[],"tests":"none"}}\n',
     );
     await supervisor.done;
     assert.deepEqual(calls.at(-1), ["kill", "pi-sub-abcd1234"]);
@@ -203,7 +213,10 @@ test("supervisor: wrong roles and unknown ids get an error message", async () =>
     const client = await connect(supervisor.path);
     const next = lines(client);
     for (const [line, pattern] of [
-      ['{"type":"start","task":"t","args":[],"checks":[]}', /only a connection with hello role "main"/],
+      [
+        '{"type":"start","task":"t","args":[],"checks":[],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',
+        /only a connection with hello role "main"/,
+      ],
       ['{"type":"event","event":{"kind":"settled","text":""}}', /only a connection with hello role "sub"/],
       ['{"type":"hello","role":"sub","id":"nope"}', /no subagent with id "nope"/],
     ] as const) {

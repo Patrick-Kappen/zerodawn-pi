@@ -27,6 +27,7 @@ test("blocker: all fields required, issue not empty, tried has an entry", () => 
 
 const OK_HANDOFF = {
   summary: "s",
+  change: "fix" as const,
   changes: [{ file: "a.ts", what: "w" }],
   tests: [],
   findings: [],

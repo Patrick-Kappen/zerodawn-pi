@@ -2,10 +2,11 @@
 
 Delegate tasks to pi agents. Each agent runs as a normal interactive pi in a window of a detached tmux session.
 
-Status: work in progress. The tool `subagent` has three actions:
+Status: work in progress. The tool `subagent` has four actions:
 
-- `start` with `profile` and `task`: the supervisor starts a pi agent with that profile in a new window `sub-<first 4 characters of its id>`. The tool waits and returns the final answer.
+- `start` with `profile`, `task` and optional `base`: the supervisor creates a worktree (see "Worktrees") and starts a pi agent with that profile in a new window `sub-<first 4 characters of its id>`, with the worktree as its cwd. The tool waits and returns the final answer.
 - `answer` with `id` and `text`: sends `text` to the agent and waits for its next result, like `start`. The agent must have status `idle`, `question` or `blocked`.
+- `discard` with `id`: removes the worktree and the branch of an agent. It refuses while the agent runs.
 - `status`: starts or finds the supervisor, connects, and shows the agents.
 
 The result that the model sees is small: agent id, status, the result text (see "Handoff") and one line with tokens and cost. The last 20 events (200 characters each) go to `details` only.
@@ -14,7 +15,7 @@ Every subagent has five fixed tools, whatever its profile says. All have strict 
 
 - `ask { question }`: `question` max 500 characters. The text goes to the supervisor. The model stops and waits. The result has status `question` and the question as text. The main agent answers with `answer`.
 - `blocker { issue, files, tried }`: all required; `issue` not empty; `tried` has at least one entry. The model uses it only after it tried to solve the problem within its task limits. The result has status `blocked`, `details.blocker = {issue, files, tried}` and the short text `issue`, `files: a, b`, `tried: x; y`. The main agent first tries to solve the problem within its own limits, then sends the solution with `answer`.
-- `handoff { summary, changes, tests, findings, decisions, open, next, risks }`: the only result of a subagent. The model never chooses it. The extension forces it, see "Flow" and "Handoff".
+- `handoff { summary, change, changes, tests, findings, decisions, open, next, risks }`: the only result of a subagent. The model never chooses it. The extension forces it, see "Flow" and "Handoff".
 - `continue {}`: keep working. The model never chooses it; it is active only when the extension forces a choice, see "Flow".
 - `done {}`: the task is finished. Always active; the model chooses it. The gate runs next.
 
@@ -28,6 +29,15 @@ pi filters extension tools with `--tools` and `--no-tools`, so the main pi alway
 4. The 3rd red gate and the token limit force `handoff` too.
 5. A valid `handoff` ends the work. The supervisor sends the result to the main agent. Nothing goes to the subagent any more.
 6. `answer` from the main agent is a new task. The agent restarts with its normal tools.
+
+## Worktrees
+
+- Every subagent works in its own git worktree `~/.worktrees/<repo>/sub-<first 8 characters of its id>` on the branch `sub/<first 8 characters of its id>`. `<repo>` is the name of the main repository root (from `git rev-parse --git-common-dir`).
+- `base` is a branch, a commit, or the absolute path of a worktree (then its HEAD). Without `base` the worktree starts at the HEAD of the cwd of the main pi. The main pi resolves `base` to a commit hash; a bad `base` fails the start and names it. When the cwd has uncommitted changes and no `base` is given, the result says "uncommitted changes in <cwd> are not in the subagent".
+- The supervisor runs `git worktree add -b` before it opens the window. A git error fails the start with the git message. All git calls use an exec function with an argument list (`lib/git.ts`).
+- `handoff` has the required field `change`: `fix`, `feature` or `breaking`. After a valid handoff the supervisor commits all changes in the worktree: subject `subagent <id8>: <summary>` (max 72 characters), body with the `changes` lines, trailer `Change: <change>`. A handoff at the token limit or after 3 red gates is committed too, with the subject `subagent <id8> (unfinished): <summary>`. The commit runs the repository hooks. When a hook refuses it, the status is `failed`, the text has the hook output, and the worktree stays with its changes.
+- Cleanup: when an agent ends (result `idle`, `handoff` or `failed`) and its worktree has no changes and no new commit, the supervisor removes the worktree and the branch. Then `answer` for that agent fails: start a new agent. Every other end keeps the worktree and the branch; the result shows their paths. `discard` removes them (with `--force`).
+- The entries in `register.json` have `base` (commit hash), `worktree` and `branch`. The last two are absent after a removal.
 
 ## Design
 
@@ -120,7 +130,7 @@ The steps are in `TODO.md`, one at a time.
 
 - **Profiles:** `~/.pi/agent/agents/<name>.md` defines all that a subagent gets: models, tools, extensions, skills, MCP, system prompt, extra checks. Repositories hold no profiles. Later, nullspace delivers the same files through its layer kind `agents/`.
 - **Model ladder:** a profile lists models in order, for example a free model, then IBM, then Haiku, then Sonnet. The tool takes the first available one. Later, quota decide too.
-- **Isolation:** window 0 gives each subagent its own worktree or a copy without `.git`, in a jail. The work goes to a merge branch at the end.
+- **Isolation:** each subagent has its own worktree (see "Worktrees"), later in a jail. The merge into a target branch is a later step.
 - **Retries:** max tries, and an agent reset with a handoff.
 - **UI:** last.
 
