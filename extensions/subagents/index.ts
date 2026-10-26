@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -6,6 +7,7 @@ import { type Client, connectMain } from "./lib/client.ts";
 import { ensureSupervisor } from "./lib/ensure.ts";
 import type { Timers } from "./lib/lifecycle.ts";
 import { answers } from "./lib/probe.ts";
+import { nodeFiles, resolveProfile } from "./lib/resolve.ts";
 import { shapeResult } from "./lib/result.ts";
 import { createSubHandlers, readSubEnv, type SubEnv } from "./lib/sub.ts";
 import { connectSub, type SubConnection } from "./lib/subclient.ts";
@@ -94,14 +96,22 @@ export default function (pi: ExtensionAPI): void {
     // One object at the root: a root anyOf made the model send empty arguments.
     parameters: Type.Object({
       action: Type.Union([Type.Literal("start"), Type.Literal("status")]),
+      profile: Type.Optional(Type.String({ description: "Required for start. Name of a profile in ~/.pi/agent/agents/<name>.md." })),
       task: Type.Optional(Type.String({ description: "Required for start. The complete task. The agent knows nothing else." })),
     }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       if (params.action === "start" && (params.task === undefined || params.task.trim() === "")) {
         throw new Error('subagent: action "start" needs a non-empty "task".');
       }
+      if (params.action === "start" && (params.profile === undefined || params.profile.trim() === "")) {
+        throw new Error(`subagent: action "start" needs a "profile". Expected a file ~/.pi/agent/agents/<name>.md.`);
+      }
+      if (params.action === "start") {
+        const { args } = await resolveProfile(homedir(), params.profile as string, nodeFiles);
+        const connected = await connection(ctx.sessionManager.getSessionId());
+        return shapeResult(await connected.start(params.task as string, args, signal));
+      }
       const connected = await connection(ctx.sessionManager.getSessionId());
-      if (params.action === "start") return shapeResult(await connected.start(params.task as string, signal));
       const status = await connected.status();
       return { content: [{ type: "text", text: JSON.stringify(status, null, 2) }], details: status };
     },

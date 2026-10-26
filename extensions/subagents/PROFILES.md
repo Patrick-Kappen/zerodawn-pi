@@ -1,6 +1,6 @@
 # Agent profiles (proposal)
 
-Status: proposal. Nothing reads profiles yet.
+Status: read by the tool since step 2; checks not run yet.
 
 An agent profile defines everything a subagent gets beyond the fixed base. One file per agent type.
 

@@ -1,7 +1,6 @@
 One step at a time. Each step is its own PR.
 
 1. Profile format: agree on PROFILES.md and close its open questions.
-2. Load one profile from `~/.pi/agent/agents/` and start the subagent with it: tools, extensions, skills, MCP, prompt, one model. Test with a real profile (scout).
 3. Done gate: when the subagent settles, the supervisor runs the repository tests and the `checks` of the profile.
    - Green: the extension asks the subagent for a short, specific done description. Only that goes to the main agent (replaces the 8000 character final text).
    - Red: the failures go back to the same subagent.

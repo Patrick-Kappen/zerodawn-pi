@@ -4,7 +4,7 @@ Delegate tasks to pi agents. Each agent runs as a normal interactive pi in a win
 
 Status: work in progress. The tool `subagent` has two actions:
 
-- `start` with `task`: the supervisor starts a pi agent (`anthropic/claude-haiku-5-5:off`) in a new window `sub-<first 4 characters of its id>`. The tool waits and returns the final answer.
+- `start` with `profile` and `task`: the supervisor starts a pi agent with that profile in a new window `sub-<first 4 characters of its id>`. The tool waits and returns the final answer.
 - `status`: starts or finds the supervisor, connects, and shows the agents.
 
 The result that the model sees is small: agent id, status, final text (cut at 8000 characters) and one line with tokens and cost. The last 20 events (200 characters each) go to `details` only.
@@ -26,12 +26,12 @@ The result that the model sees is small: agent id, status, final text (cut at 80
 
 ## What a subagent loads
 
-The command is `pi -ne -ns -np -nc --no-themes -e <path> ... --model ... --session-id ... --session-dir ...`. The flags turn off extension discovery, skills, prompt templates, context files and themes. Tools stay on.
+The command is `pi -ne -ns -np -nc --no-themes -e <path> ... <profile arguments> --session-id ... --session-dir ...`. The flags turn off extension discovery, skills, prompt templates, context files and themes. The profile decides the rest.
 
 - The first `-e` is the subagents extension. It connects the subagent to the supervisor.
 - The other `-e` paths come from `subagentExtensions` in `config.json`, in order. Use it for a provider login extension.
 - Without `subagentExtensions`, the tool fails. Set `[]` to start with no extra extension.
-- Later, an agent profile adds its own prompt, tools and extensions. See `PROFILES.md`.
+- The profile `~/.pi/agent/agents/<name>.md` adds its tools, extensions, skills, system prompt and first model. See `PROFILES.md`. The ladder and the `checks` are later steps.
 
 ## Plan
 

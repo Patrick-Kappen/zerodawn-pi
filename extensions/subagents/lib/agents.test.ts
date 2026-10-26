@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createAgents, MAX_EVENTS, MODEL } from "./agents.ts";
+import { createAgents, MAX_EVENTS } from "./agents.ts";
 import type { Timers } from "./lifecycle.ts";
 import type { ServerMessage } from "./protocol.ts";
 
@@ -69,11 +69,12 @@ function setup(options: { openFails?: boolean } = {}) {
 }
 
 const ID = "abcdef12-0000-4000-8000-000000000000";
+const ARGS = ["--no-tools", "--no-mcp", "--model", "m/x:off", "--system-prompt", "You are a test."];
 const usage = { tokens: 10, cost: 0.5 };
 
 test("start opens a window with the pi command, the env and a starting entry", async () => {
   const { agents, opened } = setup();
-  assert.equal(await agents.start("do it"), ID);
+  assert.equal(await agents.start("do it", ARGS), ID);
   assert.deepEqual(opened, [
     {
       name: "sub-abcd",
@@ -88,8 +89,7 @@ test("start opens a window with the pi command, the env and a starting entry", a
         "/x/index.ts",
         "-e",
         "/y/login.ts",
-        "--model",
-        MODEL,
+        ...ARGS,
         "--session-id",
         ID,
         "--session-dir",
@@ -104,14 +104,17 @@ test("start opens a window with the pi command, the env and a starting entry", a
 
 test("a failed window start leaves no entry and names the cause", async () => {
   const { agents } = setup({ openFails: true });
-  await assert.rejects(agents.start("t"), (error: Error) => /could not start subagent/.test(error.message) && /tmux down/.test((error.cause as Error).message));
+  await assert.rejects(
+    agents.start("t", ARGS),
+    (error: Error) => /could not start subagent/.test(error.message) && /tmux down/.test((error.cause as Error).message),
+  );
   assert.deepEqual(agents.entries(), []);
   assert.equal(agents.running(), false);
 });
 
 test("hello sends the task and sets running; settle sets idle and sends one result", async () => {
   const { agents, toSub, toMains } = setup();
-  await agents.start("do it");
+  await agents.start("do it", ARGS);
   agents.hello(ID);
   assert.deepEqual(toSub, [[ID, { type: "task", task: "do it" }]]);
   assert.equal(agents.entries()[0]?.status, "running");
@@ -135,7 +138,7 @@ test("hello sends the task and sets running; settle sets idle and sends one resu
 
 test("only the last 20 events are kept, each at most 200 characters", async () => {
   const { agents, toMains } = setup();
-  await agents.start("t");
+  await agents.start("t", ARGS);
   agents.hello(ID);
   for (let i = 0; i < 30; i++) agents.event(ID, { kind: "tool_start", name: `t${i}`, args: "a".repeat(500) });
   agents.event(ID, { kind: "settled", text: "x" });
@@ -148,7 +151,7 @@ test("only the last 20 events are kept, each at most 200 characters", async () =
 
 test("no hello within 30 s fails the agent and tells main", async () => {
   const { agents, clock, toMains } = setup();
-  await agents.start("t");
+  await agents.start("t", ARGS);
   await clock.advance(29_000);
   assert.equal(agents.entries()[0]?.status, "starting");
   await clock.advance(1000);
@@ -167,7 +170,7 @@ test("no hello within 30 s fails the agent and tells main", async () => {
 
 test("a hello cancels the hello timeout", async () => {
   const { agents, clock, toMains } = setup();
-  await agents.start("t");
+  await agents.start("t", ARGS);
   agents.hello(ID);
   await clock.advance(60_000);
   assert.equal(agents.entries()[0]?.status, "running");
@@ -176,7 +179,7 @@ test("a hello cancels the hello timeout", async () => {
 
 test("a window that is gone without a settle fails the agent at the next check", async () => {
   const { agents, clock, toMains, setWindows, errors } = setup();
-  await agents.start("t");
+  await agents.start("t", ARGS);
   agents.hello(ID);
   await clock.advance(2000);
   assert.equal(agents.entries()[0]?.status, "running");
@@ -192,7 +195,7 @@ test("a window that is gone without a settle fails the agent at the next check",
 
 test("a settled agent whose window is gone stays idle", async () => {
   const { agents, clock, setWindows } = setup();
-  await agents.start("t");
+  await agents.start("t", ARGS);
   agents.hello(ID);
   agents.event(ID, { kind: "settled", text: "x" });
   setWindows([]);
@@ -202,12 +205,12 @@ test("a settled agent whose window is gone stays idle", async () => {
 
 test("late events of a failed agent are ignored; a second settle does not send a second result", async () => {
   const { agents, clock, toMains } = setup();
-  await agents.start("t");
+  await agents.start("t", ARGS);
   await clock.advance(30_000);
   agents.event(ID, { kind: "message", text: "late", usage });
   assert.equal(toMains.length, 1);
   const second = setup();
-  await second.agents.start("t");
+  await second.agents.start("t", ARGS);
   second.agents.hello(ID);
   second.agents.event(ID, { kind: "settled", text: "a" });
   second.agents.event(ID, { kind: "settled", text: "b" });
@@ -218,7 +221,7 @@ test("hello and events of an unknown agent fail loud; a second hello fails", asy
   const { agents } = setup();
   assert.throws(() => agents.hello("nope"), /no subagent with id "nope"/);
   assert.throws(() => agents.event("nope", { kind: "settled", text: "" }), /no subagent/);
-  await agents.start("t");
+  await agents.start("t", ARGS);
   agents.hello(ID);
   assert.throws(() => agents.hello(ID), /cannot say hello again/);
 });
@@ -245,7 +248,7 @@ test("a listWindows error goes to onError", async () => {
     onChange: () => {},
     onError: (error) => errors.push(error),
   });
-  await agents.start("t");
+  await agents.start("t", ARGS);
   await clock.advance(2000);
   assert.equal(errors.length, 1);
   assert.match(errors[0]?.message ?? "", /could not list the windows/);
@@ -254,7 +257,7 @@ test("a listWindows error goes to onError", async () => {
 
 test("dispose clears every timer", async () => {
   const { agents, clock } = setup();
-  await agents.start("t");
+  await agents.start("t", ARGS);
   assert.ok(clock.pending.size > 0);
   agents.dispose();
   assert.equal(clock.pending.size, 0);

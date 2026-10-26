@@ -5,7 +5,6 @@ import type { Tmux } from "./tmux.ts";
 
 export const HELLO_TIMEOUT_MS = 30_000;
 export const POLL_MS = 2000;
-export const MODEL = "anthropic/claude-haiku-5-5:off";
 export const MAX_EVENTS = 20;
 export const MAX_LINE = 200;
 
@@ -114,7 +113,7 @@ export function createAgents(options: AgentsOptions) {
     }
   }
 
-  async function start(task: string): Promise<string> {
+  async function start(task: string, args: string[]): Promise<string> {
     const id = options.newId();
     const record: AgentRecord = {
       entry: { id, role: "sub", window: "", status: "starting" },
@@ -134,8 +133,7 @@ export function createAgents(options: AgentsOptions) {
       "-nc",
       "--no-themes",
       ...options.extensions.flatMap((path) => ["-e", path]),
-      "--model",
-      MODEL,
+      ...args,
       "--session-id",
       id,
       "--session-dir",
