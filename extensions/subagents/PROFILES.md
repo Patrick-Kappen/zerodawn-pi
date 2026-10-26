@@ -41,7 +41,7 @@ You are a scout. ...
 | `description` | yes | When to use this profile. The main agent reads it to choose a profile. |
 | `models` | yes | Model ladder, `<provider>/<model>[:<thinking>]`. The tool takes the first available one. |
 | `tools` | yes | Exact tool set, passed as `--tools`. `[]` is no tools. MCP tools by pattern, for example `mcp__github__*`. Without an `mcp__` entry the subagent starts with `--no-mcp`. |
-| `extensions` | yes | Extensions of this package by name (`bash`, `files`, `tests`, ...), found next to the subagents extension (`../<name>/index.ts`), or absolute paths. Loaded with `-e`. |
+| `extensions` | yes | Extension names, found in the packages that Home Manager installs: `~/.pi/agent/packages/*/extensions/<name>/index.ts`. Loaded with `-e`. |
 | `skills` | yes | Skill names, found only in `~/.pi/agent/skills/<name>`. A package delivers its skills there through Home Manager. Loaded with `--skill`. |
 | `system` | yes | `replace`: the body replaces the pi system prompt. `append`: the body goes after it. |
 | `checks` | yes | Extra commands that must pass before the agent is done, after the repository tests. |
