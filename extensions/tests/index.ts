@@ -3,14 +3,18 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { textOf } from "../../shared/util.ts";
 import { isCheck, isTest, loadRecipes, promptText, type Recipes, Tracker } from "./lib/recipes.ts";
-import { RunTests, TOOL } from "./lib/run.ts";
+import { type Replacement, RunTests, TOOL } from "./lib/run.ts";
+
+/** Bash runs this in place of a test or check command; the extension runs the command itself. */
+const NO_OP = ":";
 
 export default function (pi: ExtensionAPI) {
   let tracker = new Tracker();
   let recipes: Recipes | undefined;
   const hints = new Map<string, string>();
+  const replaced = new Map<string, Promise<Replacement>>();
 
-  const runTests = new RunTests();
+  const runTests = new RunTests((text) => pi.sendMessage({ customType: "run-tests", content: text, display: true }, { triggerTurn: true, deliverAs: "steer" }));
 
   pi.registerTool({
     ...TOOL,
@@ -24,6 +28,11 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_start", () => {
     tracker = new Tracker();
+    replaced.clear();
+    runTests.reset();
+  });
+
+  pi.on("session_shutdown", () => {
     runTests.reset();
   });
 
@@ -32,19 +41,36 @@ export default function (pi: ExtensionAPI) {
     if (recipes) event.systemPromptOptions.sections.project_recipes = promptText(recipes);
   });
 
-  pi.on("tool_call", async (event, ctx) => {
-    const command = (event.input as any).command;
+  pi.on("tool_call", (event, ctx) => {
+    const input = event.input as { command?: unknown; background?: boolean };
+    const command = input.command;
     if (event.toolName !== "bash" || typeof command !== "string") return;
-    if (isTest(command)) return { block: true, reason: await runTests.insteadOfBash(event.toolCallId, command, ctx) };
     const reason = tracker.check(command, recipes);
-    if (reason) return { block: true, reason };
-    if (isCheck(command)) return { block: true, reason: await runTests.check(event.toolCallId, command, ctx) };
+    if (reason && !isTest(command)) return { block: true, reason };
+    // Not awaited: pi runs the tool_call handlers of parallel calls one after another, so a wait here holds the other calls.
+    const replacement = isTest(command)
+      ? runTests.insteadOfBash(event.toolCallId, command, ctx)
+      : isCheck(command)
+        ? runTests.check(event.toolCallId, command, ctx)
+        : undefined;
+    if (replacement) {
+      replaced.set(event.toolCallId, replacement);
+      input.command = NO_OP;
+      input.background = false;
+      return;
+    }
     const hint = tracker.started(command, recipes);
     if (hint) hints.set(event.toolCallId, hint);
   });
 
-  pi.on("tool_result", (event) => {
+  pi.on("tool_result", async (event) => {
     if (event.toolName !== "bash") return;
+    const pending = replaced.get(event.toolCallId);
+    if (pending) {
+      replaced.delete(event.toolCallId);
+      const replacement = await pending;
+      return { content: [{ type: "text", text: replacement.text }], isError: replacement.isError };
+    }
     const hint = hints.get(event.toolCallId);
     hints.delete(event.toolCallId);
     if (!hint) return;
