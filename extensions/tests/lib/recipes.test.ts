@@ -76,9 +76,20 @@ test("isTest: test commands of many tools, also behind cd, env, npx, uv run, nix
 });
 
 test("isCheck: lint, type and check commands; not tests or builds", () => {
-  for (const c of ["just check", "just lint", "nix flake check", "biome check .", "npx eslint src", "tsc", "cargo clippy", "ruff check .", "go vet ./..."])
+  for (const c of [
+    "just check",
+    "just lint",
+    "nix flake check",
+    "biome check .",
+    "npx eslint src",
+    "tsc",
+    "cargo clippy",
+    "ruff check .",
+    "go vet ./...",
+    "nixfmt --check f.nix",
+  ])
     assert.ok(isCheck(c), c);
-  for (const c of ["just test", "nix build", "just fmt", "echo tsc", 'git commit -m "just check"']) assert.ok(!isCheck(c), c);
+  for (const c of ["just test", "nix build", "just fmt", "nixfmt f.nix", "echo tsc", 'git commit -m "just check"']) assert.ok(!isCheck(c), c);
 });
 
 test("a command that a recipe does is blocked", () => {

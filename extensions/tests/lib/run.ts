@@ -1,10 +1,11 @@
-import { writeFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { callOutFile, shorten } from "../../../shared/store.ts";
+import { callFileId, callOutFile, shorten } from "../../../shared/store.ts";
 import { CHANGED_RECIPE, changedFiles, execute, inGit, plan, type Run, reader, TIMEOUT_MS } from "../../../shared/testrun.ts";
 import { absolutePath } from "../../../shared/util.ts";
 import { loadRecipes } from "./recipes.ts";
-import { counts, diagnostics, failures, warningCount } from "./report.ts";
+import { counts, type Diagnosis, diagnose, failures, warningCount } from "./report.ts";
 
 const INLINE_MS = 15 * 1000;
 const RERUN = "# rerun";
@@ -14,8 +15,19 @@ type Result = { content: { type: "text"; text: string }[]; details: Record<strin
 const noTest = (uncovered: string[]) =>
   `No test for: ${uncovered.join(", ")}. Add a test file that imports each of them, at the place and in the form that the AGENTS.md or README of the project gives, then run run_tests again.`;
 
+/** The file in the session directory where noteAnomaly writes; extensions/bash/scripts/check-findings.ts reads it. */
+export const ANOMALIES = "check-anomalies.jsonl";
+
+/** Writes a red result that the parser did not understand: no line matched, the result was cut, or no diagnostic has a location. */
+function noteAnomaly(d: Diagnosis, command: string, log: string): void {
+  const signals = [d.fallback && "fallback", d.capped && "capped", !d.fallback && !d.located && "no location"].filter(Boolean);
+  if (!signals.length) return;
+  const line = JSON.stringify({ time: new Date().toISOString(), signals, command, log, result: d.text });
+  appendFileSync(join(dirname(dirname(log)), ANOMALIES), `${line}\n`);
+}
+
 /** One line for green; for red the failures of a test run, or the diagnostics of a check or a warning; the full output in the log. A warning makes a run red. */
-function report(run: Run, kind: "tests" | "check", uncovered: string[], log: string): { text: string; ok: boolean } {
+function report(run: Run, kind: "tests" | "check", command: string, uncovered: string[], log: string): { text: string; ok: boolean } {
   const warned = warningCount(run.output);
   const failed = run.code !== 0 || run.timedOut;
   const ok = !failed && !warned && !uncovered.length;
@@ -26,7 +38,11 @@ function report(run: Run, kind: "tests" | "check", uncovered: string[], log: str
   if (uncovered.length) lines.push(noTest(uncovered));
   if (warned) lines.push("A warning is an error here: fix each one.");
   if (failed && kind === "tests") lines.push(failures(run.output));
-  else if (failed || warned) lines.push(diagnostics(run.output));
+  else if (failed || warned) {
+    const d = diagnose(run.output);
+    lines.push(d.text);
+    noteAnomaly(d, command, log);
+  }
   lines.push(`log: ${shorten(log)}`);
   return { text: lines.join("\n"), ok };
 }
@@ -117,11 +133,11 @@ export class RunTests {
       const earlier = this.last.get(key);
       if (earlier && !command.includes(RERUN))
         return { text: `${CHECK_HEAD}\n${again(earlier, `add "${RERUN}" to run it again`).content[0].text}`, isError: earlier.isError };
-      const r = await this.inline(key, `check "${clean}"`, ctx.signal, async (signal) => {
+      const r = await this.inline(key, `check ${callFileId(ctx, toolCallId)}`, ctx.signal, async (signal) => {
         const run = await execute(["bash", "-c", command], ctx.cwd, signal);
         const log = callOutFile(ctx, toolCallId, "check");
         writeFileSync(log, run.output);
-        const { text: t, ok } = report(run, "check", [], log);
+        const { text: t, ok } = report(run, "check", command, [], log);
         return text(t, !ok, { log });
       });
       return { text: `${CHECK_HEAD}\n${r.content[0].text}`, isError: r.isError };
@@ -183,11 +199,11 @@ export class RunTests {
       this.last.set(key, result);
       return result;
     }
-    return this.inline(key, `run_tests "${p.run.join(" ")}"`, signal, async (stop) => {
+    return this.inline(key, `run_tests ${callFileId(ctx, toolCallId)}`, signal, async (stop) => {
       const run = await execute(p.run, cwd, stop);
       const log = callOutFile(ctx, toolCallId, "tests");
       writeFileSync(log, run.output);
-      const { text: t, ok } = report(run, "tests", p.uncovered, log);
+      const { text: t, ok } = report(run, "tests", p.run.join(" "), p.uncovered, log);
       return text(t, !ok, { changed, tests: p.tests, uncovered: p.uncovered, log });
     });
   }

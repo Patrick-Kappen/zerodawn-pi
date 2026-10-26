@@ -31,6 +31,7 @@ const CHECK_TOOLS = [
   "nix\\s+flake\\s+check",
   "biome\\s+(check|lint|ci)",
   "(eslint|tsc|mypy|pyright|shellcheck|golangci-lint|statix|deadnix|Invoke-ScriptAnalyzer)",
+  "nixfmt\\s+(--check|-c)",
   "ruff\\s+check",
   "cargo\\s+(clippy|check)",
   "go\\s+vet",
