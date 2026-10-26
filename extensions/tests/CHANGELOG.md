@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 — 2026-10-26
+
+- short check result: diagnostics only, deduplicated
+
 ## 0.3.0 — 2026-10-26
 
 - subagents: done gate runs the tests in the subagent

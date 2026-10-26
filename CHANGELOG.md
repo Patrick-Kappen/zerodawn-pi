@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.1 — 2026-10-26
+
+### shared 0.4.1
+
+- tests: short check result: diagnostics only, deduplicated
+
+### tests 0.3.1
+
+- short check result: diagnostics only, deduplicated
+
 ## 0.8.0 — 2026-10-26
 
 ### shared 0.4.0
