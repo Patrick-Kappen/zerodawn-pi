@@ -12,7 +12,7 @@ export interface Status {
 
 export interface Client {
   status(): Promise<Status>;
-  start(task: string, args: string[], signal?: AbortSignal): Promise<AgentResult>;
+  start(task: string, args: string[], checks: string[], signal?: AbortSignal): Promise<AgentResult>;
   answer(id: string, text: string, signal?: AbortSignal): Promise<AgentResult>;
   isOpen(): boolean;
   close(): void;
@@ -88,8 +88,8 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
       });
     }
 
-    function start(task: string, args: string[], signal?: AbortSignal): Promise<AgentResult> {
-      return run({ type: "start", task, args }, signal);
+    function start(task: string, args: string[], checks: string[], signal?: AbortSignal): Promise<AgentResult> {
+      return run({ type: "start", task, args, checks }, signal);
     }
 
     function answer(id: string, text: string, signal?: AbortSignal): Promise<AgentResult> {

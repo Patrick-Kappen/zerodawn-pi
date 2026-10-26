@@ -167,7 +167,7 @@ export async function startSupervisor(options: SupervisorOptions) {
         return;
       case "start":
         if (connection.role !== "main") throw new Error('supervisor: only a connection with hello role "main" can start a subagent.');
-        agents.start(message.task, message.args).then(
+        agents.start(message.task, message.args, message.checks).then(
           async (id) => {
             await writing;
             send(socket, { type: "started", id });

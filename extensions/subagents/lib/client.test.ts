@@ -77,7 +77,7 @@ test("client start sends the task and waits for the result of its agent, even in
     },
     async (path) => {
       const client = await connectMain(path, timers, 1000);
-      assert.deepEqual(await client.start("do it", ["--no-tools"]), {
+      assert.deepEqual(await client.start("do it", ["--no-tools"], []), {
         type: "result",
         id: "a1",
         status: "idle",
@@ -96,7 +96,7 @@ test("client start rejects an error reply, a closed connection and a missing sta
     (_data, write) => write('{"type":"error","message":"no tmux"}\n'),
     async (path) => {
       const client = await connectMain(path, timers, 1000);
-      await assert.rejects(client.start("t", ["--no-tools"]), /refused the request: no tmux/);
+      await assert.rejects(client.start("t", ["--no-tools"], []), /refused the request: no tmux/);
       client.close();
     },
   );
@@ -104,7 +104,7 @@ test("client start rejects an error reply, a closed connection and a missing sta
     () => {},
     async (path) => {
       const client = await connectMain(path, timers, 100);
-      await assert.rejects(client.start("t", ["--no-tools"]), /did not start the subagent within 100 ms/);
+      await assert.rejects(client.start("t", ["--no-tools"], []), /did not start the subagent within 100 ms/);
       client.close();
     },
   );
@@ -112,7 +112,7 @@ test("client start rejects an error reply, a closed connection and a missing sta
     (_data, write) => write('{"type":"started","id":"a1"}\n'),
     async (path) => {
       const client = await connectMain(path, timers, 1000);
-      const waiting = client.start("t", ["--no-tools"]);
+      const waiting = client.start("t", ["--no-tools"], []);
       setTimeout(() => client.close(), 50);
       await assert.rejects(waiting, /closed the connection/);
     },
@@ -125,7 +125,7 @@ test("client start stops waiting on abort", async () => {
     async (path) => {
       const client = await connectMain(path, timers, 1000);
       const controller = new AbortController();
-      const waiting = client.start("t", ["--no-tools"], controller.signal);
+      const waiting = client.start("t", ["--no-tools"], [], controller.signal);
       setTimeout(() => controller.abort(), 50);
       await assert.rejects(waiting, /subagent a1 was aborted/);
       client.close();

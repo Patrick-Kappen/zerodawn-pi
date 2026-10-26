@@ -7,9 +7,9 @@ fail() { printf 'pi-version: %s\nNext: %s\n' "$1" "$2" >&2; exit 1; }
 command -v nix >/dev/null || fail "nix is not installed" "install nix; the dev shell and the tests come from flake.nix"
 system="$(nix eval --raw --impure --expr builtins.currentSystem)"
 shell=".#devShells.$system.default"
-nix build --no-link --quiet "$shell" || fail "cannot build the dev shell $shell" "fix flake.nix, then run again"
-expected="$(nix eval --raw "$shell.PI_VERSION")"
-modules="$(nix eval --raw "$shell.NODE_MODULES")"
+nix build --option warn-dirty false --no-link --quiet "$shell" || fail "cannot build the dev shell $shell" "fix flake.nix, then run again"
+expected="$(nix eval --option warn-dirty false --raw "$shell.PI_VERSION")"
+modules="$(nix eval --option warn-dirty false --raw "$shell.NODE_MODULES")"
 if [ -e node_modules ] && [ ! -L node_modules ]; then
   fail "node_modules is a directory, not the link to pi's packages" "rm -rf node_modules"
 fi

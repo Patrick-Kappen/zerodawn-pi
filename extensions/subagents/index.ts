@@ -3,8 +3,11 @@ import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { config } from "../../shared/config.ts";
+import { loadRecipes } from "../../shared/recipes.ts";
+import { changedFiles, execute, plan, uncoveredOf } from "../../shared/testrun.ts";
 import { type Client, connectMain } from "./lib/client.ts";
 import { ensureSupervisor } from "./lib/ensure.ts";
+import { runGate } from "./lib/gate.ts";
 import type { Timers } from "./lib/lifecycle.ts";
 import { answers } from "./lib/probe.ts";
 import { nodeFiles, resolveProfile } from "./lib/resolve.ts";
@@ -19,6 +22,7 @@ const EXTENSION_PATH = fileURLToPath(import.meta.url);
 
 function registerSub(pi: ExtensionAPI, env: SubEnv): void {
   let connection: SubConnection | undefined;
+  let cwd = process.cwd();
   const connected = (): SubConnection => {
     if (connection === undefined) throw new Error(`subagents: no connection to "${env.socket}". The session_start handler failed; read the error above.`);
     return connection;
@@ -26,9 +30,23 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
   const handlers = createSubHandlers({
     send: (message) => connected().send(message),
     sendUserMessage: (text) => void pi.sendUserMessage(text),
+    gate: () =>
+      runGate({
+        checks: env.checks,
+        changed: () => changedFiles(cwd),
+        uncovered: (changed) => uncoveredOf(cwd, changed).uncovered,
+        testCommand: () => {
+          const all = plan(cwd, loadRecipes(cwd), "all", []);
+          if (!("run" in all)) throw new Error(`subagents: plan for every test gave no command in ${cwd}.`);
+          return all.run;
+        },
+        run: (argv) => execute(argv, cwd, undefined),
+        sendUserMessage: (text) => void pi.sendUserMessage(text),
+      }),
   });
 
   pi.on("session_start", async (_event, ctx) => {
+    cwd = ctx.cwd;
     connection = await connectSub(env, handlers.onServerMessage, (error) => ctx.ui.notify(error.message, "error"));
   });
   pi.registerTool({
@@ -134,9 +152,9 @@ export default function (pi: ExtensionAPI): void {
         throw new Error(`subagent: action "start" needs a "profile". Expected a file ~/.pi/agent/agents/<name>.md.`);
       }
       if (params.action === "start") {
-        const { args } = await resolveProfile(homedir(), params.profile as string, nodeFiles);
+        const { args, profile } = await resolveProfile(homedir(), params.profile as string, nodeFiles);
         const connected = await connection(ctx.sessionManager.getSessionId());
-        return shapeResult(await connected.start(params.task as string, args, signal));
+        return shapeResult(await connected.start(params.task as string, args, profile.checks, signal));
       }
       const connected = await connection(ctx.sessionManager.getSessionId());
       const status = await connected.status();

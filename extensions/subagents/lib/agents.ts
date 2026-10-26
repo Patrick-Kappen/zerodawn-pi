@@ -49,6 +49,10 @@ export function formatEvent(event: SubEvent): string {
       return line(`message ${event.text}`);
     case "settled":
       return line(`settled ${event.text}`);
+    case "gate":
+      return line(`gate ${event.ok ? "green" : "red"}${event.text ? `: ${event.text}` : ""}`);
+    case "error":
+      return line(`error ${event.text}`);
   }
 }
 
@@ -115,7 +119,7 @@ export function createAgents(options: AgentsOptions) {
     }
   }
 
-  async function start(task: string, args: string[]): Promise<string> {
+  async function start(task: string, args: string[], checks: string[]): Promise<string> {
     const id = options.newId();
     const record: AgentRecord = {
       entry: { id, role: "sub", window: "", status: "starting" },
@@ -145,6 +149,7 @@ export function createAgents(options: AgentsOptions) {
       record.entry.window = await options.tmux.openWindow(options.session, `sub-${id.slice(0, 4)}`, command, {
         PI_SUBAGENT_SOCKET: options.socket,
         PI_SUBAGENT_ID: id,
+        PI_SUBAGENT_CHECKS: JSON.stringify(checks),
       });
     } catch (cause) {
       records.delete(id);
@@ -182,6 +187,8 @@ export function createAgents(options: AgentsOptions) {
     if (record.events.length > MAX_EVENTS) record.events.shift();
     if (value.kind === "message") {
       record.usage = { tokens: record.usage.tokens + value.usage.tokens, cost: record.usage.cost + value.usage.cost };
+    } else if (value.kind === "error") {
+      fail(record, value.text);
     } else if (value.kind === "settled" && record.entry.status === "running") {
       const pending = record.pending;
       record.pending = undefined;

@@ -1,3 +1,4 @@
+import type { GateResult } from "./gate.ts";
 import type { ClientMessage, ServerMessage } from "./protocol.ts";
 
 export const MAX_FIELD = 200;
@@ -5,6 +6,7 @@ export const MAX_FIELD = 200;
 export interface SubEnv {
   socket: string;
   id: string;
+  checks: string[];
 }
 
 export function readSubEnv(env: Record<string, string | undefined>): SubEnv | undefined {
@@ -14,7 +16,21 @@ export function readSubEnv(env: Record<string, string | undefined>): SubEnv | un
   if (socket === undefined || socket === "" || id === undefined || id === "") {
     throw new Error("subagents: set both PI_SUBAGENT_SOCKET and PI_SUBAGENT_ID, or neither. The supervisor sets both for a subagent.");
   }
-  return { socket, id };
+  return { socket, id, checks: parseChecks(env.PI_SUBAGENT_CHECKS) };
+}
+
+function parseChecks(raw: string | undefined): string[] {
+  const next = "The supervisor sets it to a JSON list of strings.";
+  if (raw === undefined) throw new Error(`subagents: PI_SUBAGENT_CHECKS is not set. ${next}`);
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch (cause) {
+    throw new Error(`subagents: PI_SUBAGENT_CHECKS is not valid JSON. ${next}`, { cause });
+  }
+  if (!Array.isArray(value) || value.some((check) => typeof check !== "string"))
+    throw new Error(`subagents: PI_SUBAGENT_CHECKS is not a list of strings. ${next}`);
+  return value as string[];
 }
 
 export function shorten(text: string, max = MAX_FIELD): string {
@@ -39,10 +55,12 @@ function textOf(message: MessageLike): string {
 export interface SubHandlerOptions {
   send: (message: ClientMessage) => void;
   sendUserMessage: (text: string) => void;
+  gate: () => Promise<GateResult>;
 }
 
 export function createSubHandlers(options: SubHandlerOptions) {
   let lastText = "";
+  let pending = false;
   return {
     onServerMessage(message: ServerMessage): void {
       if (message.type === "task") options.sendUserMessage(message.task);
@@ -65,14 +83,29 @@ export function createSubHandlers(options: SubHandlerOptions) {
       });
     },
     ask(question: string): string {
+      pending = true;
       options.send({ type: "ask", text: question });
       return "Your question went to the main agent. Stop now and wait for a new message with the answer.";
     },
     blocker(reason: string): string {
+      pending = true;
       options.send({ type: "blocker", text: reason });
       return "Your blocker went to the main agent. Stop now and wait for a new message.";
     },
-    settled(): void {
+    async settled(): Promise<void> {
+      if (!pending) {
+        let result: { ok: boolean; reason: string };
+        try {
+          result = await options.gate();
+        } catch (error) {
+          // Without this the subagent never settles and the main tool waits forever.
+          options.send({ type: "event", event: { kind: "error", text: `done gate failed in the subagent: ${(error as Error).message}` } });
+          return;
+        }
+        options.send({ type: "event", event: { kind: "gate", ok: result.ok, text: shorten(result.reason) } });
+        if (!result.ok) return;
+      }
+      pending = false;
       options.send({ type: "event", event: { kind: "settled", text: lastText } });
       lastText = "";
     },
