@@ -4,6 +4,10 @@ Registers pi's `read`, `grep`, `edit` and `write` tools again with shorter descr
 
 ## Changes
 
+- `read`: a file over 200 lines without `offset` and `limit` gives an outline with line numbers: headings for Markdown, declarations for code (ts/js, py, sh, nix, go, rs, lua, yaml, json, toml, justfile). A file type without a rule gives the first 200 lines.
+- `read`: `limit` is capped at 200 lines, and the output at 16 KB. The note names the next `offset`. `offset=-N` gives the last N lines.
+- `read`: lines that are unchanged and still in the model context are not sent again. read, edit and write store line hashes of the lines they show in `details.seen`. A read checks the results in the current model context (after prune and compaction) and finds those lines in the file again, also when an edit moved them. A range with no new lines gives one line of text.
+- bash: a file viewer whose output goes to the model is blocked: `cat`, `head`, `tail`, `less`, `more`, `nl`, `bat`, `sed -n` and `grep`/`rg` with a file argument, also when piped into other viewers. A redirect to a file, `tail -f`, `grep -l/-c/-q` and a pipe into another program are allowed.
 - `edit`: when `oldText` is not found, the tool looks for the same lines with other indentation. One unique match: the edit is applied with the file's indentation, and the result says so. No match: the error shows the most similar place in the file, with line numbers.
 - `edit`: the result ends with the current lines around each change, so the model does not read the file again.
 - `write`: blocked on an existing file of more than 100 lines. Use `edit`, or remove the file first.
@@ -12,7 +16,7 @@ Registers pi's `read`, `grep`, `edit` and `write` tools again with shorter descr
 
 ## Constants
 
-`lib/files.ts`: `WRITE_MAX_LINES`, `GREP_LINE_MAX`. `index.ts`: `MAX_BYTES`.
+`lib/files.ts`: `WRITE_MAX_LINES`, `GREP_LINE_MAX`. `lib/read.ts`: `READ_MAX_LINES`, `READ_MAX_BYTES`. `lib/outline.ts`: `OUTLINE_MAX`. `index.ts`: `MAX_BYTES`.
 
 ## Changes
 
