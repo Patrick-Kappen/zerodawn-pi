@@ -2,11 +2,24 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GateResult } from "./gate.ts";
 import type { ClientMessage } from "./protocol.ts";
-import { createSubHandlers, GATE_HANDOFF_PROMPT, HANDOFF_PROMPT, readSubEnv, shorten } from "./sub.ts";
+import { createSubHandlers, DONE_PROMPT, GATE_HANDOFF_PROMPT, HANDOFF_PROMPT, readSubEnv, shorten } from "./sub.ts";
 
 const HANDOFF = { done: ["a"], open: ["b"], next: "c", files: ["f"], risks: [], tests: "green" };
 
-function setup(result: GateResult | Error = { ok: true, reason: "tests and checks green" }, idle = false) {
+const GREEN: GateResult = { ok: true, reason: "tests and checks green", files: ["a.ts", "a.test.ts"], tests: "green: 3 pass, 0 fail" };
+const SCOUT_GREEN: GateResult = { ok: true, reason: "no changed files", files: [], tests: "not run: no changed files" };
+const DONE = {
+  summary: "It works.",
+  changes: [
+    { file: "a.ts", what: "w" },
+    { file: "a.test.ts", what: "t" },
+  ],
+  tests: [{ file: "a.test.ts", covers: "c" }],
+  decisions: [],
+  open: [],
+};
+
+function setup(result: GateResult | Error = GREEN, idle = false, changed = ["a.ts", "a.test.ts"]) {
   const sent: ClientMessage[] = [];
   const user: string[] = [];
   let gates = 0;
@@ -16,7 +29,9 @@ function setup(result: GateResult | Error = { ok: true, reason: "tests and check
     sendUserMessage: (text) => user.push(text),
     abort: () => calls.push("abort"),
     isIdle: () => idle,
+    getActiveTools: () => ["read", "ask"],
     setActiveTools: (names) => calls.push(`tools ${names.join(",")}`),
+    changed: () => changed,
     gate: async (send) => {
       gates++;
       if (result instanceof Error) throw result;
@@ -74,26 +89,93 @@ test("assistant messages send shortened text and usage; other roles are ignored"
   assert.throws(() => handlers.messageEnd({ role: "assistant", content: [] }), /no usage/);
 });
 
-test("settled sends the full final text of the last assistant message", async () => {
-  const { sent, handlers } = setup();
-  const long = "z".repeat(1000);
-  handlers.messageEnd({ role: "assistant", content: [{ type: "text", text: "first" }], usage });
-  handlers.messageEnd({ role: "assistant", content: [{ type: "text", text: long }], usage });
+test("a green gate forces the tool done with the gate data; the model data goes out with the gate", async () => {
+  const { sent, user, calls, handlers } = setup();
   await handlers.settled();
-  assert.deepEqual(sent.at(-1), { type: "event", event: { kind: "settled", text: long } });
-  await handlers.settled();
-  assert.deepEqual(sent.at(-1), { type: "event", event: { kind: "settled", text: "" } });
-});
-
-test("settled runs the gate first: green sends the gate event and then settled", async () => {
-  const { sent, handlers } = setup();
-  handlers.messageEnd({ role: "assistant", content: [{ type: "text", text: "done" }], usage });
+  assert.deepEqual(sent, [{ type: "event", event: { kind: "gate", ok: true, text: "tests and checks green" } }]);
+  assert.deepEqual(user, [DONE_PROMPT]);
+  assert.deepEqual(calls, ["tools done"]);
+  assert.deepEqual(handlers.beforeRequest({ tools: [{ name: "done", input_schema: {} }] }), {
+    tools: [{ name: "done", input_schema: {} }],
+    tool_choice: { type: "tool", name: "done" },
+  });
+  assert.match(handlers.done(DONE), /Done sent/);
+  assert.deepEqual(sent.at(-1), { type: "done", data: DONE, gate: { ok: true, files: ["a.ts", "a.test.ts"], tests: "green: 3 pass, 0 fail" } });
   sent.length = 0;
   await handlers.settled();
-  assert.deepEqual(sent, [
-    { type: "event", event: { kind: "gate", ok: true, text: "tests and checks green" } },
-    { type: "event", event: { kind: "settled", text: "done" } },
-  ]);
+  assert.deepEqual(sent, []);
+  assert.equal(handlers.beforeRequest({ tools: [{ name: "done", input_schema: {} }] }), undefined);
+});
+
+test("a new task after done restores the tools and the gate runs again", async () => {
+  const { user, calls, handlers, gates } = setup();
+  await handlers.settled();
+  handlers.done(DONE);
+  handlers.onServerMessage({ type: "task", task: "more" });
+  assert.deepEqual(calls, ["tools done", "tools read,ask"]);
+  assert.deepEqual(user, [DONE_PROMPT, "more"]);
+  await handlers.settled();
+  assert.equal(gates(), 2);
+  assert.deepEqual(user.at(-1), DONE_PROMPT);
+});
+
+test("a green gate without changed files forces done_findings", async () => {
+  const { sent, calls, handlers } = setup(SCOUT_GREEN, false, []);
+  await handlers.settled();
+  assert.deepEqual(calls, ["tools done_findings"]);
+  assert.throws(() => handlers.done(DONE), /not active/);
+  const findings = { summary: "S", findings: ["a.ts:1 x"] };
+  assert.match(handlers.doneFindings(findings), /Done sent/);
+  assert.deepEqual(sent.at(-1), { type: "done", data: findings, gate: { ok: true, files: [], tests: "not run: no changed files" } });
+});
+
+test("done before it is forced fails", () => {
+  const { handlers } = setup();
+  assert.throws(() => handlers.done(DONE), /not active/);
+  assert.throws(() => handlers.doneFindings({ summary: "s", findings: ["x"] }), /not active/);
+});
+
+test("done checks changes against git: a missing file, an extra file, and an exact match", async () => {
+  const missing = setup(GREEN, false, ["a.ts", "a.test.ts", "b.ts"]);
+  await missing.handlers.settled();
+  assert.throws(() => missing.handlers.done(DONE), /Changed: a\.ts, a\.test\.ts, b\.ts\. Listed: a\.ts, a\.test\.ts\. Not changed: none\. Missing: b\.ts\./);
+  const extra = setup(GREEN, false, ["a.ts"]);
+  await extra.handlers.settled();
+  assert.throws(() => extra.handlers.done(DONE), /Not changed: a\.test\.ts\. Missing: none\./);
+  assert.ok(!extra.sent.some((message) => message.type === "done"));
+  const ok = setup(GREEN, false, ["a.test.ts", "a.ts"]);
+  await ok.handlers.settled();
+  assert.match(ok.handlers.done(DONE), /Done sent/);
+});
+
+test("two invalid done calls send an error event; a valid call between is not needed", async () => {
+  const { handlers, sent } = setup();
+  await handlers.settled();
+  handlers.toolEnd({ toolName: "done", isError: true });
+  assert.ok(!sent.some((message) => message.type === "event" && message.event.kind === "error"));
+  handlers.toolEnd({ toolName: "done", isError: true });
+  const error = sent.at(-1);
+  assert.ok(error?.type === "event" && error.event.kind === "error");
+  assert.match(error.event.text, /2 invalid calls of the tool done/);
+});
+
+test("two invalid done_findings calls fail the agent", async () => {
+  const { handlers, sent } = setup(SCOUT_GREEN, false, []);
+  await handlers.settled();
+  handlers.toolEnd({ toolName: "done_findings", isError: true });
+  handlers.toolEnd({ toolName: "done_findings", isError: true });
+  const error = sent.at(-1);
+  assert.ok(error?.type === "event" && error.event.kind === "error");
+  assert.match(error.event.text, /2 invalid calls of the tool done_findings/);
+});
+
+test("settled while done is forced and no call came is an error event", async () => {
+  const { handlers, sent } = setup();
+  await handlers.settled();
+  await handlers.settled();
+  const error = sent.at(-1);
+  assert.ok(error?.type === "event" && error.event.kind === "error");
+  assert.match(error.event.text, /without a call of the tool done/);
 });
 
 test("settled with a red gate sends only the gate event and keeps the agent running", async () => {

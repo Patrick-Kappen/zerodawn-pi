@@ -28,6 +28,14 @@ socket.on("data", (chunk) => {
       send({ type: "event", event: { kind: "message", text: "big", usage: { tokens: 100000, cost: 1 } } });
       continue;
     }
+    if (message.task === "CHANGES") {
+      send({
+        type: "done",
+        data: { summary: "It works.", changes: [{ file: "a.ts", what: "w" }], tests: [{ file: "a.test.ts", covers: "c" }], decisions: ["d"], open: [] },
+        gate: { ok: true, files: ["a.ts", "a.test.ts"], tests: "green: 2 pass, 0 fail" },
+      });
+      continue;
+    }
     if (message.task === "ASK") {
       send({ type: "ask", text: "which db?" });
       send({ type: "event", event: { kind: "settled", text: "asked" } });
@@ -36,7 +44,11 @@ socket.on("data", (chunk) => {
     send({ type: "event", event: { kind: "tool_start", name: "bash", args: "x".repeat(200) } });
     send({ type: "event", event: { kind: "tool_end", name: "bash", isError: false } });
     send({ type: "event", event: { kind: "message", text: "working", usage: { tokens: 7, cost: 0.01 } } });
-    send({ type: "event", event: { kind: "settled", text: `answer to: ${message.task}` } });
+    send({
+      type: "done",
+      data: { summary: `answer to: ${message.task}`, findings: ["a.ts:1 fact"] },
+      gate: { ok: true, files: [], tests: "not run: no changed files" },
+    });
   }
 });
 socket.on("close", () => process.exit(0));

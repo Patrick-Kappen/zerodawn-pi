@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MAX_TEXT, shapeResult } from "./result.ts";
+import { shapeResult } from "./result.ts";
 
 const base = { id: "abc", status: "idle" as const, text: "done", usage: { tokens: 1234, cost: 0.5 }, events: [] };
 
@@ -11,10 +11,11 @@ test("the content has only id, status, text and one usage line", () => {
   assert.doesNotMatch(shaped.content[0]?.text ?? "", /tool bash/);
 });
 
-test("a long text is cut and the cut is named", () => {
-  const shaped = shapeResult({ ...base, text: "x".repeat(MAX_TEXT + 5) });
-  assert.match(shaped.content[0]?.text ?? "", /\[cut: 5 more characters\]/);
-  assert.ok((shaped.content[0]?.text.length ?? 0) < MAX_TEXT + 200);
+test("details carry done and gate", () => {
+  const gate = { ok: true as const, files: [], tests: "t" };
+  const done = { summary: "s", findings: ["a.ts:1 x"] };
+  const shaped = shapeResult({ ...base, done, gate });
+  assert.deepEqual([shaped.details.done, shaped.details.gate], [done, gate]);
 });
 
 test("details keep at most 20 events of at most 200 characters", () => {

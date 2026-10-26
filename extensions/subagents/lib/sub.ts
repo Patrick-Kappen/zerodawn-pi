@@ -1,11 +1,11 @@
 import { forceTool } from "./force.ts";
-import type { Blocker, Handoff } from "./format.ts";
+import type { Blocker, Done, Findings, GateInfo, Handoff } from "./format.ts";
 import type { GateResult } from "./gate.ts";
 import type { ClientMessage, ServerMessage } from "./protocol.ts";
 
 export const MAX_FIELD = 200;
 export const MAX_GATE_TRIES = 3;
-export const MAX_INVALID_HANDOFFS = 2;
+export const MAX_INVALID_CALLS = 2;
 
 export interface SubEnv {
   socket: string;
@@ -57,6 +57,7 @@ function textOf(message: MessageLike): string {
 }
 
 export const HANDOFF_PROMPT = "You reached the token limit. Call the tool handoff now.";
+export const DONE_PROMPT = "The checks are green. Call the tool done now.";
 export const GATE_HANDOFF_PROMPT = `The done gate was red ${MAX_GATE_TRIES} times. Call the tool handoff now.`;
 
 export interface SubHandlerOptions {
@@ -64,26 +65,31 @@ export interface SubHandlerOptions {
   sendUserMessage: (text: string) => void;
   abort: () => void;
   isIdle: () => boolean;
+  getActiveTools: () => string[];
   setActiveTools: (names: string[]) => void;
+  changed: () => string[];
   gate: (sendUserMessage: (text: string) => void) => Promise<GateResult>;
 }
 
-// off: no handoff. waiting: aborted, the new run starts at the next settle. forced: the tool choice names handoff. done: sent or failed.
+// off: no forced tool. waiting: aborted, the new run starts at the next settle. forced: the tool choice names the tool in forcedTool. done: sent or failed.
 type HandoffState = "off" | "waiting" | "forced" | "done";
 
 export function createSubHandlers(options: SubHandlerOptions) {
-  let lastText = "";
   let pending = false;
   let redGates = 0;
   let state: HandoffState = "off";
   let invalidCalls = 0;
   let gateReason: string | undefined;
+  let forcedTool = "handoff";
+  let gateInfo: GateInfo | undefined;
+  let savedTools: string[] | undefined;
 
   const fail = (text: string) => {
     state = "done";
     options.send({ type: "event", event: { kind: "error", text } });
   };
-  const startHandoff = (prompt: string) => {
+  const startForced = (tool: string, prompt: string) => {
+    forcedTool = tool;
     state = "forced";
     options.sendUserMessage(prompt);
   };
@@ -92,6 +98,12 @@ export function createSubHandlers(options: SubHandlerOptions) {
     onServerMessage(message: ServerMessage): void {
       if (message.type === "task") {
         redGates = 0;
+        if (state === "done" && savedTools !== undefined) {
+          options.setActiveTools(savedTools);
+          savedTools = undefined;
+          state = "off";
+          invalidCalls = 0;
+        }
         options.sendUserMessage(message.task);
       } else if (message.type === "handoff") {
         // A gate handoff may already run when the token limit arrives.
@@ -100,7 +112,7 @@ export function createSubHandlers(options: SubHandlerOptions) {
         options.abort();
         options.setActiveTools(["handoff"]);
         // abort() ends the run later; a prompt during the run throws. Without a run, no settle comes.
-        if (options.isIdle()) startHandoff(HANDOFF_PROMPT);
+        if (options.isIdle()) startForced("handoff", HANDOFF_PROMPT);
       } else if (message.type === "error") throw new Error(`subagents: the supervisor refused the request: ${message.message}`);
       else throw new Error(`subagents: the supervisor sent "${message.type}" to a subagent. Stop the supervisor and start it again.`);
     },
@@ -109,17 +121,16 @@ export function createSubHandlers(options: SubHandlerOptions) {
     },
     toolEnd(event: { toolName: string; isError: boolean }): void {
       options.send({ type: "event", event: { kind: "tool_end", name: event.toolName, isError: event.isError } });
-      if (state === "forced" && event.toolName === "handoff" && event.isError && ++invalidCalls >= MAX_INVALID_HANDOFFS) {
-        fail(`handoff: the model sent ${MAX_INVALID_HANDOFFS} invalid calls of the tool handoff. Read the validation errors in the subagent window.`);
+      if (state === "forced" && event.toolName === forcedTool && event.isError && ++invalidCalls >= MAX_INVALID_CALLS) {
+        fail(`${forcedTool}: the model sent ${MAX_INVALID_CALLS} invalid calls of the tool ${forcedTool}. Read the validation errors in the subagent window.`);
       }
     },
     messageEnd(message: MessageLike): void {
       if (message.role !== "assistant") return;
       if (message.usage === undefined) throw new Error("subagents: an assistant message has no usage. Check the pi version.");
-      lastText = textOf(message);
       options.send({
         type: "event",
-        event: { kind: "message", text: shorten(lastText), usage: { tokens: message.usage.totalTokens, cost: message.usage.cost.total } },
+        event: { kind: "message", text: shorten(textOf(message)), usage: { tokens: message.usage.totalTokens, cost: message.usage.cost.total } },
       });
     },
     ask(question: string): string {
@@ -138,11 +149,36 @@ export function createSubHandlers(options: SubHandlerOptions) {
       state = "done";
       return "Handoff sent. Stop.";
     },
+    done(data: Done): string {
+      if (state !== "forced" || forcedTool !== "done" || gateInfo === undefined) {
+        throw new Error("done: the tool is not active. Do not call it until the checks are green.");
+      }
+      const listed = new Set(data.changes.map((change) => change.file));
+      const changed = new Set(options.changed());
+      const extra = [...listed].filter((file) => !changed.has(file));
+      const missing = [...changed].filter((file) => !listed.has(file));
+      if (extra.length > 0 || missing.length > 0) {
+        throw new Error(
+          `done: "changes" must list exactly the files that git shows as changed. Changed: ${[...changed].join(", ") || "none"}. Listed: ${[...listed].join(", ")}. Not changed: ${extra.join(", ") || "none"}. Missing: ${missing.join(", ") || "none"}. Call done again with the right list.`,
+        );
+      }
+      options.send({ type: "done", data, gate: gateInfo });
+      state = "done";
+      return "Done sent. Stop.";
+    },
+    doneFindings(data: Findings): string {
+      if (state !== "forced" || forcedTool !== "done_findings" || gateInfo === undefined) {
+        throw new Error("done_findings: the tool is not active. Do not call it until the checks are green.");
+      }
+      options.send({ type: "done", data, gate: gateInfo });
+      state = "done";
+      return "Done sent. Stop.";
+    },
     // Returns a changed copy of the payload, or undefined when pi must send it as it is.
     beforeRequest(payload: unknown): unknown {
       if (state !== "waiting" && state !== "forced") return undefined;
       try {
-        return forceTool(payload, "handoff");
+        return forceTool(payload, forcedTool);
       } catch (error) {
         fail((error as Error).message);
         return undefined;
@@ -151,16 +187,16 @@ export function createSubHandlers(options: SubHandlerOptions) {
     async settled(): Promise<void> {
       // The gate does not run on unfinished work; the handoff data is the result.
       if (state === "waiting") {
-        startHandoff(HANDOFF_PROMPT);
+        startForced("handoff", HANDOFF_PROMPT);
         return;
       }
       if (state === "forced") {
-        fail("handoff: the agent stopped without a call of the tool handoff. Read the subagent window.");
+        fail(`${forcedTool}: the agent stopped without a call of the tool ${forcedTool}. Read the subagent window.`);
         return;
       }
       if (state === "done") return;
+      let result: GateResult | undefined;
       if (!pending) {
-        let result: { ok: boolean; reason: string };
         let failures = "";
         try {
           result = await options.gate((text) => (failures = text));
@@ -175,7 +211,7 @@ export function createSubHandlers(options: SubHandlerOptions) {
           if (redGates >= MAX_GATE_TRIES) {
             gateReason = shorten(result.reason);
             options.setActiveTools(["handoff"]);
-            startHandoff(GATE_HANDOFF_PROMPT);
+            startForced("handoff", GATE_HANDOFF_PROMPT);
           } else {
             options.sendUserMessage(failures);
           }
@@ -183,9 +219,16 @@ export function createSubHandlers(options: SubHandlerOptions) {
         }
       }
       redGates = 0;
+      if (result?.ok) {
+        gateInfo = { ok: true, files: result.files, tests: result.tests };
+        savedTools = options.getActiveTools();
+        forcedTool = result.files.length > 0 ? "done" : "done_findings";
+        options.setActiveTools([forcedTool]);
+        startForced(forcedTool, DONE_PROMPT);
+        return;
+      }
       pending = false;
-      options.send({ type: "event", event: { kind: "settled", text: lastText } });
-      lastText = "";
+      options.send({ type: "event", event: { kind: "settled", text: "" } });
     },
   };
 }

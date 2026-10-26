@@ -30,9 +30,9 @@ test("in the main pi the extension registers only the tool subagent", () => {
   assert.deepEqual(load({ PI_SUBAGENT_SOCKET: undefined, PI_SUBAGENT_ID: undefined, PI_SUBAGENT_CHECKS: undefined }), ["subagent"]);
 });
 
-test("in a subagent the extension registers ask, blocker and handoff, not subagent", () => {
+test("in a subagent the extension registers ask, blocker, handoff, done and done_findings, not subagent", () => {
   const tools = load({ PI_SUBAGENT_SOCKET: "/tmp/x.sock", PI_SUBAGENT_ID: "a", PI_SUBAGENT_CHECKS: "[]" });
-  assert.deepEqual([...tools].sort(), ["ask", "blocker", "handoff"]);
+  assert.deepEqual([...tools].sort(), ["ask", "blocker", "done", "done_findings", "handoff"]);
 });
 
 test("one of the two subagent variables alone fails", () => {

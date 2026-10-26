@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 17. Subagent `done` is enforced, with two tools (2026-10-27)
+
+A green gate no longer sends the last assistant text. The subagent extension forces the tool `done` the same way as `handoff`. A tool schema cannot have a root `anyOf` (the main tool `subagent` shows why: the model sent empty arguments). So there are two tools: `done` for changed files and `done_findings` for a scout. The gate picks the tool. `done` also checks `changes[].file` against `git` at call time, so the model cannot invent or skip a file. The extension, not the model, adds the gate data (files, test line).
+
 ## 16. Subagent handoff is enforced, not asked for (2026-10-27)
 
 A steer message did not make models write a usable handoff. The subagent extension now aborts the run, activates only the tool `handoff`, and forces it with the tool choice in `before_provider_request`. The payload shape comes from the declared tools, because the model name does not tell the API. An unknown shape fails the agent. `ask`, `blocker` and `handoff` have strict schemas so the main agent gets structured data.

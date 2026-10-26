@@ -8,15 +8,16 @@ Status: work in progress. The tool `subagent` has three actions:
 - `answer` with `id` and `text`: sends `text` to the agent and waits for its next result, like `start`. The agent must have status `idle`, `question` or `blocked`.
 - `status`: starts or finds the supervisor, connects, and shows the agents.
 
-The result that the model sees is small: agent id, status, final text (cut at 8000 characters) and one line with tokens and cost. The last 20 events (200 characters each) go to `details` only.
+The result that the model sees is small: agent id, status, the done description (see "Done") and one line with tokens and cost. The last 20 events (200 characters each) go to `details` only.
 
-Every subagent has three fixed tools, whatever its profile says. All have strict schemas (TypeBox); pi validates the arguments and gives the model the error.
+Every subagent has five fixed tools, whatever its profile says. All have strict schemas (TypeBox); pi validates the arguments and gives the model the error.
 
 - `ask { question }`: `question` max 500 characters. The text goes to the supervisor. The model stops and waits. The result has status `question` and the question as text. The main agent answers with `answer`.
 - `blocker { issue, files, tried }`: all required; `issue` not empty; `tried` has at least one entry. The model uses it only after it tried to solve the problem within its task limits. The result has status `blocked`, `details.blocker = {issue, files, tried}` and the short text `issue`, `files: a, b`, `tried: x; y`. The main agent first tries to solve the problem within its own limits, then sends the solution with `answer`.
 - `handoff { done, open, next, files, risks, tests }`: all required; `next` and `tests` not empty. The model never chooses it. The supervisor forces it, see "Handoff".
+- `done` and `done_findings`: the model never chooses them. The extension forces one when the gate is green, see "Done".
 
-pi filters extension tools with `--tools` and `--no-tools`, so the main pi always adds `ask,blocker,handoff` to the `--tools` list. The subagent extension removes `handoff` from the active tools at `session_start`.
+pi filters extension tools with `--tools` and `--no-tools`, so the main pi always adds `ask,blocker,handoff,done,done_findings` to the `--tools` list. The subagent extension removes `handoff`, `done` and `done_findings` from the active tools at `session_start`.
 
 ## Design
 
@@ -42,11 +43,24 @@ The gate runs in the subagent, in its extension, on `agent_settled`. It uses the
 - A changed code file without a test: red. The subagent gets the file list and must add a test for each.
 - The whole repository test set runs (recipe `test`, else `bun test`). Red, or any warning line: the subagent gets only the failures.
 - Then each `checks` command of the profile runs in `bash -c`. The first red one goes back with its failures.
-- All green: the result goes to the main agent as before, the final text of the subagent.
+- All green: the extension forces the tool `done`, see "Done".
 
 Red keeps the status `running`. The subagent sends a `gate` event with `green` or `red` and a one-line reason, so the event list shows it. Limits: see "Limits". The main pi sends the `checks` of the profile in the `start` message; the supervisor gives them to the subagent in `PI_SUBAGENT_CHECKS`, a JSON list.
 
 The code for the test run (`changedFiles`, `plan`, `execute`, `verdict`) is in `shared/testrun.ts`, the same as `run_tests` uses.
+
+## Done
+
+When the gate is green (also "no changed files"), the extension does not send the last assistant text. It does the same as for the handoff, without an abort (the agent settled already): `setActiveTools` with only the one tool, the user message "The checks are green. Call the tool done now.", and `forceTool` in `before_provider_request`. 2 invalid calls fail the agent, as for `handoff`. After the call, a new `task` (an `answer`) restores the tools.
+
+A schema cannot have a root `anyOf`, so there are two tools. The gate picks one:
+
+- Changed files: `done { summary, changes, tests, decisions, open }`. `summary` is 1 to 200 characters, one sentence. `changes` is a list of `{file, what}` with at least one entry. `tests` is a list of `{file, covers}`. `decisions` and `open` are lists of strings.
+- No changed files (a scout): `done_findings { summary, findings }`. `findings` has at least one string; each is a fact with `path:line` where it applies.
+
+Git check: `done` compares the set of `changes[].file` with `changedFiles` at call time (the function of the gate, paths relative to the working directory). A file that is listed and not changed, or changed and not listed, is an error that names both sets. The model tries again; the call counts as invalid.
+
+The extension adds `gate: {ok: true, files, tests}` to the model data. `tests` is the one-line test result, for example "green: 12 pass, 0 fail". The supervisor finishes the agent with status `idle`. The text is the summary, one line `file: what` for each change, `tests: <gate line>; added: a, b`, then `decisions: ...` and `open: ...` only when not empty. For a scout: the summary and one line for each finding. `details.done` has the model data and `details.gate` the gate data. A settle without a `done` call, a question or a blocker fails the agent.
 
 ## Limits
 
