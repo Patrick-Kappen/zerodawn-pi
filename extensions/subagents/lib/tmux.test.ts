@@ -80,6 +80,11 @@ test("a server without sessions is read as an absent session", async () => {
   assert.equal(await createTmux(exec).hasSession("s"), false);
 });
 
+test("a server that exits during the check is read as an absent session", async () => {
+  const { exec } = fake([{ code: 1, stderr: "server exited unexpectedly" }]);
+  assert.equal(await createTmux(exec).hasSession("s"), false);
+});
+
 test("an unknown tmux error is not read as an absent session", async () => {
   const { exec } = fake([{ code: 1, stderr: "permission denied" }]);
   await assert.rejects(createTmux(exec).hasSession("s"), /exit code 1: permission denied/);
