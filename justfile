@@ -4,6 +4,10 @@ sibling := "zerodawn-pi-private"
 test: pi-version
     bun test
 
+# Run the tests for these changed files; run_tests calls it: just test-changed FILE...
+test-changed *files: pi-version
+    scripts/test-changed.sh {{files}}
+
 # Fail when the pi of flake.lock (used by tests and types) is not the installed pi
 pi-version:
     scripts/pi-version.sh
@@ -14,7 +18,7 @@ types:
 
 # Lint and check the format
 lint:
-    biome check .
+    biome check --error-on-warnings .
     shellcheck scripts/*.sh
 
 # Format and apply safe lint fixes
@@ -24,7 +28,7 @@ fmt:
 
 # Run every check: lint, types, tests, nix (nix flake check includes tsc and the tests per extension)
 check: lint types test
-    nix flake check
+    nix flake check --option warn-dirty false
 
 # Run the tests of every extension's last released version against the current shared/ and package.json
 compat:
