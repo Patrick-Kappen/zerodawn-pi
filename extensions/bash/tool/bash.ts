@@ -139,7 +139,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       widget.refresh();
       done.then((r) => reports.report(job, meta, r.text, true));
       return {
-        content: [{ type: "text", text: `job ${id} runs in the background · log: ${shorten(log)} · a message reports the result` }],
+        content: [{ type: "text", text: `job ${id}: running · log: ${shorten(log)}` }],
         details: { log, job: id, background: true },
       };
     },

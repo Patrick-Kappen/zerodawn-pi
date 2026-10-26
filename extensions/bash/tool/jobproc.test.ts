@@ -25,10 +25,7 @@ test("a job runs without a terminal, keeps the output and reports its exit code"
   const out = render(r.log, 1 << 20);
   assert.deepEqual(out.plain, ["no-tty", "ok", "b"]);
   assert.match(out.lines[1], /\x1b\[32mok\x1b\[0m/);
-  assert.match(
-    resultText(r.log, "exit 3 (1s)"),
-    /^exit 3 \(1s\) · 3 lines, \d+ bytes · output: .*\.txt\nno line looks like an error; last 3 lines:\nno-tty\nok\nb$/,
-  );
+  assert.match(resultText(r.log, "exit 3 (1s)"), /^exit 3 \(1s\) · 3 lines, \d+ bytes · output: .*\.txt\nlast 3 lines:\nno-tty\nok\nb$/);
 });
 
 test("a prompt gets EOF at once and an editor fails instead of waiting", async () => {
@@ -56,14 +53,14 @@ test("summarizeFromDisk reads the exit code from the script footer of an old log
   const log = join(dir, "job.log");
   writeFileSync(log, 'Script started on x\nhi\r\n\nScript done on y [COMMAND_EXIT_CODE="5"]\n');
   const meta = { id: "x", command: "echo hi", log, status: join(dir, "missing"), start: Date.now(), limit: 0, bg: true, reported: false };
-  assert.match(summarizeFromDisk(meta), /^exit 5 · 1 lines, \d+ bytes · output: .*\.txt\nno line looks like an error; last 1 lines:\nhi$/);
+  assert.match(summarizeFromDisk(meta), /^exit 5 · 1 lines, \d+ bytes · output: .*\.txt\nlast 1 lines:\nhi$/);
 });
 
-test("a failure returns the status, the path and only the lines that look like errors", async () => {
+test("a failure returns the status, the path and the error lines", async () => {
   const r = await run("seq 1 3000 | sed 's/$/ line of padding/; 1500s/.*/error: thing 1500 broke/; 2000s/.*/FAIL case 2000/'; exit 1");
   const lines = resultText(r.log, "exit 1 (1s)").split("\n");
   assert.match(lines[0], /^exit 1 \(1s\) \u00b7 3000 lines, \d+ bytes \u00b7 output: .*\.txt$/);
-  assert.deepEqual(lines.slice(1), ["2 distinct lines look like errors (lines: text):", "  1500: error: thing 1500 broke", "  2000: FAIL case 2000"]);
+  assert.deepEqual(lines.slice(1), ["errors (lines: text):", "  1500: error: thing 1500 broke", "  2000: FAIL case 2000"]);
   const txt = r.log.replace(/\.log$/, ".txt");
   assert.equal(readFileSync(txt, "utf8").split("\n")[1499], "error: thing 1500 broke");
 });
@@ -72,7 +69,7 @@ test("a failure without error lines returns the last lines", async () => {
   const r = await run("seq 1 10; exit 2");
   const lines = resultText(r.log, "exit 2 (1s)").split("\n");
   assert.match(lines[0], /^exit 2 \(1s\) \u00b7 10 lines/);
-  assert.deepEqual(lines.slice(1), ["no line looks like an error; last 3 lines:", "8", "9", "10"]);
+  assert.deepEqual(lines.slice(1), ["last 3 lines:", "8", "9", "10"]);
 });
 
 test("a success returns short output inline, else only the status and the path", async () => {

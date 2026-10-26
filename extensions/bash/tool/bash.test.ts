@@ -37,15 +37,12 @@ test("a short command returns its result inline", async () => {
 });
 
 test("a failing command throws its result", async () => {
-  await assert.rejects(
-    bash({ command: "echo bad >&2; exit 2" }, "b"),
-    /^Error: exit 2 \(\d+s\) \u00b7 1 lines.*\nno line looks like an error; last 1 lines:\nbad$/,
-  );
+  await assert.rejects(bash({ command: "echo bad >&2; exit 2" }, "b"), /^Error: exit 2 \(\d+s\) \u00b7 1 lines.*\nlast 1 lines:\nbad$/);
 });
 
 test("background: true returns the job id at once and a report follows", async () => {
   const r = await bash({ command: "echo late", background: true }, "c");
-  assert.match(r.content[0].text, /^job .* runs in the background/);
+  assert.match(r.content[0].text, /^job .*: running · log: /);
   assert.equal(r.details.background, true);
   while (reported.length === 0) await new Promise((done) => setTimeout(done, 50));
   assert.equal(reported[0].id, r.details.job);
@@ -54,7 +51,7 @@ test("background: true returns the job id at once and a report follows", async (
 test(`a command that runs longer than ${INLINE_WAIT_S} s moves to the background on its own`, { timeout: (INLINE_WAIT_S + 10) * 1000 }, async () => {
   const start = Date.now();
   const r = await bash({ command: "sleep 60", timeout: INLINE_WAIT_S + 5 }, "d");
-  assert.match(r.content[0].text, /^job .* runs in the background/);
+  assert.match(r.content[0].text, /^job .*: running · log: /);
   const waited = (Date.now() - start) / 1000;
   assert.ok(waited >= INLINE_WAIT_S && waited < INLINE_WAIT_S + 3, `waited ${waited}s`);
   kill(s.jobs.get(r.details.job)?.pid);
