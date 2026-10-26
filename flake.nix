@@ -7,6 +7,11 @@
       url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # The source of pi: types and tests use the pi that the user runs. A consumer sets follows to its own llm-agents.
+    llm-agents = {
+      url = "github:numtide/llm-agents.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -14,6 +19,7 @@
       self,
       nixpkgs,
       git-hooks,
+      llm-agents,
     }:
     let
       forAll =
@@ -28,35 +34,26 @@
       inherit (nixpkgs) lib;
       inherit (builtins.fromJSON (builtins.readFile ./package.json)) version;
       own = fileset: lib.fileset.difference fileset (lib.fileset.maybeMissing ./node_modules);
-      # The pinned npm packages from bun.lock as a fixed-output derivation, so tsc can run in the sandbox.
-      # After a change of bun.lock: just deps-hash.
-      bunDepsHash = "sha256-K7xZhVgmyC5uQKcmOOJ0U+oBL2kLyO0zVX8tg1krvaw=";
-      nodeModules =
+      # node_modules for tsc and the editor: pi and its dependencies (pi-ai, pi-tui, typebox, @types/node) from
+      # the pi package of llm-agents, at the version the user runs. No lock file of its own, nothing to update by hand.
+      pi = pkgs: llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.pi;
+      piModules =
         pkgs:
         pkgs.stdenvNoCC.mkDerivation {
-          name = "node-modules";
-          src = lib.fileset.toSource {
-            root = ./.;
-            fileset = lib.fileset.unions [
-              ./package.json
-              ./bun.lock
-            ];
-          };
+          pname = "pi-node-modules";
+          inherit (pi pkgs) version src npmDeps;
           nativeBuildInputs = [
-            pkgs.bun
-            pkgs.cacert
+            pkgs.nodejs
+            pkgs.npmHooks.npmConfigHook
           ];
+          npmFlags = [ "--ignore-scripts" ];
           dontBuild = true;
           dontFixup = true;
           installPhase = ''
-            export HOME=$TMPDIR BUN_INSTALL_CACHE_DIR=$TMPDIR/cache
-            bun install --frozen-lockfile --ignore-scripts --no-progress --no-summary
-            rm -rf node_modules/.cache node_modules/.bun-tag
             cp -r node_modules $out
+            mkdir -p $out/@earendil-works/pi-coding-agent
+            cp -r package.json dist $out/@earendil-works/pi-coding-agent/
           '';
-          outputHashMode = "recursive";
-          outputHashAlgo = "sha256";
-          outputHash = bunDepsHash;
         };
       allSources = lib.fileset.toSource {
         root = ./.;
@@ -327,7 +324,7 @@
               ''
                 cp -r "$src" src
                 chmod -R u+w src
-                ln -s ${nodeModules pkgs} src/node_modules
+                ln -s ${piModules pkgs} src/node_modules
                 cd src
                 tsc
                 touch "$out"
@@ -348,6 +345,8 @@
         {
           default = pkgs.mkShell {
             PRE_COMMIT_SHELL_HOOK = self.checks.${system}.pre-commit.shellHook;
+            NODE_MODULES = piModules pkgs;
+            PI_VERSION = (pi pkgs).version;
             shellHook = "source scripts/shell-hook.sh";
             packages = [
               pkgs.nodejs_24

@@ -34,7 +34,7 @@ Feature PRs do not touch versions or changelogs. When a set of changes is done:
 2. Open that commit as a PR. Edit the changelog wording there if you want. CI recognises a release PR (only versions, changelogs and READMEs changed) and runs `release-check` instead of the tests.
 3. Merge. CI tags `v<version>`, `<extension>-v<version>` and `shared-v<version>` for every new version and creates the GitHub release from `CHANGELOG.md`.
 
-Other commands: `just bump <version> [extension]` sets one version by hand; `just notes` rewrites the README changelog blocks; `just deps-hash` updates the hash of the pinned npm packages after a change of `bun.lock`.
+Other commands: `just bump <version> [extension]` sets one version by hand; `just notes` rewrites the README changelog blocks; `just pi-version` checks that the tests use the installed pi.
 
 ## Sibling repository
 

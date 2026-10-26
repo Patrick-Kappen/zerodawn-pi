@@ -16,7 +16,7 @@ pi package with independent extensions in TypeScript. Nix flake with a Home Mana
 - Commit subject: `<scope>: what changed`, scope is an extension name, `shared`, `release`, `ci`, `docs`, `flake`, `repo` or `deps`. Max 72 characters. The subjects become the changelog.
 - Work on a branch and open a PR; `main` is protected by a hook. CI tests only what changed on a PR, everything on `main`.
 - Do not edit `CHANGELOG.md` files or versions by hand. A release is `just bump-changed <level>` on a clean `main`, as its own PR.
-- Do not add a dependency. The pinned pi types in `package.json` must match the installed pi; after a change run `just deps-hash`.
+- Do not add a dependency. pi and its packages come from the `llm-agents` flake input; `nix flake update llm-agents` follows a new pi.
 - Fail loud: no fallback that hides a missing input. Errors name the file or the id and the next step.
 - No comments except for a reason the code cannot show. English everywhere.
 

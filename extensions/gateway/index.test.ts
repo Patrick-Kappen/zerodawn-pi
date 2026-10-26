@@ -1,4 +1,5 @@
-import { expect, test } from "bun:test";
+import assert from "node:assert/strict";
+import { test } from "node:test";
 import gatewaySession, { SESSION_HEADER } from "./index.ts";
 
 type Handler = (event: { headers: Record<string, string> }, ctx: unknown) => void;
@@ -13,9 +14,9 @@ function run(headers: Record<string, string>) {
 }
 
 test("adds the session id to requests for the gateway", () => {
-  expect(run({ "x-gateway-key": "k" })[SESSION_HEADER]).toBe("sess-1");
+  assert.equal(run({ "x-gateway-key": "k" })[SESSION_HEADER], "sess-1");
 });
 
 test("leaves requests to other endpoints unchanged", () => {
-  expect(run({ authorization: "Bearer t" })).toEqual({ authorization: "Bearer t" });
+  assert.deepEqual(run({ authorization: "Bearer t" }), { authorization: "Bearer t" });
 });

@@ -69,7 +69,7 @@ case "$mode" in
     fi
     build_checks "$checks"
 
-    if git diff --quiet "$base...HEAD" -- shared package.json bun.lock; then
+    if git diff --quiet "$base...HEAD" -- shared package.json flake.lock; then
       echo "shared/ unchanged: compat skipped"
     else
       run_compat

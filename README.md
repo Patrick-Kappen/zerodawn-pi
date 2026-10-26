@@ -49,7 +49,7 @@ The module:
 
 Pin a tag (`github:Patrick-Kappen/zerodawn-pi/v0.2.0`) or follow `main` and update with `nix flake update zerodawn-pi`; `flake.lock` pins the commit either way. Releases are tagged `v<version>`; each extension also gets `<name>-v<version>` when it changes.
 
-The pinned pi types in `package.json` match the pi version the package is developed against; after a pi upgrade, bump them and run `just deps-hash`.
+The types and tests use pi from the `llm-agents` flake input. Set `inputs.zerodawn-pi.inputs.llm-agents.follows = "llm-agents"` to use the same pi as your system; `just pi-version` fails when the lock and the installed pi differ.
 
 ## Install without Nix
 
