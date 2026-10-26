@@ -6,6 +6,9 @@
 # Usage: sync-branch.sh [BRANCH]; default: the current branch.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# A git hook exports GIT_DIR and more; with them, "git -C <clone>" would act on this repository.
+# shellcheck disable=SC2046
+unset $(git rev-parse --local-env-vars)
 branch="${1:-$(git rev-parse --abbrev-ref HEAD)}"
 sibling="$(sed -n 's/^sibling := "\(.*\)"$/\1/p' justfile)"
 [ -n "$sibling" ] || { echo "sync-branch: no 'sibling := \"...\"' line in justfile" >&2; exit 2; }
