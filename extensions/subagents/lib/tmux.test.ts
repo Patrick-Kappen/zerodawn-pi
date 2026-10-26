@@ -90,3 +90,16 @@ test("real tmux: setOption stores the value and killSession removes the session"
   await tmux.killSession("pi-sub-opt");
   assert.equal(await tmux.hasSession("pi-sub-opt"), false);
 });
+
+test("getOption returns undefined for an absent session and for an unset option", async () => {
+  const absent = fake([{ code: 1, stderr: "can't find session: s" }]);
+  assert.equal(await createTmux(absent.exec).getOption("s", "@pi-sub-socket"), undefined);
+  const unset = fake([{}, { stdout: "\n" }]);
+  assert.equal(await createTmux(unset.exec).getOption("s", "@pi-sub-socket"), undefined);
+});
+
+test("getOption reads the option with an exact session target", async () => {
+  const { exec, calls } = fake([{}, { stdout: "/run/x.sock\n" }]);
+  assert.equal(await createTmux(exec).getOption("pi-sub-x", "@pi-sub-socket"), "/run/x.sock");
+  assert.deepEqual(calls[1], ["tmux", "show-options", "-qv", "-t", "=pi-sub-x:", "@pi-sub-socket"]);
+});

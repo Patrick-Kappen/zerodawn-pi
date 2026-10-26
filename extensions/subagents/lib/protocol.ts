@@ -28,3 +28,20 @@ export function parseClientLine(line: string): ClientMessage {
 export function formatServerMessage(message: ServerMessage): string {
   return `${JSON.stringify(message)}\n`;
 }
+
+export function parseServerLine(line: string): ServerMessage {
+  let value: unknown;
+  try {
+    value = JSON.parse(line);
+  } catch (cause) {
+    throw new Error("protocol: the supervisor sent a line that is not valid JSON. Stop the supervisor and start it again.", { cause });
+  }
+  const message = value as { type?: unknown; message?: unknown; main?: unknown; agents?: unknown };
+  if (typeof value === "object" && value !== null) {
+    if (message.type === "error" && typeof message.message === "string") return { type: "error", message: message.message };
+    if (message.type === "status" && Array.isArray(message.agents) && (message.main === "connected" || message.main === "gone")) {
+      return { type: "status", agents: message.agents, main: message.main };
+    }
+  }
+  throw new Error(`protocol: the supervisor sent an unknown message: ${line}. Stop the supervisor and start it again.`);
+}

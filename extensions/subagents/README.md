@@ -2,7 +2,7 @@
 
 Delegate tasks to pi agents. Each agent runs as a normal interactive pi in a window of a detached tmux session.
 
-Status: work in progress. The supervisor (`supervisor.ts`) exists. The extension registers no tool yet.
+Status: work in progress. The tool `subagent` has one action, `status`: it starts or finds the supervisor, connects, and shows the status. No agent starts yet.
 
 ## Design
 

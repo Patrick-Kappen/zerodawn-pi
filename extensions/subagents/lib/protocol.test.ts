@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatServerMessage, parseClientLine } from "./protocol.ts";
+import { formatServerMessage, parseClientLine, parseServerLine } from "./protocol.ts";
 
 test("parseClientLine accepts hello main and status", () => {
   assert.deepEqual(parseClientLine('{"type":"hello","role":"main"}'), { type: "hello", role: "main" });
@@ -18,4 +18,12 @@ test("parseClientLine rejects bad lines with a reason", () => {
 
 test("formatServerMessage ends with one newline", () => {
   assert.equal(formatServerMessage({ type: "error", message: "x" }), '{"type":"error","message":"x"}\n');
+});
+
+test("parseServerLine reads status and error, and rejects the rest", () => {
+  assert.deepEqual(parseServerLine('{"type":"status","agents":[],"main":"connected"}'), { type: "status", agents: [], main: "connected" });
+  assert.deepEqual(parseServerLine('{"type":"error","message":"x"}'), { type: "error", message: "x" });
+  assert.throws(() => parseServerLine("nope"), /not valid JSON/);
+  assert.throws(() => parseServerLine('{"type":"status","main":"x"}'), /unknown message/);
+  assert.throws(() => parseServerLine("null"), /unknown message/);
 });
