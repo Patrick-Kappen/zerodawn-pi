@@ -89,6 +89,16 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.8.1 — 2026-10-26
+
+### shared 0.4.1
+
+- tests: short check result: diagnostics only, deduplicated
+
+### tests 0.3.1
+
+- short check result: diagnostics only, deduplicated
+
 ## 0.8.0 — 2026-10-26
 
 ### shared 0.4.0
@@ -108,23 +118,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ### subagents 0.3.0
 
 - ask and blocker tools, answer action
-
-## 0.6.0 — 2026-10-26
-
-### bash 0.4.0
-
-- guidelines say continue working while a job runs
-- guide a wait as one chained command, block a bare sleep
-- short messages, no prose in reports
-
-### subagents 0.2.0
-
-- start a subagent from an agent profile
-- profile prompt always replaces the pi prompt
-- absent profile keys load nothing
-- profile extensions resolve in installed packages
-- profile skills, MCP and extension lookup
-- document the profile proposal and the plan
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

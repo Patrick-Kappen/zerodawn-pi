@@ -56,9 +56,9 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 ## Changes
 
 <!-- changelog:start -->
-## 0.2.2 — 2026-10-26
+## 0.3.1 — 2026-10-26
 
-- no block; replace the bash result, background after 15 s
+- short check result: diagnostics only, deduplicated
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

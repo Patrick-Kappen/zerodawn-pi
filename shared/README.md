@@ -27,9 +27,9 @@ Tests: `util.test.ts`, `store.test.ts`, `config.test.ts`, `testrun.test.ts`. The
 ## Changes
 
 <!-- changelog:start -->
-## 0.4.0 — 2026-10-26
+## 0.4.1 — 2026-10-26
 
-- subagents: done gate runs the tests in the subagent
+- tests: short check result: diagnostics only, deduplicated
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
