@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0 — 2026-10-26
+
+- ask and blocker tools, answer action
+
 ## 0.2.0 — 2026-10-26
 
 - start a subagent from an agent profile

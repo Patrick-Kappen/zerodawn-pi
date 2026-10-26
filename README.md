@@ -89,6 +89,12 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.7.0 — 2026-10-26
+
+### subagents 0.3.0
+
+- ask and blocker tools, answer action
+
 ## 0.6.0 — 2026-10-26
 
 ### bash 0.4.0
@@ -111,12 +117,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ### tests 0.2.2
 
 - no block; replace the bash result, background after 15 s
-
-## 0.5.1 — 2026-10-26
-
-### tests 0.2.1
-
-- an option such as --error-on-warnings is not a warning
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

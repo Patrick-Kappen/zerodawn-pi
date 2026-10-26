@@ -82,14 +82,9 @@ The main pi connects to the supervisor when the first subagent starts. At `sessi
 ## Changes
 
 <!-- changelog:start -->
-## 0.2.0 — 2026-10-26
+## 0.3.0 — 2026-10-26
 
-- start a subagent from an agent profile
-- profile prompt always replaces the pi prompt
-- absent profile keys load nothing
-- profile extensions resolve in installed packages
-- profile skills, MCP and extension lookup
-- document the profile proposal and the plan
+- ask and blocker tools, answer action
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
