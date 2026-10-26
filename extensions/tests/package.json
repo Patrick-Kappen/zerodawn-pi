@@ -1,6 +1,6 @@
 {
   "name": "tests",
   "version": "0.1.0",
-  "description": "justfile and Makefile recipes in the system prompt; blocks a repeated test run",
+  "description": "run_tests tool for the changed files; justfile and Makefile recipes in the system prompt",
   "type": "module"
 }

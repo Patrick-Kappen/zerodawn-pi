@@ -7,9 +7,8 @@ export type Recipes = { tool: "just" | "make"; file: string; list: Recipe[] };
 
 const REPEAT_MAX = 2;
 const LONG = 80;
-const RERUN = "# rerun";
 const TEST =
-  /(^|[\s;&|(])(just\s+(test|check)\S*|make\s+(test|check)\S*|npm\s+(run\s+)?test|pnpm\s+test|yarn\s+test|bun\s+test|node\s+(--\S+\s+)*--test|pytest|python3?\s+-m\s+pytest|cargo\s+(test|nextest)|go\s+test|nix\s+flake\s+check|vitest|jest)(\s|$)/;
+  /(^|[\s;&|(])(just\s+test\S*|make\s+test\S*|npm\s+(run\s+)?test|pnpm\s+test|yarn\s+test|bun\s+test|node\s+(--\S+\s+)*--test|pytest|python3?\s+-m\s+pytest|cargo\s+(test|nextest)|go\s+test|vitest|jest)(\s|$)/;
 
 export const isTest = (command: string) => TEST.test(command);
 
@@ -88,33 +87,17 @@ export function loadRecipes(cwd: string): Recipes | undefined {
 export function promptText(r: Recipes): string {
   const run = r.tool === "just" ? "just" : "make";
   const lines = r.list.map((x) => `- ${run} ${x.name}${x.doc ? `: ${x.doc}` : ""}`);
-  return `Project recipes (${r.file}). Run project tasks with them. A bash command that a recipe does is blocked. A hint tells you when a long command runs ${REPEAT_MAX + 1} times. Then add it as a recipe.\n${lines.join("\n")}`;
+  return `Project recipes (${r.file}). Run project tasks with them. Run tests with run_tests. A bash command that a recipe does is blocked. A hint tells you when a long command runs ${REPEAT_MAX + 1} times. Then add it as a recipe.\n${lines.join("\n")}`;
 }
 
 export class Tracker {
-  private changes = 0;
   private runs = new Map<string, number>();
-  private tests = new Map<string, { changes: number; result?: string }>();
-
-  changed() {
-    this.changes++;
-  }
-
-  turn() {
-    this.changed();
-  }
 
   check(command: string, recipes: Recipes | undefined): string | undefined {
     const norm = normalize(command);
-    const run = recipes?.tool;
-    if (recipes) {
-      const same = recipes.list.find((r) => r.body && normalize(r.body) === norm);
-      if (same) return `This command is the recipe "${same.name}" in ${recipes.file}. Run "${run} ${same.name}".`;
-    }
-    const test = isTest(norm) && !command.includes(RERUN);
-    const last = test ? this.tests.get(norm) : undefined;
-    if (last && last.changes === this.changes)
-      return `No file changed since the last run of this test${last.result ? ` (${last.result})` : ""}. Use that result, or change the code first. For a flaky test, add "${RERUN}" at the end.`;
+    if (isTest(norm)) return "Test commands are blocked in bash. Use the run_tests tool: it picks the tests for the changed files.";
+    const same = recipes?.list.find((r) => r.body && normalize(r.body) === norm);
+    if (same && recipes) return `This command is the recipe "${same.name}" in ${recipes.file}. Run "${recipes.tool} ${same.name}".`;
     return undefined;
   }
 
@@ -122,16 +105,9 @@ export class Tracker {
     const norm = normalize(command);
     const count = (this.runs.get(norm) ?? 0) + 1;
     this.runs.set(norm, count);
-    if (isTest(norm)) this.tests.set(norm, { changes: this.changes });
-    else this.changed();
     if (norm.length < LONG || count !== REPEAT_MAX + 1) return undefined;
     if (!recipes) return `This command ran ${count} times. This project has no justfile: tell the user that a recipe for it can help.`;
     if (!norm.startsWith(`${recipes.tool} `)) return `This command ran ${count} times. Add it as a recipe to ${recipes.file}, then run the recipe.`;
     return undefined;
-  }
-
-  ended(command: string, result: string) {
-    const t = this.tests.get(normalize(command));
-    if (t) t.result = result.split("\n")[0].slice(0, 200);
   }
 }

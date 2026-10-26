@@ -28,37 +28,25 @@ test("parseMake: targets with tab bodies", () => {
   ]);
 });
 
+const recipe = parseJust(
+  JSON.stringify({ recipes: { lint: { name: "lint", doc: null, private: false, parameters: [], body: [["biome check ."]] } } }),
+  "/p/justfile",
+);
+
 test("normalize and isTest", () => {
   assert.equal(normalize("cd /p &&  node --test   a.ts 2>&1"), "node --test a.ts");
-  for (const c of ["just test", "npm test", "node --experimental-strip-types --test x.ts", "cd x && pytest -q", "nix flake check"]) assert.ok(isTest(c), c);
-  for (const c of ["just build", "node x.ts", "grep test file", "nix build"]) assert.ok(!isTest(c), c);
+  for (const c of ["just test", "just test-changed a.ts", "npm test", "bun test x", "node --experimental-strip-types --test x.ts", "cd x && pytest -q"])
+    assert.ok(isTest(c), c);
+  for (const c of ["just build", "just check", "nix flake check", "node x.ts", "grep test file", "nix build"]) assert.ok(!isTest(c), c);
+});
+
+test("a test command in bash is blocked, also when a recipe does it", () => {
+  assert.match(new Tracker().check("cd /p && node --experimental-strip-types --test a.test.ts", just)!, /Use the run_tests tool/);
+  assert.match(new Tracker().check("bun test extensions/x 2>&1 | tail", undefined)!, /Use the run_tests tool/);
 });
 
 test("a command that a recipe does is blocked", () => {
-  assert.match(new Tracker().check("cd /p && node --experimental-strip-types --test a.test.ts", just)!, /Run "just test"/);
-});
-
-test("a test does not run again when nothing changed", () => {
-  const t = new Tracker();
-  assert.equal(t.check("just test", just), undefined);
-  t.started("just test", just);
-  t.ended("just test", "exit 1\nnot ok 3");
-  assert.match(t.check("just test", just)!, /No file changed since the last run of this test \(exit 1\)/);
-  assert.equal(t.check("just test # rerun", just), undefined);
-  t.changed();
-  assert.equal(t.check("just test", just), undefined);
-});
-
-test("a new turn may follow edits outside pi, so the first test run in it is not blocked", () => {
-  const t = new Tracker();
-  t.started("just test", just);
-  t.ended("just test", "exit 1\nnot ok 3");
-  assert.match(t.check("just test", just)!, /No file changed since the last run/);
-  t.turn();
-  assert.equal(t.check("just test", just), undefined);
-  t.started("just test", just);
-  t.ended("just test", "exit 0");
-  assert.match(t.check("just test", just)!, /No file changed since the last run of this test \(exit 0\)/);
+  assert.match(new Tracker().check("biome check .", recipe)!, /Run "just lint"/);
 });
 
 test("a long command that ran 3 times gets a hint, no block", () => {
