@@ -6,7 +6,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const CHECK_HEAD = "Check commands in bash give a short result.";
+/** The first words of a check result: the current one, and the one before 2026-10-27. */
+const CHECK_HEAD = /^(Check result \(|Check commands in bash give a short result\.)/;
 const LINTER = /(^|[;&|(]|\s-c|\bnpx|\bbunx)\s*(biome|eslint|tsc|shellcheck|statix|deadnix|nixfmt|ruff|mypy|pyright|cargo\s+clippy|go\s+vet)\b/;
 const OTHER_FORM = /\|\s*(grep|tail|head|less|sed)\b|2>&1/;
 
@@ -63,7 +64,7 @@ export function findings(entries: unknown[]): Finding[] {
   list.forEach((c, i) => {
     const cmd = command(c);
     if (!cmd) return;
-    const isCheck = c.result.startsWith(CHECK_HEAD);
+    const isCheck = CHECK_HEAD.test(c.result);
     if (!isCheck) {
       if (LINTER.test(cmd)) out.push({ kind: "linter without short result", command: cmd, detail: c.result.split("\n")[0] });
       return;

@@ -31,10 +31,8 @@ test("recipes go into the system prompt; a test command in bash runs run_tests, 
   assert.deepEqual(input, { command: ":", background: false });
   const replaced = await result("t1");
   assert.equal(replaced.isError, true);
-  assert.match(
-    replaced.content[0].text,
-    /^Test commands in bash run through run_tests\. Use run_tests next time\. Result:\nrun_tests: "git rev-parse --show-toplevel" failed/,
-  );
+  assert.equal(replaced.terminate, undefined, "a result in the turn does not end it");
+  assert.match(replaced.content[0].text, /^run_tests result \(use run_tests next time\):\nrun_tests: "git rev-parse --show-toplevel" failed/);
   assert.equal(await result("t1"), undefined);
   assert.match((await bash("cc main.c"))?.reason, /Run "make build"/);
   assert.equal(await bash("ls"), undefined);

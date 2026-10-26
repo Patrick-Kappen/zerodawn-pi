@@ -44,14 +44,18 @@ test("background: true returns the job id at once and a report follows", async (
   const r = await bash({ command: "echo late", background: true }, "c");
   assert.match(r.content[0].text, /^job .*: running · log: /);
   assert.equal(r.details.background, true);
+  assert.equal(r.terminate, undefined, "a server keeps the turn: the agent works with it");
   while (reported.length === 0) await new Promise((done) => setTimeout(done, 50));
   assert.equal(reported[0].id, r.details.job);
 });
 
-test(`a command that runs longer than ${INLINE_WAIT_S} s moves to the background on its own`, { timeout: (INLINE_WAIT_S + 10) * 1000 }, async () => {
+test(`a command that runs longer than ${INLINE_WAIT_S} s moves to the background on its own and ends the turn`, {
+  timeout: (INLINE_WAIT_S + 10) * 1000,
+}, async () => {
   const start = Date.now();
   const r = await bash({ command: "sleep 60", timeout: INLINE_WAIT_S + 5 }, "d");
   assert.match(r.content[0].text, /^job .*: running · log: /);
+  assert.equal(r.terminate, true);
   const waited = (Date.now() - start) / 1000;
   assert.ok(waited >= INLINE_WAIT_S && waited < INLINE_WAIT_S + 3, `waited ${waited}s`);
   kill(s.jobs.get(r.details.job)?.pid);

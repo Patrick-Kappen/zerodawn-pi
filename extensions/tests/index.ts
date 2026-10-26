@@ -69,7 +69,7 @@ export default function (pi: ExtensionAPI) {
     if (pending) {
       replaced.delete(event.toolCallId);
       const replacement = await pending;
-      return { content: [{ type: "text", text: replacement.text }], isError: replacement.isError };
+      return { content: [{ type: "text", text: replacement.text }], isError: replacement.isError, terminate: replacement.background || undefined };
     }
     const hint = hints.get(event.toolCallId);
     hints.delete(event.toolCallId);
