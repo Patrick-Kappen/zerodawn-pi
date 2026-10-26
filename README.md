@@ -89,6 +89,12 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.5.2 — 2026-10-26
+
+### tests 0.2.2
+
+- no block; replace the bash result, background after 15 s
+
 ## 0.5.1 — 2026-10-26
 
 ### tests 0.2.1
@@ -161,20 +167,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ### watchdog 0.2.0
 
 - docs: AGENTS.md of each extension as rules, facts to README
-
-## 0.4.0 — 2026-10-26
-
-### shared 0.2.0
-
-- file ids for codemode tool calls
-
-### bash 0.2.0
-
-- run jobs without a terminal, like CI
-
-### git 0.2.0
-
-- name output files of codemode calls without ENOENT
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

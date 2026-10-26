@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 — 2026-10-26
+
+- no block; replace the bash result, background after 15 s
+
 ## 0.2.1 — 2026-10-26
 
 - an option such as --error-on-warnings is not a warning
