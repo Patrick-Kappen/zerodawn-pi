@@ -78,7 +78,7 @@ test("a task message becomes a user message; other messages fail loud", () => {
   handlers.onServerMessage({ type: "task", task: "do it" });
   assert.deepEqual(user, ["do it"]);
   assert.throws(() => handlers.onServerMessage({ type: "error", message: "bad" }), /refused the request: bad/);
-  assert.throws(() => handlers.onServerMessage({ type: "started", id: "a" }), /sent "started"/);
+  assert.throws(() => handlers.onServerMessage({ type: "started", requestId: "1", id: "a" }), /sent "started"/);
 });
 
 test("tool events carry the name and arguments shortened to 200 characters", () => {
