@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 36. pi-tui-kit is a dependency of shared/, an exception to "do not add a dependency" (2026-10-27)
+
+The user chose `@narumitw/pi-tui-kit` 0.67.0 for the pickers of the `projects` extension, over writing the interaction lifecycle (owner and abort handling, disposal, confirmations) by hand. It is declared in `shared/package.json`. Nix gets it from the npm registry: `nix/pi-tui-kit/` holds a `package.json` that mirrors the dependency and a `package-lock.json` (made with `npm install --package-lock-only --legacy-peer-deps`; the peers are pi, which `piModules` already brings). `fetchNpmDeps` pins the lock, and its modules are copied into the same `node_modules` as pi, for the tests, and into the installed package, for run time. Updating it: change the version in both manifests, regenerate the lock, update the `hash` in `flake.nix`. Cost: a second npm lock to maintain, and a pi API change can break the kit before it is updated.
+
 ## 35. The handoff warning is short; the agent can call handoff early (2026-10-28)
 
 Changes 34. The warning of 34 was long and told the agent how to act. The owner wants only the state and the choice. The warning now gives the context in percent and the tokens left until the cut. The agent continues working or calls the tool `handoff`. A warning no longer starts a cut at the next tool call, because the agent can continue. The cut in the middle of the work comes from 150k, or after the tool call. The cut at the end of a run after a warning stays, and it keeps the final answer.

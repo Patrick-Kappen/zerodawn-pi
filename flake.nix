@@ -39,6 +39,35 @@
       # The packages are in $out/node_modules, not in $out: bun resolves a dependency of a package from its real
       # path, and finds typebox for pi-ai only in a parent directory named node_modules.
       pi = pkgs: llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.pi;
+      # pi-tui-kit and its dependencies, from the npm registry. nix/pi-tui-kit/package.json mirrors the dependency of
+      # shared/package.json; the lock file comes from: npm install --package-lock-only --legacy-peer-deps
+      # (its peers are pi, which piModules brings).
+      kitModules =
+        pkgs:
+        pkgs.stdenvNoCC.mkDerivation {
+          pname = "pi-tui-kit-modules";
+          version = "0.67.0";
+          src = ./nix/pi-tui-kit;
+          npmDeps = pkgs.fetchNpmDeps {
+            src = ./nix/pi-tui-kit;
+            name = "pi-tui-kit-npm-deps";
+            hash = "sha256-d5J1/VySEoLlrayLJyHMue5vt8i6bC4PMp+pneyR0VQ=";
+          };
+          nativeBuildInputs = [
+            pkgs.nodejs
+            pkgs.npmHooks.npmConfigHook
+          ];
+          npmFlags = [
+            "--ignore-scripts"
+            "--legacy-peer-deps"
+          ];
+          dontBuild = true;
+          dontFixup = true;
+          installPhase = ''
+            mkdir -p $out
+            cp -r node_modules/. $out/
+          '';
+        };
       piModules =
         pkgs:
         pkgs.stdenvNoCC.mkDerivation {
@@ -54,6 +83,8 @@
           installPhase = ''
             mkdir -p $out/node_modules/@earendil-works/pi-coding-agent
             cp -r node_modules/. $out/node_modules/
+            chmod -R u+w $out/node_modules
+            cp -r ${kitModules pkgs}/. $out/node_modules/
             cp -r package.json dist $out/node_modules/@earendil-works/pi-coding-agent/
           '';
         };
@@ -164,7 +195,11 @@
             );
           };
           dontBuild = true;
-          installPhase = "cp -r . $out";
+          installPhase = ''
+            cp -r . $out
+            mkdir -p $out/node_modules
+            cp -r ${kitModules pkgs}/. $out/node_modules/
+          '';
         };
     in
     {
