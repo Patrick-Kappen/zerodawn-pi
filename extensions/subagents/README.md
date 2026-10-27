@@ -104,7 +104,7 @@ The code for the test run (`changedFiles`, `plan`, `execute`, `verdict`) is in `
 The limits are constants in code. A later step moves them to the profile.
 
 - **Gate tries:** max 3 red gate results per task. On the third, the subagent does not get the failures. It does the forced handoff (see "Handoff") and the result has status `handoff`, `details.reason` with the gate reason, and the line `gate red: <reason>` in the text. An `answer` or a new `task` message resets the count, and so does a green gate.
-- **Tokens:** max 100 000 tokens per agent (sum of the usage of its messages). When the sum reaches the limit while the agent runs, the supervisor sends `{type:"handoff"}`. See "Handoff".
+- **Tokens:** max 100 000 tokens of context per agent: the tokens of its last message, which hold the whole context of that request. The cost is the sum of all messages. When the context reaches the limit while the agent runs, the supervisor sends `{type:"handoff"}`. See "Handoff".
 - A failed agent is final: a later `settled`, `gate` or `message` event changes nothing.
 
 ## Handoff
