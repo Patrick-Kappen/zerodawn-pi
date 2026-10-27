@@ -42,8 +42,6 @@ const text = (content: unknown) =>
         .join("\n")
     : String(content ?? "");
 
-const isCheck = (name: string, args: any) => name === "run_tests" || (name === "bash" && /\bjust (check|test|lint|types)\b/.test(String(args?.command ?? "")));
-
 /** State of the run since the last user message, from session branch entries. */
 export function buildState(entries: any[]) {
   let start = -1;
@@ -59,7 +57,6 @@ export function buildState(entries: any[]) {
   const toolErrors: { tool: string; text: string }[] = [];
   const edits = new Set<string>();
   const toolsUsed: Record<string, number> = {};
-  let checksAfterLastEdit: { tool: string; failed: boolean }[] = [];
   let finalAnswer = "";
   let followups = 0;
   for (const e of run) {
@@ -78,11 +75,7 @@ export function buildState(entries: any[]) {
       const call = calls.get(m.toolCallId);
       const name = call?.name ?? m.toolName;
       if (m.isError) toolErrors.push({ tool: name, text: clip(text(m.content), 600) });
-      if (EDIT_TOOLS.has(name) && !m.isError) {
-        if (call?.args?.path) edits.add(String(call.args.path));
-        checksAfterLastEdit = [];
-      }
-      if (isCheck(name, call?.args)) checksAfterLastEdit.push({ tool: name, failed: !!m.isError });
+      if (EDIT_TOOLS.has(name) && !m.isError && call?.args?.path) edits.add(String(call.args.path));
     }
   }
   return {
@@ -90,13 +83,10 @@ export function buildState(entries: any[]) {
     finalAnswer: clip(finalAnswer, 6000),
     toolErrors: toolErrors.slice(-8),
     edits: [...edits],
-    checksAfterLastEdit,
     toolsUsed,
     followupsUsed: followups,
   };
 }
-
-export type State = NonNullable<ReturnType<typeof buildState>>;
 
 export const QUESTIONS = {
   status: {
@@ -124,11 +114,6 @@ export const QUESTIONS = {
     instructions: "If finalAnswer asks the user a question, can the agent find the answer itself by reading code, docs or running tools?",
     criteria: { true: "The agent can find it itself.", false: "Only the user knows it, or there is no question." },
   },
-  verified: {
-    type: "bool",
-    instructions: "If the agent changed files (edits), did it run tests or checks after the last change and did they pass (checksAfterLastEdit)?",
-    criteria: { true: "Verified after the last change, or no files changed.", false: "Files changed without a passing check afterwards." },
-  },
   completeness: {
     type: "score",
     instructions: "How completely does finalAnswer handle the request?",
@@ -144,20 +129,18 @@ export const QUESTIONS = {
 type Answers = Record<string, any>;
 
 /** Reasons for one more turn; empty means settle. rule_violation is only logged. */
-export function decide(a: Answers, state: State): string[] {
+export function decide(a: Answers): string[] {
   const reasons: string[] = [];
   const p = (id: string) => (a[id]?.type === "bool" ? a[id].probability : 0);
-  if (p("open_error") > 0.7 && p("in_scope") > 0.6) reasons.push("You reported or left an error inside the scope of the task. Fix it.");
-  if (a.status?.choice === "question" && p("question_answerable") > 0.7)
-    reasons.push("You asked the user a question that you can answer yourself with code, docs or tools. Find the answer.");
-  if (state.edits.length > 0 && p("verified") < 0.3) reasons.push("You changed files without a passing test or check after the last change. Run them.");
+  if (p("open_error") > 0.7 && p("in_scope") > 0.6) reasons.push("Fix the error in scope.");
+  if (a.status?.choice === "question" && p("question_answerable") > 0.7) reasons.push("Find the answer yourself.");
   if ((a.status?.choice === "incomplete" && a.status.confidence > 0.7) || (a.completeness?.type === "score" && a.completeness.score <= 1))
-    reasons.push("The task is not complete. Finish it.");
+    reasons.push("Finish the task.");
   return reasons;
 }
 
 export function followupText(reasons: string[]) {
-  return `Automatic check before you finish:\n${reasons.map((r) => `- ${r}`).join("\n")}\nIf a point is wrong, say why in one sentence and finish.`;
+  return `checker:\n${reasons.map((r) => `- ${r}`).join("\n")}\nIf wrong, say why in one sentence.`;
 }
 
 function log(record: unknown) {
@@ -182,7 +165,7 @@ export default function (pi: ExtensionAPI) {
       log({ at: new Date().toISOString(), session: ctx.sessionManager.getSessionId(), state, error: res.errorMessage });
       return;
     }
-    const reasons = decide(res.answers, state);
+    const reasons = decide(res.answers);
     const followup = reasons.length > 0 && state.followupsUsed < MAX_FOLLOWUPS;
     const record = { at: new Date().toISOString(), session: ctx.sessionManager.getSessionId(), state, answers: res.answers, reasons, followup };
     log(record);
