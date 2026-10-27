@@ -93,11 +93,12 @@ export async function cleanupMerged(deps: Pick<MergeDeps, "exec" | "home" | "run
   return removed;
 }
 
-/** Runs in the main pi when a session starts. Gives nothing outside a git repository. */
+/** Runs in the main pi when a session starts. Gives nothing outside a git repository or in one without a commit. */
 export async function cleanupAt(deps: Pick<MergeDeps, "exec" | "home" | "runtimeRoot" | "cwd">): Promise<string[]> {
   const common = await deps.exec("git", ["-C", deps.cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"]);
-  // Not in a repository, or in a bare one: no worktrees of this tool exist here.
+  // Not in a repository, in a bare one, or before the first commit: no worktrees of this tool exist here.
   if (common.code !== 0 || basename(common.stdout.trim()) !== ".git") return [];
+  if ((await deps.exec("git", ["-C", deps.cwd, "rev-parse", "--verify", "--quiet", "HEAD^{commit}"])).code !== 0) return [];
   return cleanupMerged(deps, (await resolveBase(deps.exec, deps.cwd)).repo);
 }
 
