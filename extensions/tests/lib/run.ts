@@ -115,6 +115,15 @@ export class RunTests {
     this.session = new AbortController();
   }
 
+  /** Ends when the next background run ends and its notify ran; undefined when none runs. */
+  nextResult(): Promise<void> | undefined {
+    if (this.running.size === 0) return undefined;
+    return Promise.race([...this.running.values()]).then(
+      () => {},
+      () => {},
+    );
+  }
+
   /** Runs the tests for the changed files in place of a test command in bash, in the directory of its leading cd. */
   async insteadOfBash(toolCallId: string, command: string, ctx: ExtensionContext): Promise<Replacement> {
     try {

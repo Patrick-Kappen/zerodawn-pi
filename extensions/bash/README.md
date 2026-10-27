@@ -8,6 +8,7 @@ Replaces pi's `bash` tool. Every command runs as a job without a terminal, like 
 
 - Result: the exit status. Output of at most 50 lines comes with it; longer output gives its size and path, and the agent reads the file with `read`. A failure adds every distinct error line with its line numbers, from the whole log, or the last 3 lines when there is none.
 - A command that ends within 15 s returns its output inline. A longer command returns the job id and ends the turn. `background: true` (a server) returns the job id at once and keeps the turn. The result comes as a `bash-job` message, or through `jobs wait`. Jobs with the same `group` report together.
+- In print and json mode (`pi -p`), pi ends when the agent settles. So before it settles, the extension waits for the next background job and sends its report; the agent then continues. pi ends only when no background job runs.
 - A report that pi did not record is sent again after 20 s of idle time.
 - A user prompt gets one hidden line `jobs: 3: running · 4 [g]: exit 0` with the jobs that run or ended without a report in the context, only when it changed since the last line.
 
