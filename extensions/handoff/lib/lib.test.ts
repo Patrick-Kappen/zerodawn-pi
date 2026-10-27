@@ -5,21 +5,25 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { type Card, checkCard, HANDOFF_MAX_CHARS, render } from "./card.ts";
 import { decide, warmDecision, warning } from "./decider.ts";
-import { gitFacts, jobFacts } from "./facts.ts";
+import { gitFacts, jobFacts, systemFacts } from "./facts.ts";
 import { ask, readSession, select } from "./recall.ts";
 import { lastHandoff, saveHandoff } from "./store.ts";
-import { parseEntry, type Registry, writeCard } from "./summarize.ts";
-import { strip, tail } from "./transcript.ts";
+import { parseEntry, prompt, type Registry, writeCard } from "./summarize.ts";
+import { strip } from "./transcript.ts";
 import { UPDATE_CHARS, updateReasons } from "./triggers.ts";
 
 const card: Card = {
   goal: "Ship the handoff",
   status: "active",
+  state: [
+    { now: "package 0.16.0 installed", target: "package 0.17.0 installed" },
+    { now: "main clean", target: "main clean" },
+  ],
+  next: ["Merge #102", "Rebuild gaia"],
+  merged: ["#90 handoff card"],
+  open: ["#102 short card: checks green"],
   decisions: ["Card from a cheap model"],
-  open: [],
-  next: "Write tests",
   avoid: [],
-  done: ["#90 handoff card"],
 };
 
 test("strip keeps text and one line per tool call with the first result line, without output or thinking", () => {
@@ -41,22 +45,59 @@ test("strip keeps text and one line per tool call with the first result line, wi
     { id: "4", type: "custom_message", customType: "bash-job", content: "job 3: exit 0" },
   ]);
   assert.deepEqual(lines, ["user: Build the card", "assistant: Running checks.", "bash: just check → error: exit 1", "event bash-job: job 3: exit 0"]);
-  assert.deepEqual(tail(["aaaa", "bbbb", "cccc"], 10), ["bbbb", "cccc"]);
 });
 
 test("checkCard accepts a valid card and names every invalid field", () => {
   assert.equal(checkCard(card), card);
-  assert.throws(() => checkCard({ ...card, status: "half", decisions: Array(6).fill("x"), next: "" }), /status: .*next: .*decisions: at most 5/);
+  assert.throws(
+    () => checkCard({ ...card, status: "half", state: [{ now: "x" }], decisions: Array(4).fill("x"), next: [] }),
+    /status: .*state: .*decisions: at most 3.*next: at least 1/,
+  );
   assert.throws(() => checkCard(null), /not an object/);
 });
 
-test("render puts card, facts, recent lines and source in the handoff and fails above the limit", () => {
-  const text = render(card, ["branch: main"], ["user: hi"], "/s.jsonl");
-  assert.match(
-    text,
-    /^# Handoff\nGoal: Ship the handoff\nStatus: active\nNext: Write tests\nDecisions:\n- Card from a cheap model\nDone:\n- #90 handoff card\nState:\n- branch: main\nLast actions:\n- user: hi\nEarlier work: \/s\.jsonl$/,
+test("render puts next actions, state now and target, open, merged, facts and source in the handoff and fails above the limit", () => {
+  assert.equal(
+    render(card, ["branch: main"], "/s.jsonl"),
+    [
+      "# Handoff",
+      "Goal: Ship the handoff",
+      "Status: active",
+      "Next:",
+      "1. Merge #102",
+      "2. Rebuild gaia",
+      "State:",
+      "- now: package 0.16.0 installed → must be: package 0.17.0 installed",
+      "- main clean (correct)",
+      "Open:",
+      "- #102 short card: checks green",
+      "Merged:",
+      "- #90 handoff card",
+      "Decisions:",
+      "- Card from a cheap model",
+      "Facts:",
+      "- branch: main",
+      "Earlier work: /s.jsonl",
+    ].join("\n"),
   );
-  assert.throws(() => render(card, ["x".repeat(HANDOFF_MAX_CHARS)], [], "/s"), /more than 32000/);
+  assert.throws(() => render(card, ["x".repeat(HANDOFF_MAX_CHARS)], "/s"), /more than 8000/);
+});
+
+test("prompt gives the facts, the previous card and the transcript to the card model", () => {
+  assert.equal(
+    prompt(undefined, ["branch: main"], ["user: hi"]),
+    "Facts now:\nbranch: main\n\nPrevious card:\n(none)\n\nTranscript since the previous card:\nuser: hi",
+  );
+});
+
+test("systemFacts names the active system and its config revision, and names a failing command", () => {
+  const exec = (cmd: string) => (cmd === "readlink" ? "/nix/store/abc-nixos-system" : '{"configurationRevision":"0123456789ab-dirty"}');
+  assert.deepEqual(systemFacts(exec), ["system: /nix/store/abc-nixos-system (config revision 01234567, dirty)"]);
+  const noVersion = (cmd: string) => {
+    if (cmd === "readlink") return "/nix/store/abc";
+    throw new Error("not found");
+  };
+  assert.deepEqual(systemFacts(noVersion), ["system: /nix/store/abc", "system revision: unknown (nixos-version failed: not found)"]);
 });
 
 test("writeCard walks the ladder until a model returns a valid write_card call", async () => {
@@ -72,11 +113,11 @@ test("writeCard walks the ladder until a model returns a valid write_card call",
       return { stopReason: "toolUse", content: [{ type: "toolCall", name: "write_card", arguments: card }] };
     },
   };
-  const result = await writeCard(registry, ["a/missing", "a/noauth", "a/broken", "a/text", "a/bad", "a/good:low"], undefined, ["user: hi"]);
+  const result = await writeCard(registry, ["a/missing", "a/noauth", "a/broken", "a/text", "a/bad", "a/good:low"], undefined, [], ["user: hi"]);
   assert.deepEqual(result, { card, model: "a/good:low" });
   assert.deepEqual(calls, ["a/broken", "a/text", "a/bad", "a/good"]);
   await assert.rejects(
-    writeCard(registry, ["a/missing", "a/broken"], undefined, []),
+    writeCard(registry, ["a/missing", "a/broken"], undefined, [], []),
     /no model wrote a valid card\. a\/missing: not in the pi model registry; a\/broken: down/,
   );
   assert.deepEqual(parseEntry("p/m:high"), { provider: "p", id: "m", thinking: "high" });
@@ -93,7 +134,7 @@ test("gitFacts reads branch, dirty files, worktrees and PRs, and names a failing
   assert.deepEqual(gitFacts("/r", exec), [
     "branch: feat in /r",
     "dirty files (2): a.ts, b.ts",
-    "worktrees: /w/x",
+    "worktrees: /w/x (x)",
     "open PRs: unknown (gh failed: gh: not logged in)",
   ]);
   const local = (_cmd: string, args: string[]) => {
@@ -119,7 +160,7 @@ test("jobFacts lists background jobs without a report, and handoff files keep th
   job("3", { bg: false });
   assert.deepEqual(jobFacts(dir), ["bash jobs: 2 (running): sleep 9"]);
   assert.equal(lastHandoff(dir), undefined);
-  const h = { card, model: "m", facts: [], recent: [], text: "t", untilEntry: "e1", createdAt: "now" };
+  const h = { card, model: "m", facts: [], text: "t", untilEntry: "e1", createdAt: "now" };
   saveHandoff(dir, h);
   assert.match(saveHandoff(dir, { ...h, untilEntry: "e2" }), /handoff\/2\.json$/);
   assert.equal(lastHandoff(dir)?.untilEntry, "e2");

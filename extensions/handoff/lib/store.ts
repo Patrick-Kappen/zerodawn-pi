@@ -2,7 +2,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Card } from "./card.ts";
 
-export type Handoff = { card: Card; model: string; facts: string[]; recent: string[]; text: string; untilEntry: string; createdAt: string };
+export type Handoff = { card: Card; model: string; facts: string[]; text: string; untilEntry: string; createdAt: string };
 
 const files = (dir: string) =>
   readdirSync(dir)

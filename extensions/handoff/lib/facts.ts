@@ -35,7 +35,7 @@ export function gitFacts(cwd: string, exec: Run = run): string[] {
     out.push(
       `worktrees: ${trees
         .slice(1)
-        .map((l) => l.split(/\s+/)[0])
+        .map((l) => `${l.split(/\s+/)[0]} (${/\[(.+)\]$/.exec(l)?.[1] ?? "detached"})`)
         .join(", ")}`,
     );
   const prs = tryRun(
@@ -49,6 +49,15 @@ export function gitFacts(cwd: string, exec: Run = run): string[] {
     if (!/no git remotes/.test(prs)) out.push(prs);
   } else if (prs.length) out.push(`open PRs: ${prs.join("; ")}`);
   return out;
+}
+
+export function systemFacts(exec: Run = run): string[] {
+  const system = tryRun(exec, "system", "readlink", ["/run/current-system"], "/");
+  if (typeof system === "string") return [system];
+  const version = tryRun(exec, "system revision", "nixos-version", ["--json"], "/");
+  if (typeof version === "string") return [`system: ${system[0]}`, version];
+  const rev = String(JSON.parse(version.join("\n")).configurationRevision ?? "unknown");
+  return [`system: ${system[0]} (config revision ${rev.slice(0, 8)}${rev.endsWith("-dirty") ? ", dirty" : ""})`];
 }
 
 type OpenJob = { id: string; running: boolean; command: string };

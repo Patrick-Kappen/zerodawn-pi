@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 29. The handoff card holds state, next actions and PR status, no transcript lines (2026-10-27)
+
+The first live cards were long and unclear. The last transcript lines were noise, and "done" mixed merged and open PRs. "next" was one line with alternatives. The card now has the state now and the state it must have, 1 to 3 concrete next actions, merged PRs and open work as separate fields. The card model gets the facts, so the state now comes from code. The handoff has no transcript lines and a limit of 8000 characters. This changes the card of 27.
+
 ## 28. A subagent gets its end tool without a provider tool choice (2026-10-27)
 
 The subagent forced `handoff` and the choice tools with `tool_choice` in `before_provider_request`. Claude Sonnet 5.5 refuses `tool_choice` `tool` and `any`, also with thinking off, so the ladder entry failed every time. Now only the expected tools are active, and their schemas fix the answer; the provider payload is not changed. A text answer gets one more prompt; the second fails the agent. Live, Sonnet 5.5 and DeepSeek v4.1 flash both called `handoff` this way. This replaces the forced tool choice of 18.
