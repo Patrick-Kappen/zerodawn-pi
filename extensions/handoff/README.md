@@ -13,9 +13,19 @@
 
 `/handoff` starts the new session with the session as parent and the handoff as the first message. The file can also go to another agent as its task.
 
+## Updates
+
+The card is updated in the background, so the state is there when a handoff comes:
+
+- After a run (`agent_end`), when the stripped transcript since the last card has 20000 characters or more, or the run had a successful `git commit`, `git push`, `gh pr create` or `gh pr merge` in bash. A notification names the reason and the model; a failure is an error notification.
+- On `/quit` and `/new`, when there is something new since the last card. Pi waits for this update before it stops.
+- One update at a time. `/handoff` waits for a running update.
+
+A command that moved to the background (over 15 s) does not count: its tool result says only that the job runs. The next trigger catches its effect.
+
 ## Constants
 
-`index.ts`: `RECENT_MAX_CHARS`. `lib/card.ts`: `LIMITS`, `HANDOFF_MAX_CHARS`. `lib/summarize.ts`: `TRANSCRIPT_MAX_CHARS`. `lib/transcript.ts`: `TEXT_MAX`.
+`index.ts`: `RECENT_MAX_CHARS`. `lib/triggers.ts`: `UPDATE_CHARS`. `lib/card.ts`: `LIMITS`, `HANDOFF_MAX_CHARS`. `lib/summarize.ts`: `TRANSCRIPT_MAX_CHARS`. `lib/transcript.ts`: `TEXT_MAX`.
 
 ## Changes
 

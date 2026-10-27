@@ -47,7 +47,7 @@ test("/handoff starts a new session with the handoff; /handoff card only shows i
   writeFileSync(config, JSON.stringify({ handoffModels: ["p/m"] }));
   process.env.ZERODAWN_PI_CONFIG = config;
   let command: any;
-  register({ registerCommand: (_n: string, c: any) => (command = c) } as any);
+  register({ registerCommand: (_n: string, c: any) => (command = c), on() {} } as any);
   const seen: any[] = [];
   await assert.rejects(command.handler("later", ctx(seen)), /unknown argument "later"/);
   await command.handler("", ctx(seen));
@@ -56,4 +56,41 @@ test("/handoff starts a new session with the handoff; /handoff card only shows i
   assert.equal(seen.at(-1), join(root, "s.jsonl"));
   await command.handler("card", ctx(seen));
   assert.match(String(seen.at(-1)), /^Handoff card by p\/m: .*handoff\/\d+\.json\n\n# Handoff/);
+});
+
+test("agent_end updates the card in the background after a commit; /quit and /new update it when something is new", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "handoff-events-"));
+  const config = join(dir, "config.json");
+  writeFileSync(config, JSON.stringify({ handoffModels: ["p/m"] }));
+  process.env.ZERODAWN_PI_CONFIG = config;
+  const entries: any[] = [{ id: "u1", type: "message", message: { role: "user", content: "Commit it" } }];
+  const notes: string[] = [];
+  const own = {
+    cwd: dir,
+    signal: undefined,
+    sessionManager: { getSessionFile: () => join(dir, "s.jsonl"), getBranch: () => entries },
+    modelRegistry: ctx([]).modelRegistry,
+    ui: { notify: (text: string) => notes.push(text) },
+  } as any;
+  const handlers = new Map<string, any>();
+  register({ registerCommand() {}, on: (name: string, fn: any) => handlers.set(name, fn) } as any);
+
+  await handlers.get("agent_end")({}, own);
+  assert.deepEqual(notes, []);
+  entries.push(
+    {
+      id: "a1",
+      type: "message",
+      message: { role: "assistant", content: [{ type: "toolCall", id: "c1", name: "bash", arguments: { command: "git commit -qm x" } }] },
+    },
+    { id: "r1", type: "message", message: { role: "toolResult", toolCallId: "c1", content: "ok" } },
+  );
+  await handlers.get("agent_end")({}, own);
+  await handlers.get("session_shutdown")({ reason: "reload" }, own);
+  await handlers.get("session_shutdown")({ reason: "quit" }, own);
+  assert.match(notes[0], /^handoff: card updated \(commit\) by p\/m: .*handoff\/1\.json$/);
+  assert.equal(notes.length, 1);
+  entries.push({ id: "u2", type: "message", message: { role: "user", content: "One more" } });
+  await handlers.get("session_shutdown")({ reason: "new" }, own);
+  assert.match(notes[1], /^handoff: card updated \(\/new\) by p\/m: .*handoff\/2\.json$/);
 });

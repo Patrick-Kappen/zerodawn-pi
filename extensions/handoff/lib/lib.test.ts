@@ -8,6 +8,7 @@ import { gitFacts, jobFacts } from "./facts.ts";
 import { lastHandoff, saveHandoff } from "./store.ts";
 import { parseEntry, type Registry, writeCard } from "./summarize.ts";
 import { strip, tail } from "./transcript.ts";
+import { UPDATE_CHARS, updateReasons } from "./triggers.ts";
 
 const card: Card = {
   goal: "Ship the handoff",
@@ -122,4 +123,32 @@ test("jobFacts lists background jobs without a report, and handoff files keep th
   assert.equal(lastHandoff(dir)?.untilEntry, "e2");
   writeFileSync(join(dir, "handoff", "3.json"), "{");
   assert.throws(() => lastHandoff(dir), /cannot read .*3\.json/);
+});
+
+test("updateReasons: 20k characters, or a successful commit, push, PR create or PR merge", () => {
+  const call = (id: string, command: string) => ({
+    id: `a${id}`,
+    type: "message",
+    message: { role: "assistant", content: [{ type: "toolCall", id, name: "bash", arguments: { command } }] },
+  });
+  const result = (id: string, isError = false) => ({ id: `r${id}`, type: "message", message: { role: "toolResult", toolCallId: id, isError, content: "ok" } });
+  const entries = [
+    call("1", "git add -A && git commit -qm 'x'"),
+    result("1"),
+    call("2", "git push -u origin b"),
+    result("2", true),
+    call("3", "gh pr create -t x"),
+    result("3"),
+    call("4", "echo git log; gh pr merge 5"),
+    result("4"),
+  ];
+  assert.deepEqual(updateReasons(entries, ["short"]), ["commit", "PR created", "PR merged"]);
+  assert.deepEqual(updateReasons([], ["x".repeat(UPDATE_CHARS)]), [`${UPDATE_CHARS + 1} characters`]);
+  assert.deepEqual(updateReasons([call("5", "git status"), result("5")], ["x"]), []);
+  const background = {
+    id: "r6",
+    type: "message",
+    message: { role: "toolResult", toolCallId: "6", content: [{ type: "text", text: "job 3.1-C1: running · log: out:3.1-C1.bash" }] },
+  };
+  assert.deepEqual(updateReasons([call("6", "git push"), background], ["x"]), []);
 });
