@@ -71,6 +71,13 @@ test("a failure with short output returns it inline, without a file", async () =
   assert.equal(existsSync(r.log.replace(/\.log$/, ".txt")), false);
 });
 
+test("output of few but long lines over 4 KB goes to a file", async () => {
+  const r = await run("for i in 1 2 3; do printf 'x%.0s' $(seq 1500); echo; done");
+  assert.match(resultText(r.log, "exit 0 (1s)"), /^exit 0 \(1s\) \u00b7 3 lines, \d+ bytes \u00b7 output: .*\.txt$/);
+  const short = await run("printf 'x%.0s' $(seq 4000); echo");
+  assert.equal(resultText(short.log, "exit 0 (1s)"), `exit 0 (1s)\n${"x".repeat(4000)}`);
+});
+
 test("a long failure without error lines returns the last lines", async () => {
   const r = await run("seq 1 60; exit 2");
   const lines = resultText(r.log, "exit 2 (1s)").split("\n");

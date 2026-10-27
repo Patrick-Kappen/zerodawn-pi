@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 — 2026-10-27
+
+- read resends a known part shorter than its note
+
 ## 0.3.0 — 2026-10-27
 
 - edit and write run the formatter of the project

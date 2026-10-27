@@ -2,7 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync, readSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { outRef } from "../../../shared/store.ts";
 import { age, commandLine } from "../../../shared/util.ts";
-import { DEFAULT_COLUMNS, DEFAULT_LIMIT_S, DEFAULT_ROWS, INLINE_LINES, NO_TIME_LIMIT, RESULT_TAIL_BYTES, TAIL_LINES } from "../config.ts";
+import { DEFAULT_COLUMNS, DEFAULT_LIMIT_S, DEFAULT_ROWS, INLINE_BYTES, INLINE_LINES, NO_TIME_LIMIT, RESULT_TAIL_BYTES, TAIL_LINES } from "../config.ts";
 import { Screen, stripScript } from "../screen/screen.ts";
 
 export type Job = {
@@ -194,7 +194,8 @@ export function resultText(log: string, status: string): string {
   const ok = /^exit 0\b/.test(status);
   const { plain, cut } = render(log, ok ? RESULT_TAIL_BYTES : Number.POSITIVE_INFINITY);
   if (plain.length === 0) return status;
-  if (plain.length <= INLINE_LINES) return `${status}\n${plain.join("\n")}`;
+  const text = plain.join("\n");
+  if (plain.length <= INLINE_LINES && Buffer.byteLength(text) <= INLINE_BYTES) return `${status}\n${text}`;
   const txt = log.replace(/\.log$/, ".txt");
   writeFileSync(txt, `${plain.join("\n")}\n`);
   const { bytes } = statsOf(log);

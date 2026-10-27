@@ -8,6 +8,7 @@ import { outline } from "./outline.ts";
 import { READ_MAX_BYTES, READ_MAX_LINES, registerRead, renderRead } from "./read.ts";
 
 const numbered = (n: number) => Array.from({ length: n }, (_, i) => `line ${i + 1}`);
+const wide = (n: number) => numbered(n).map((l) => `${l} ${"-".repeat(30)}`);
 const none = new Set<number>();
 
 test("a small file without a range is sent in full", () => {
@@ -44,13 +45,24 @@ test("an offset past the end fails with the line count", () => {
 });
 
 test("lines already in context are not sent again; only the rest is shown", () => {
-  const r = renderRead("x.ts", numbered(20), 1, 20, new Set([1, 2, 3, 4, 5]));
+  const r = renderRead("x.ts", wide(20), 1, 20, new Set([1, 2, 3, 4, 5]));
   assert.deepEqual(r.shown, [[6, 20]]);
-  assert.match(r.text, /^\[Lines 1-5 are unchanged and already in your context; not sent again\.\]\n\[lines 6-20\]\nline 6\n/);
+  assert.match(r.text, /^\[Lines 1-5 are unchanged and already in your context; not sent again\.\]\n\[lines 6-20\]\nline 6 -+\n/);
+});
+
+test("a known part shorter than the note is sent again; one known line is named as a line", () => {
+  assert.deepEqual(renderRead("x.ts", numbered(20), 1, 20, new Set([1, 2])).shown, [[1, 20]]);
+  const lines = [...numbered(3), "x".repeat(120), ...numbered(3)];
+  const r = renderRead("x.ts", lines, 1, 7, new Set([4]));
+  assert.deepEqual(r.shown, [
+    [1, 3],
+    [5, 7],
+  ]);
+  assert.match(r.text, /^\[Line 4 is unchanged and already in your context; not sent again\.\]\n/);
 });
 
 test("a range fully in context gives one line", () => {
-  const r = renderRead("x.ts", numbered(10), 2, 3, new Set([2, 3, 4]));
+  const r = renderRead("x.ts", wide(10), 2, 3, new Set([2, 3, 4]));
   assert.deepEqual(r, { text: "[x.ts lines 2-4 are unchanged and already in your context. Use that copy.]", shown: [] });
 });
 
@@ -115,7 +127,7 @@ test("read tool: a second read of the same range is not sent again; after a chan
   registerRead({ registerTool: (t: any) => (tool = t) } as any, "/");
   const dir = mkdtempSync(join(tmpdir(), "read-"));
   const file = join(dir, "a.ts");
-  writeFileSync(file, `${numbered(10).join("\n")}\n`);
+  writeFileSync(file, `${wide(10).join("\n")}\n`);
   const entries: any[] = [];
   const ctx = { cwd: dir, sessionManager: { buildSessionProjection: () => ({ entries }) } } as any;
   const call = async (offset?: number, limit?: number) => {
@@ -124,10 +136,10 @@ test("read tool: a second read of the same range is not sent again; after a chan
     entries.push({ sourceEntry: { type: "message", message }, messages: [{ ...message }] });
     return r.content[0].text as string;
   };
-  assert.match(await call(1, 5), /^line 1\n[\s\S]*line 5\n\n\[Showing lines 1-5 of 10\. Use offset=6 to continue\.\]$/);
+  assert.match(await call(1, 5), /^line 1 -+\n[\s\S]*line 5 -+\n\n\[Showing lines 1-5 of 10\. Use offset=6 to continue\.\]$/);
   assert.match(await call(1, 5), /already in your context/);
-  assert.match(await call(1, 8), /^\[Lines 1-5 are unchanged.*\n\[lines 6-8\]\nline 6\nline 7\nline 8\n/);
+  assert.match(await call(1, 8), /^\[Lines 1-5 are unchanged.*\n\[lines 6-8\]\nline 6 -+\nline 7 -+\nline 8 -+\n/);
   entries[0].messages[0].content = [{ type: "text", text: "[pruned]" }];
   entries[2].messages = [];
-  assert.match(await call(1, 5), /^line 1\n/);
+  assert.match(await call(1, 5), /^line 1 -+\n/);
 });
