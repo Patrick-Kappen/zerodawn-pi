@@ -420,6 +420,7 @@
                 enable = true;
                 name = "gitleaks";
                 entry = "${pkgs.gitleaks}/bin/gitleaks git --pre-commit --staged --redact --no-banner";
+                args = [ ];
                 pass_filenames = false;
               };
             };
