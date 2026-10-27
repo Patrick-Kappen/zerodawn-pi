@@ -12,7 +12,7 @@ The pre-commit hook `tests` runs `bun test` over the whole repository, with the 
 
 ## 25. A classifier decides at settle time whether the agent is done (2026-10-27)
 
-Agents report an error in scope, ask a question they can answer themselves, or stop halfway, and call that done. The `checker` asks a classifier model on `agent_before_settle`, so it sees the whole run once and can request one more turn through pi, without a user message. The classifier only answers typed questions with probabilities. Fixed thresholds in code make the decision, so a change of behaviour is a code change with a test. A limit of 3 follow-ups per user message stops a loop between agent and classifier. Every check goes to a JSONL log, to tune the thresholds on real runs. Cost: one classify call per finished run.
+Agents report an error in scope, ask a question they can answer themselves, or stop halfway, and call that done. The `checker` asks a classifier model on `agent_before_settle`, so it sees the whole run once and can request one more turn through pi, without a user message. The classifier only answers typed questions with probabilities. Fixed thresholds in code make the decision, so a change of behaviour is a code change with a test. A limit of 3 follow-ups in a row stops a loop between agent and classifier. A tool call sets the count back to 0, because a long run with one user message made progress and must be checked to its end. Every check goes to a JSONL log, to tune the thresholds on real runs. Cost: one classify call per finished run.
 
 ## 24. Tests and gates run in the dev environment of the project (2026-10-27)
 
