@@ -25,13 +25,13 @@ Registers pi's `read`, `edit` and `write` tools again with shorter descriptions 
 ## Changes
 
 <!-- changelog:start -->
-## 0.4.0 — 2026-10-27
+## 0.5.0 — 2026-10-27
 
-- shared: outputs as out:<name>; read and grep take it as a path
+- docs: open points of 2026-10-27 in the TODO files
 
-- the grep and rg block points to the grep tool
+- core: each tool rule in one place, description or parameter
 
-- own grep tool on ripgrep with noIgnore, type and counts
+- core: workflow prompt replaces pi rules; tool descriptions complete
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

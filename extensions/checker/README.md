@@ -43,9 +43,9 @@ Every check goes to the session as a custom entry `checker` and as one JSON line
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.0 — 2026-10-27
+## 0.1.1 — 2026-10-27
 
-- First release.
+- skip the check while a bash job runs in the background
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

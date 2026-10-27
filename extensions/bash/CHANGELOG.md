@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.0 — 2026-10-27
+
+- checker: skip the check while a bash job runs in the background
+
+- docs: open points of 2026-10-27 in the TODO files
+
+- core: each tool rule in one place, description or parameter
+
+- a reported job stays out of the status note after a restart
+
+- core: workflow prompt replaces pi rules; tool descriptions complete
+
 ## 0.7.0 — 2026-10-27
 
 - the tool description names the out:<name> reference

@@ -1,5 +1,73 @@
 # Changelog
 
+## 0.16.0 — 2026-10-27
+
+### ast-grep 0.3.0
+
+- docs: open points of 2026-10-27 in the TODO files
+
+- core: each tool rule in one place, description or parameter
+
+- core: workflow prompt replaces pi rules; tool descriptions complete
+
+### bash 0.8.0
+
+- checker: skip the check while a bash job runs in the background
+
+- docs: open points of 2026-10-27 in the TODO files
+
+- core: each tool rule in one place, description or parameter
+
+- a reported job stays out of the status note after a restart
+
+- core: workflow prompt replaces pi rules; tool descriptions complete
+
+### checker 0.1.1
+
+- skip the check while a bash job runs in the background
+
+### core 0.3.0
+
+- workflow prompt replaces pi rules; tool descriptions complete
+
+### ctx-manager 0.2.1
+
+- docs: open points of 2026-10-27 in the TODO files
+
+### files 0.5.0
+
+- docs: open points of 2026-10-27 in the TODO files
+
+- core: each tool rule in one place, description or parameter
+
+- core: workflow prompt replaces pi rules; tool descriptions complete
+
+### git 0.5.0
+
+- core: workflow prompt replaces pi rules; tool descriptions complete
+
+### opencode 0.3.0
+
+- core: each tool rule in one place, description or parameter
+
+- core: workflow prompt replaces pi rules; tool descriptions complete
+
+### subagents 0.8.2
+
+- docs: open points of 2026-10-27 in the TODO files
+
+- core: each tool rule in one place, description or parameter
+
+### tests 0.6.0
+
+- core: each tool rule in one place, description or parameter
+
+- core: workflow prompt replaces pi rules; tool descriptions complete
+
+### repository
+
+- docs: open points of 2026-10-27 in the TODO files
+
 ## 0.15.0 — 2026-10-27
 
 ### shared 0.8.0

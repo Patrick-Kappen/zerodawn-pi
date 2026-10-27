@@ -210,13 +210,11 @@ The main pi connects to the supervisor when the first subagent starts. At `sessi
 ## Changes
 
 <!-- changelog:start -->
-## 0.8.1 — 2026-10-27
+## 0.8.2 — 2026-10-27
 
-- tests: run tests and gates in the dev environment of the project
+- docs: open points of 2026-10-27 in the TODO files
 
-- request id in each client request and its answer
-
-- token limit checks the context size, not a sum
+- core: each tool rule in one place, description or parameter
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

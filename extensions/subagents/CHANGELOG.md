@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2 — 2026-10-27
+
+- docs: open points of 2026-10-27 in the TODO files
+
+- core: each tool rule in one place, description or parameter
+
 ## 0.8.1 — 2026-10-27
 
 - tests: run tests and gates in the dev environment of the project
