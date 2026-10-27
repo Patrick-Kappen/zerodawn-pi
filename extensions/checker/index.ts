@@ -4,7 +4,8 @@
  * On agent_before_settle it builds a state of the run since the last user message
  * and asks all questions in one classify() call. Fixed thresholds in decide() turn the
  * answers into reasons. With a reason, a hidden message asks the agent for one more turn.
- * At most MAX_FOLLOWUPS in a row without a tool call in between. Every check goes to the session and to a JSONL log.
+ * At most MAX_FOLLOWUPS per user message; tool calls do not reset the count. A follow-up answers only
+ * with text and no tool call is a rebuttal, so the checker stops. Every check goes to the session and to a JSONL log.
  *
  * Env:
  *   PI_CHECKER_CLASSIFIER  classifier model as provider/model (default typesafe/Decision-1)
@@ -43,6 +44,27 @@ const text = (content: unknown) =>
         .join("\n")
     : String(content ?? "");
 
+const isFollowup = (e: any) => e.type === "custom_message" && e.customType === FOLLOWUP_TYPE;
+
+/** Reasons listed in a follow-up message, in the format of followupText(). */
+export function followupReasons(content: unknown): string[] {
+  return text(content)
+    .split("\n")
+    .filter((line) => line.startsWith("- "))
+    .map((line) => line.slice(2).trim())
+    .filter((line) => line.length > 0);
+}
+
+/** Reasons that no earlier follow-up of this user message already sent. */
+export function newReasons(reasons: string[], sentReasons: string[]) {
+  return reasons.filter((reason) => !sentReasons.includes(reason));
+}
+
+/** Handoff warning in the run, or a text-only answer after a follow-up, ends the check. */
+export function shouldSkip(state: { stopRequested: boolean; rebutted: boolean }) {
+  return state.stopRequested || state.rebutted;
+}
+
 /** State of the run since the last user message, from session branch entries. */
 export function buildState(entries: any[]) {
   let start = -1;
@@ -58,37 +80,59 @@ export function buildState(entries: any[]) {
   const toolErrors: { tool: string; text: string }[] = [];
   const edits = new Set<string>();
   const toolsUsed: Record<string, number> = {};
-  let finalAnswer = "";
+  let firstFollowup = -1;
+  let lastFollowup = -1;
   let followups = 0;
   let stopRequested = false;
-  for (const e of run) {
-    if (e.type === "custom_message" && e.customType === FOLLOWUP_TYPE) followups++;
-    if (e.type === "custom_message" && e.customType === HANDOFF_WARNING_TYPE) stopRequested = true;
+  const sentReasons: string[] = [];
+  for (let i = 0; i < run.length; i++) {
+    const e = run[i];
+    if (isFollowup(e)) {
+      if (firstFollowup < 0) firstFollowup = i;
+      lastFollowup = i;
+      followups++;
+      for (const reason of followupReasons(e.content)) if (!sentReasons.includes(reason)) sentReasons.push(reason);
+    } else if (e.type === "custom_message" && e.customType === HANDOFF_WARNING_TYPE) stopRequested = true;
+  }
+  let finalAnswer = "";
+  let rebuttal = "";
+  let toolCallsAfterFollowup = 0;
+  for (let i = 0; i < run.length; i++) {
+    const e = run[i];
     if (e.type !== "message") continue;
     const m = e.message;
-    if (m.role === "assistant") {
-      const t = text(m.content);
+    if (m.role !== "assistant") continue;
+    const t = text(m.content);
+    if (firstFollowup < 0 || i < firstFollowup) {
       if (t.trim()) finalAnswer = t;
-      for (const c of Array.isArray(m.content) ? m.content : []) {
-        if (c.type !== "toolCall") continue;
-        followups = 0;
-        calls.set(c.id, { name: c.name, args: c.arguments });
-        toolsUsed[c.name] = (toolsUsed[c.name] ?? 0) + 1;
-      }
-    } else if (m.role === "toolResult") {
-      const call = calls.get(m.toolCallId);
-      const name = call?.name ?? m.toolName;
-      if (m.isError) toolErrors.push({ tool: name, text: clip(text(m.content), 600) });
-      if (EDIT_TOOLS.has(name) && !m.isError && call?.args?.path) edits.add(String(call.args.path));
     }
+    if (lastFollowup >= 0 && i > lastFollowup && t.trim()) rebuttal = t;
+    for (const c of Array.isArray(m.content) ? m.content : []) {
+      if (c.type !== "toolCall") continue;
+      if (lastFollowup >= 0 && i > lastFollowup) toolCallsAfterFollowup++;
+      calls.set(c.id, { name: c.name, args: c.arguments });
+      toolsUsed[c.name] = (toolsUsed[c.name] ?? 0) + 1;
+    }
+  }
+  for (let i = 0; i < run.length; i++) {
+    const e = run[i];
+    if (e.type !== "message" || e.message.role !== "toolResult") continue;
+    const m = e.message;
+    const call = calls.get(m.toolCallId);
+    const name = call?.name ?? m.toolName;
+    if (m.isError) toolErrors.push({ tool: name, text: clip(text(m.content), 600) });
+    if (EDIT_TOOLS.has(name) && !m.isError && call?.args?.path) edits.add(String(call.args.path));
   }
   return {
     request: clip(text(entries[start].message.content), 4000),
     finalAnswer: clip(finalAnswer, 6000),
+    rebuttal: clip(rebuttal, 6000),
     toolErrors: toolErrors.slice(-8),
     edits: [...edits],
     toolsUsed,
     followupsUsed: followups,
+    sentReasons,
+    rebutted: lastFollowup >= 0 && toolCallsAfterFollowup === 0 && rebuttal.trim().length > 0,
     stopRequested,
   };
 }
@@ -173,7 +217,8 @@ export default function (pi: ExtensionAPI) {
     if (!shouldCheck(event)) return;
     if (backgroundJobRunning(pi)) return;
     const state = buildState(ctx.sessionManager.getBranch() as any[]);
-    if (!state || state.stopRequested) return;
+    if (!state) return;
+    if (shouldSkip(state)) return;
     const model = ctx.modelRegistry.findOfType("classifier", ...CLASSIFIER);
     if (!model) {
       ctx.ui.notify(`checker: classifier ${CLASSIFIER.join("/")} not found; set PI_CHECKER_CLASSIFIER or add the model.`, "warning");
@@ -185,7 +230,7 @@ export default function (pi: ExtensionAPI) {
       log({ at: new Date().toISOString(), session: ctx.sessionManager.getSessionId(), state, error: res.errorMessage });
       return;
     }
-    const reasons = decide(res.answers);
+    const reasons = newReasons(decide(res.answers), state.sentReasons);
     const followup = reasons.length > 0 && state.followupsUsed < MAX_FOLLOWUPS;
     const record = { at: new Date().toISOString(), session: ctx.sessionManager.getSessionId(), state, answers: res.answers, reasons, followup };
     log(record);

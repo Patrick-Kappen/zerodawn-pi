@@ -9,8 +9,10 @@ import {
   FOLLOWUP_TYPE,
   followupText,
   HANDOFF_WARNING_TYPE,
+  newReasons,
   QUESTIONS,
   shouldCheck,
+  shouldSkip,
 } from "./index.ts";
 
 test("shouldCheck runs on a completed run that ends on assistant text, not on a continuation or abort", () => {
@@ -32,6 +34,8 @@ const msg = (message: any) => ({ type: "message", message });
 const call = (id: string, name: string, args: any) => ({ type: "toolCall", id, name, arguments: args });
 const result = (id: string, toolName: string, t: string, isError = false) =>
   msg({ role: "toolResult", toolCallId: id, toolName, isError, content: [{ type: "text", text: t }] });
+const followup = (reasons: string[]) => ({ type: "custom_message", customType: FOLLOWUP_TYPE, content: followupText(reasons), display: false });
+const handoffWarning = { type: "custom_message", customType: HANDOFF_WARNING_TYPE, content: "end the run", display: false };
 
 test("buildState takes only the run since the last user message", () => {
   const entries = [
@@ -44,7 +48,8 @@ test("buildState takes only the run since the last user message", () => {
     result("2", "run_tests", "1 failed", true),
     msg({ role: "assistant", content: [call("3", "write", { path: "b.ts" })] }),
     result("3", "write", "ok"),
-    { type: "custom_message", customType: FOLLOWUP_TYPE, content: "x", display: false },
+    msg({ role: "assistant", content: [{ type: "text", text: "Half done." }] }),
+    followup(["Finish the task."]),
     msg({ role: "assistant", content: [call("4", "bash", { command: "just check" })] }),
     result("4", "bash", "ok"),
     msg({ role: "assistant", content: [{ type: "text", text: "Done." }] }),
@@ -52,20 +57,79 @@ test("buildState takes only the run since the last user message", () => {
   const s = buildState(entries);
   assert.ok(s);
   assert.equal(s.request, "fix the bug");
-  assert.equal(s.finalAnswer, "Done.");
+  assert.equal(s.finalAnswer, "Half done.");
+  assert.equal(s.rebuttal, "Done.");
   assert.deepEqual(s.edits, ["a.ts", "b.ts"]);
   assert.deepEqual(s.toolErrors, [{ tool: "run_tests", text: "1 failed" }]);
   assert.deepEqual(s.toolsUsed, { edit: 1, run_tests: 1, write: 1, bash: 1 });
-  assert.equal(s.followupsUsed, 0);
+  assert.equal(s.followupsUsed, 1);
+  assert.deepEqual(s.sentReasons, ["Finish the task."]);
+  assert.equal(s.rebutted, false);
 });
 
-test("buildState counts follow-ups in a row; a tool call sets the count back to 0", () => {
-  const followup = { type: "custom_message", customType: FOLLOWUP_TYPE, content: "x", display: false };
+test("buildState takes finalAnswer from before the first follow-up and the rebuttal after the last", () => {
+  const entries = [
+    msg({ role: "user", content: "go" }),
+    msg({ role: "assistant", content: [{ type: "text", text: "first answer" }] }),
+    followup(["Finish the task."]),
+    msg({ role: "assistant", content: [{ type: "text", text: "first rebuttal" }] }),
+    followup(["Do the step that you offered."]),
+    msg({ role: "assistant", content: [{ type: "text", text: "last rebuttal" }] }),
+  ];
+  const s = buildState(entries);
+  assert.ok(s);
+  assert.equal(s.finalAnswer, "first answer");
+  assert.equal(s.rebuttal, "last rebuttal");
+  assert.deepEqual(s.sentReasons, ["Finish the task.", "Do the step that you offered."]);
+});
+
+test("buildState marks a text-only answer after a follow-up as a rebuttal", () => {
   const answer = msg({ role: "assistant", content: [{ type: "text", text: "later" }] });
-  const entries = [msg({ role: "user", content: "go" }), answer, followup, answer, followup, answer];
+  const entries = [msg({ role: "user", content: "go" }), answer, followup(["Finish the task."]), answer];
+  assert.equal(buildState(entries)?.rebutted, true);
+  assert.equal(buildState([msg({ role: "user", content: "go" }), answer])?.rebutted, false);
+  entries.push(msg({ role: "assistant", content: [call("1", "read", { path: "a" })] }), result("1", "read", "ok"));
+  assert.equal(buildState(entries)?.rebutted, false);
+});
+
+test("newReasons drops every reason an earlier follow-up already sent", () => {
+  assert.deepEqual(newReasons(["Finish the task.", "Fix the error in scope."], ["Finish the task."]), ["Fix the error in scope."]);
+  assert.deepEqual(newReasons(["Finish the task."], ["Finish the task."]), []);
+});
+
+test("buildState counts all follow-ups since the last user message; a tool call does not reset the count", () => {
+  const answer = msg({ role: "assistant", content: [{ type: "text", text: "later" }] });
+  const entries = [msg({ role: "user", content: "go" }), answer, followup(["Finish the task."]), answer, followup(["Finish the task."]), answer];
   assert.equal(buildState(entries)?.followupsUsed, 2);
-  entries.push(followup, msg({ role: "assistant", content: [call("1", "read", { path: "a" })] }), result("1", "read", "ok"), answer);
-  assert.equal(buildState(entries)?.followupsUsed, 0);
+  entries.push(msg({ role: "assistant", content: [call("1", "read", { path: "a" })] }), result("1", "read", "ok"));
+  assert.equal(buildState(entries)?.followupsUsed, 2);
+  entries.push(followup(["Finish the task."]), answer);
+  assert.equal(buildState(entries)?.followupsUsed, 3);
+});
+
+test("a handoff warning in the run skips the check", () => {
+  const answer = msg({ role: "assistant", content: [{ type: "text", text: "later" }] });
+  const s = buildState([msg({ role: "user", content: "go" }), answer, handoffWarning]);
+  assert.ok(s);
+  assert.equal(s.stopRequested, true);
+  assert.equal(shouldSkip(s), true);
+  assert.equal(shouldSkip(buildState([msg({ role: "user", content: "go" }), answer])!), false);
+});
+
+test("a live branch with three rounds of follow-up and text-only rebuttal gives at most one follow-up", () => {
+  const entries: any[] = [msg({ role: "user", content: "fix the bug" }), msg({ role: "assistant", content: [{ type: "text", text: "I fixed it." }] })];
+  let given = 0;
+  for (let round = 0; round < 3; round++) {
+    const state = buildState(entries);
+    assert.ok(state);
+    if (shouldSkip(state)) break;
+    const reasons = newReasons(["Finish the task."], state.sentReasons);
+    if (reasons.length === 0 || state.followupsUsed >= 3) break;
+    given++;
+    entries.push(followup(reasons));
+    entries.push(msg({ role: "assistant", content: [{ type: "text", text: "the checker is wrong: it is done" }] }));
+  }
+  assert.equal(given, 1);
 });
 
 test("buildState marks a run with a handoff warning as stop requested", () => {

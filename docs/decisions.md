@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 31. The checker takes a rebuttal and counts follow-ups per user message (2026-10-27)
+
+A live run went in circles. The agent answered a follow-up with a rebuttal, the classifier judged that rebuttal against the old answer, and the same "Finish the task" came again. Every tool call reset the count, so a look into the problem made the loop longer. The state now keeps the answer from before the first follow-up and the rebuttal as separate fields. A text-only run after a follow-up is a rebuttal: the checker stops. A run with tool calls is checked again, but reasons that an earlier follow-up already sent are dropped. The limit counts all follow-ups of the user message. A handoff warning skips the check because the handoff resumes the work after its cut.
+
 ## 30. A handoff at the end of a run goes on unless the card waits for the user (2026-10-27)
 
 After a cut at the end of a run the agent often stood still. The 130k warning tells it to end the run, so the cut came between two steps of work, and nothing started the next run. The card model now sets `waitsForUser` and writes the half-done step in `inProgress`. The cut adds the resume message and requests one continuation only when three things are true: the warning came in the same run, the card is active, and it does not wait for the user. A run that ends without the warning ended by choice of the agent, so it waits for the user. A live test showed why: a local model invented a release as next step, and an automatic continuation would start it.
