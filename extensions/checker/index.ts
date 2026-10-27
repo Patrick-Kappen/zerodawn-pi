@@ -20,6 +20,14 @@ const LOG = process.env.PI_CHECKER_LOG ?? join(homedir(), ".pi", "agent", "check
 export const MAX_FOLLOWUPS = 3;
 export const FOLLOWUP_TYPE = "checker-followup";
 const EDIT_TOOLS = new Set(["edit", "write"]);
+export const BACKGROUND_JOBS_QUERY = "bash:background-jobs";
+
+/** The bash extension answers synchronously; without it nothing answers and the result is false. */
+export function backgroundJobRunning(pi: Pick<ExtensionAPI, "events">) {
+  const query = { running: false };
+  pi.events.emit(BACKGROUND_JOBS_QUERY, query);
+  return query.running;
+}
 
 export const clip = (v: unknown, n: number) => {
   const s = typeof v === "string" ? v : JSON.stringify(v ?? "");
@@ -160,6 +168,7 @@ function log(record: unknown) {
 export default function (pi: ExtensionAPI) {
   pi.on("agent_before_settle", async (event, ctx: ExtensionContext) => {
     if (event.outcome !== "completed" || event.continue || !event.context.canContinue) return;
+    if (backgroundJobRunning(pi)) return;
     const state = buildState(ctx.sessionManager.getBranch() as any[]);
     if (!state) return;
     const model = ctx.modelRegistry.findOfType("classifier", ...CLASSIFIER);

@@ -6,7 +6,7 @@ import { Key } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { shorten, storeDir } from "../../../shared/store.ts";
 import { commandLine } from "../../../shared/util.ts";
-import { hasBackgroundJob, type State } from "../state.ts";
+import { hasBackgroundJob, registerJobsQuery, type State } from "../state.ts";
 import type { Widget } from "../ui/dashboard.ts";
 import { closeFollow, toggleFollow } from "../ui/jobview.ts";
 import { alive, describe, ending, exitStatus, type Job, kill, type Meta, saveMeta, statsOf, summarizeFromDisk } from "./jobproc.ts";
@@ -24,6 +24,7 @@ export type Reports = {
 
 export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Reports {
   const { jobs } = s;
+  registerJobsQuery(pi, s);
   const visible = () => {
     const running = [...jobs.values()].filter((j) => !j.result).sort((a, b) => b.start - a.start);
     const ended = [...jobs.values()]

@@ -29,7 +29,7 @@ The checker sends the agent back when one of these is true:
 - files changed and `verified` < 0.3
 - `status` is `incomplete` with confidence > 0.7, or `completeness` ≤ 1
 
-The follow-up message lists only the reasons that apply. At most 3 follow-ups per user message; then a warning shows the open points. A run that was aborted or failed is not checked. A missing model or a failed classify call shows a warning and does not send the agent back.
+The follow-up message lists only the reasons that apply. At most 3 follow-ups per user message; then a warning shows the open points. A run that was aborted or failed is not checked. A run is also not checked while a bash job runs in the background, because the job report starts the next turn. The checker asks the bash extension with `{ running: false }` on the `pi.events` channel `bash:background-jobs`. A missing model or a failed classify call shows a warning and does not send the agent back.
 
 Every check goes to the session as a custom entry `checker` and as one JSON line to the log file.
 
