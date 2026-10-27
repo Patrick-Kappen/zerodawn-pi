@@ -1,9 +1,11 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import { handoffModels } from "../../shared/config.ts";
 import { sessionDir } from "../../shared/store.ts";
 import { render } from "./lib/card.ts";
 import { type Boundary, decide, RESUME, warmDecision, warning } from "./lib/decider.ts";
 import { gitFacts, jobFacts, jobsRunning } from "./lib/facts.ts";
+import { ask, RECALL_MAX_CHARS, RECALL_TEXT_MAX, readSession, select } from "./lib/recall.ts";
 import { type Handoff, lastHandoff, saveHandoff } from "./lib/store.ts";
 import { type Registry, writeCard } from "./lib/summarize.ts";
 import { type Entry, strip, tail } from "./lib/transcript.ts";
@@ -92,6 +94,25 @@ export default function (pi: ExtensionAPI) {
     if (event.reason !== "quit" && event.reason !== "new") return;
     if (running) await running;
     if (sinceLastCard(ctx).lines.length) await update(ctx, `/${event.reason}`);
+  });
+
+  pi.registerTool({
+    name: "recall",
+    label: "recall",
+    description: `Answer one question about earlier work of a session, also the part before a handoff, without reading the session yourself. A cheap model reads the stripped transcript (text and one line per tool call) and answers in a few lines with entry ids. Use it when the handoff or your context lacks a detail: a reason, an error, a command, a decision. Returns "Not in the transcript." when the session does not hold the answer.`,
+    parameters: Type.Object({
+      question: Type.String({ description: "One concrete question, for example: why did we drop the job:<id> paths?" }),
+      session: Type.Optional(
+        Type.String({ description: "Path of a .jsonl session file, for example the one under Earlier work in a handoff. Default: this session." }),
+      ),
+    }),
+    async execute(_id, params, signal, _onUpdate, ctx) {
+      const path = params.session ?? ctx.sessionManager.getSessionFile();
+      if (!path) throw new Error("recall: this session has no session file. Give the path of a .jsonl session file in session.");
+      const lines = select(strip(readSession(path), { ids: true, textMax: RECALL_TEXT_MAX }), params.question, RECALL_MAX_CHARS);
+      const { answer, model } = await ask(ctx.modelRegistry as unknown as Registry, handoffModels(), params.question, lines, signal);
+      return { content: [{ type: "text", text: answer }], details: { model, session: path, lines: lines.length } };
+    },
   });
 
   pi.registerCommand("handoff", {

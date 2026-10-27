@@ -47,7 +47,7 @@ test("/handoff starts a new session with the handoff; /handoff card only shows i
   writeFileSync(config, JSON.stringify({ handoffModels: ["p/m"] }));
   process.env.ZERODAWN_PI_CONFIG = config;
   let command: any;
-  register({ registerCommand: (_n: string, c: any) => (command = c), on() {} } as any);
+  register({ registerCommand: (_n: string, c: any) => (command = c), on() {}, registerTool() {} } as any);
   const seen: any[] = [];
   await assert.rejects(command.handler("later", ctx(seen)), /unknown argument "later"/);
   await command.handler("", ctx(seen));
@@ -73,7 +73,7 @@ test("agent_end updates the card in the background after a commit; /quit and /ne
     ui: { notify: (text: string) => notes.push(text) },
   } as any;
   const handlers = new Map<string, any>();
-  register({ registerCommand() {}, on: (name: string, fn: any) => handlers.set(name, fn) } as any);
+  register({ registerCommand() {}, registerTool() {}, on: (name: string, fn: any) => handlers.set(name, fn) } as any);
 
   await handlers.get("agent_end")({}, own);
   assert.deepEqual(notes, []);
@@ -110,7 +110,7 @@ test("turn_end warns, settle cuts with the handoff as a compaction, the hard lim
     getContextUsage: () => ({ tokens }),
   } as any;
   const handlers = new Map<string, any>();
-  register({ registerCommand() {}, on: (name: string, fn: any) => handlers.set(name, fn) } as any);
+  register({ registerCommand() {}, registerTool() {}, on: (name: string, fn: any) => handlers.set(name, fn) } as any);
   const turnEnd = () => handlers.get("turn_end")({}, own);
   const settle = () => handlers.get("agent_before_settle")({}, own);
 
@@ -140,4 +140,40 @@ test("turn_end warns, settle cuts with the handoff as a compaction, the hard lim
   assert.equal(await settle(), undefined);
   tokens = 50_000;
   assert.deepEqual(handlers.get("cache_warming_decision")({}, own), { action: "warm" });
+});
+
+test("recall answers from the session file with entry ids, and names a missing session file", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "handoff-recall-"));
+  const config = join(dir, "config.json");
+  writeFileSync(config, JSON.stringify({ handoffModels: ["p/m"] }));
+  process.env.ZERODAWN_PI_CONFIG = config;
+  const session = join(dir, "old.jsonl");
+  writeFileSync(
+    session,
+    [
+      { type: "session", id: "h" },
+      { type: "message", id: "e1", message: { role: "user", content: "Why out:<name>?" } },
+      { type: "message", id: "e2", message: { role: "assistant", content: [{ type: "text", text: "It covers every output, not only bash jobs." }] } },
+    ]
+      .map((e) => JSON.stringify(e))
+      .join("\n"),
+  );
+  let tool: any;
+  register({ registerCommand() {}, on() {}, registerTool: (t: any) => (tool = t) } as any);
+  let asked = "";
+  const own = {
+    sessionManager: { getSessionFile: () => undefined },
+    modelRegistry: {
+      find: () => "m",
+      hasConfiguredAuth: () => true,
+      complete: async (_m: unknown, c: any) => {
+        asked = c.messages[0].content;
+        return { stopReason: "stop", content: [{ type: "text", text: "Covers every output [e2]." }] };
+      },
+    },
+  } as any;
+  const result = await tool.execute("id", { question: "Why out:<name>?", session }, undefined, undefined, own);
+  assert.equal(result.content[0].text, "Covers every output [e2].");
+  assert.match(asked, /^Question: Why out:<name>\?\n\nTranscript:\n\[e1\] user: Why out:<name>\?\n\[e2\] assistant: It covers every output/);
+  await assert.rejects(tool.execute("id", { question: "x" }, undefined, undefined, own), /has no session file/);
 });
