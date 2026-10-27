@@ -204,3 +204,21 @@ test("the cache knows the directory: the same change in another worktree runs ag
   const r = await tool.execute("call-5", { path: other }, undefined, ctx);
   assert.doesNotMatch(r.content[0].text, /same result/);
 });
+
+test("a check that starts with cd runs in the dev environment of that directory, not of pi's cwd", async () => {
+  const project = temp("envproject");
+  const bin = temp("bin");
+  execFileSync("git", ["init", "-q"], { cwd: project });
+  writeFileSync(join(project, ".envrc"), "use flake\n");
+  writeFileSync(join(bin, "direnv"), '#!/bin/sh\necho "env of $2"\nshift 2\nexec "$@"\n', { mode: 0o755 });
+  const path = process.env.PATH;
+  process.env.PATH = `${bin}:${path}`;
+  try {
+    const r = await new RunTests(notify).check("call-env", `cd ${project} && echo inside`, { ...ctx, cwd: plain });
+    const log = r.text.match(/log: (\S+)/)?.[1] ?? "";
+    assert.match(readFileSync(log.replace(/^~/, process.env.HOME ?? ""), "utf8"), new RegExp(`^env of ${project}\\ninside`));
+  } finally {
+    process.env.PATH = path;
+    for (const d of [project, bin]) rmSync(d, { recursive: true, force: true });
+  }
+});

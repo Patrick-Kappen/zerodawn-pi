@@ -9,7 +9,7 @@ Gives the agent the tool `run_tests`. It runs the tests for the files that chang
 - `rerun: true`: run again when no file changed. Without it, the tool gives the earlier result.
 - `path`: the project directory, such as a git worktree. Default: the current directory.
 
-The run gets the dev environment of the project: when the git root of the directory has an `.envrc`, the command runs through `direnv exec <git root>`. A blocked `.envrc` fails the run with the direnv message: run `direnv allow <git root>`. The check commands in bash run the same way.
+The run gets the dev environment of the project: when the git root of the directory has an `.envrc`, the command runs through `direnv exec <git root>`. A blocked `.envrc` fails the run with the direnv message: run `direnv allow <git root>`. The check commands in bash run the same way; for a check that starts with `cd <dir> &&`, the directory is `<dir>`, so a check in a worktree gets the environment of that worktree.
 
 How it picks the tests for `changed`:
 
