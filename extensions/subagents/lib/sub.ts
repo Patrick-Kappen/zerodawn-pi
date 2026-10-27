@@ -46,6 +46,8 @@ export interface MessageLike {
   role: string;
   content?: unknown;
   usage?: { totalTokens: number; cost: { total: number } };
+  stopReason?: string;
+  errorMessage?: string;
 }
 
 function textOf(message: MessageLike): string {
@@ -88,6 +90,8 @@ export function createSubHandlers(options: SubHandlerOptions) {
   let gateReason: string | undefined;
   let gateInfo: GateInfo | undefined;
   let savedTools: string[] | undefined;
+  // The last assistant message ended with a provider error. pi retries some errors itself; a later good message clears it.
+  let providerError: string | undefined;
 
   const fail = (text: string) => {
     state = "done";
@@ -122,6 +126,7 @@ export function createSubHandlers(options: SubHandlerOptions) {
         gateInfo = undefined;
         gateReason = undefined;
         invalidCalls = 0;
+        providerError = undefined;
         restoreTools();
         state = "off";
         options.sendUserMessage(message.task);
@@ -152,6 +157,7 @@ export function createSubHandlers(options: SubHandlerOptions) {
     messageEnd(message: MessageLike): void {
       if (message.role !== "assistant") return;
       if (message.usage === undefined) throw new Error("subagents: an assistant message has no usage. Check the pi version.");
+      providerError = message.stopReason === "error" ? shorten(message.errorMessage ?? "the provider returned an error") : undefined;
       options.send({
         type: "event",
         event: { kind: "message", text: shorten(textOf(message)), usage: { tokens: message.usage.totalTokens, cost: message.usage.cost.total } },
@@ -224,6 +230,13 @@ export function createSubHandlers(options: SubHandlerOptions) {
       }
     },
     async settled(): Promise<void> {
+      if (providerError !== undefined) {
+        const text = providerError;
+        providerError = undefined;
+        state = "done";
+        options.send({ type: "event", event: { kind: "provider_error", text } });
+        return;
+      }
       // The gate does not run on unfinished work; the handoff data is the result.
       if (state === "waiting") {
         state = "forced";

@@ -9,15 +9,22 @@ function isObject(value: unknown): value is Payload {
 // OpenAI chat completions:   { type: "function", function: { name, parameters } }
 // OpenAI responses:          { type: "function", name, parameters }
 // pi declares a tool that becomes active during a session as a "tool_addition" block in the messages
-// (Anthropic deferred tools), not in payload.tools.
+// (Anthropic deferred tools), not in payload.tools. OpenAI responses declare them in payload.input as
+// "additional_tools" or "tool_search_output" items with a tools list (Codex sends no payload.tools at all).
 function addedTools(payload: Payload): unknown[] {
-  if (!Array.isArray(payload.messages)) return [];
-  return payload.messages.flatMap((message) =>
-    isObject(message) && Array.isArray(message.content)
-      ? message.content
-          .filter((block) => isObject(block) && block.type === "tool_addition" && isObject(block.tool))
-          .map((block) => (block.tool as Payload).definition)
-      : [],
+  const input = Array.isArray(payload.input) ? payload.input : [];
+  const responses = input.flatMap((item) =>
+    isObject(item) && (item.type === "additional_tools" || item.type === "tool_search_output") && Array.isArray(item.tools) ? item.tools : [],
+  );
+  if (!Array.isArray(payload.messages)) return responses;
+  return responses.concat(
+    payload.messages.flatMap((message) =>
+      isObject(message) && Array.isArray(message.content)
+        ? message.content
+            .filter((block) => isObject(block) && block.type === "tool_addition" && isObject(block.tool))
+            .map((block) => (block.tool as Payload).definition)
+        : [],
+    ),
   );
 }
 

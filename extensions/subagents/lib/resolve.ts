@@ -39,7 +39,7 @@ export function buildArgs(profile: Profile, extensionPaths: string[], skillPaths
   // --tools is an allowlist that also filters extension tools, and --no-tools disables them: ask, blocker, handoff, continue and done must be named.
   args.push("--tools", [...profile.tools, ...FIXED_TOOLS].join(","));
   if (!profile.tools.some((tool) => tool.startsWith("mcp__"))) args.push("--no-mcp");
-  args.push("--model", profile.models[0] as string, "--system-prompt", profile.prompt);
+  args.push("--system-prompt", profile.prompt);
   return args;
 }
 

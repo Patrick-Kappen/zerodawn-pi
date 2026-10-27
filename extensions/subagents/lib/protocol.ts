@@ -12,7 +12,13 @@ export type SubEvent =
   | { kind: "message"; text: string; usage: Usage }
   | { kind: "settled"; text: string }
   | { kind: "gate"; ok: boolean; text: string }
-  | { kind: "error"; text: string };
+  | { kind: "error"; text: string }
+  | { kind: "provider_error"; text: string };
+
+export interface FailedModel {
+  model: string;
+  reason: string;
+}
 
 export type AgentStatus = "idle" | "failed" | "question" | "blocked" | "handoff";
 
@@ -22,6 +28,8 @@ export interface AgentResult {
   text: string;
   usage: Usage;
   events: string[];
+  model: string;
+  failedModels?: FailedModel[];
   blocker?: Blocker;
   handoff?: Handoff;
   reason?: string;
@@ -35,7 +43,7 @@ export type ClientMessage =
   | { type: "hello"; role: "main" }
   | { type: "hello"; role: "sub"; id: string }
   | { type: "status" }
-  | { type: "start"; task: string; args: string[]; checks: string[]; repo: string; sha: string }
+  | { type: "start"; task: string; args: string[]; checks: string[]; models: string[]; repo: string; sha: string }
   | { type: "discard"; id: string }
   | { type: "answer"; id: string; text: string }
   | { type: "ask"; text: string }
@@ -132,6 +140,15 @@ function parseGate(fields: Fields, type: string): GateInfo {
   return { ok: true, files: strings(fields, "files", type), tests: text(fields, "tests", type) };
 }
 
+function parseFailed(value: unknown): FailedModel[] {
+  const bad = () => new Error('protocol: field "failedModels" of "result" must be a list of objects with the strings "model" and "reason". Fix the sender.');
+  if (!Array.isArray(value)) throw bad();
+  return value.map((entry) => {
+    if (typeof entry !== "object" || entry === null || typeof entry.model !== "string" || typeof entry.reason !== "string") throw bad();
+    return { model: entry.model, reason: entry.reason };
+  });
+}
+
 function number(fields: Fields, key: string, type: string): number {
   const value = fields[key];
   if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`protocol: field "${key}" of "${type}" must be a number. Fix the sender.`);
@@ -164,8 +181,12 @@ function parseEvent(value: unknown): SubEvent {
     }
     case "error":
       return { kind: "error", text: text(event, "text", "error") };
+    case "provider_error":
+      return { kind: "provider_error", text: text(event, "text", "provider_error") };
   }
-  throw new Error(`protocol: unknown event kind ${JSON.stringify(event.kind)}. Use "tool_start", "tool_end", "message", "settled" or "gate".`);
+  throw new Error(
+    `protocol: unknown event kind ${JSON.stringify(event.kind)}. Use "tool_start", "tool_end", "message", "settled", "gate", "error" or "provider_error".`,
+  );
 }
 
 export function parseClientLine(line: string): ClientMessage {
@@ -185,11 +206,13 @@ export function parseClientLine(line: string): ClientMessage {
       if (!Array.isArray(message.checks) || message.checks.some((check) => typeof check !== "string")) {
         throw new Error('protocol: field "checks" of "start" must be a list of strings. Fix the sender.');
       }
+      const models = strings(message, "models", "start");
+      if (models.length === 0) throw new Error('protocol: field "models" of "start" must not be empty. Fix the sender.');
       const repo = text(message, "repo", "start");
       if (!repo.startsWith("/")) throw new Error('protocol: field "repo" of "start" must be an absolute path. Fix the sender.');
       const sha = text(message, "sha", "start");
       if (!/^[0-9a-f]{40,64}$/.test(sha)) throw new Error('protocol: field "sha" of "start" must be a full commit hash. Fix the sender.');
-      return { type: "start", task, args: message.args as string[], checks: message.checks as string[], repo, sha };
+      return { type: "start", task, args: message.args as string[], checks: message.checks as string[], models, repo, sha };
     }
     case "discard":
       return { type: "discard", id: text(message, "id", "discard") };
@@ -260,6 +283,8 @@ export function parseServerLine(line: string): ServerMessage {
         text: text(message, "text", "result"),
         usage: usage(message, "result"),
         events: message.events as string[],
+        model: text(message, "model", "result"),
+        ...(message.failedModels === undefined ? {} : { failedModels: parseFailed(message.failedModels) }),
         ...(message.blocker === undefined ? {} : { blocker: parseBlocker(object(message, "blocker", "result"), "result.blocker") }),
         ...(message.handoff === undefined ? {} : { handoff: parseHandoff(object(message, "handoff", "result"), "result.handoff") }),
         ...(message.reason === undefined ? {} : { reason: text(message, "reason", "result") }),

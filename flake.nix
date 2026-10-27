@@ -191,6 +191,7 @@
             }}";
             inherit (cfg) nixosRepo;
             subagentExtensions = if cfg.subagentExtensions == [ ] then null else cfg.subagentExtensions;
+            subagentModels = if cfg.subagentModels == [ ] then null else cfg.subagentModels;
           };
           # The extensions read config.json next to package.json, so it is copied into the package.
           configured = pkgs.runCommand "${cfg.package.name}-configured" { } ''
@@ -266,6 +267,17 @@
               type = lib.types.listOf lib.types.str;
               default = [ ];
               description = "Absolute paths of extensions that every subagent loads, for example a provider login extension.";
+            };
+            subagentModels = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [
+                "ibm-next/qwen38-flash-next:medium"
+                "opencode/deepseek-v4.1-flash-free:low"
+                "openai-codex/gpt-6-luna:high"
+                "openai-codex/gpt-6.1-sol:medium"
+                "anthropic/claude-sonnet-5-5:medium"
+              ];
+              description = "Models for every subagent as provider/id[:thinking], in order. A subagent gets the first one that is available.";
             };
             logCleanup = {
               enable = lib.mkOption {

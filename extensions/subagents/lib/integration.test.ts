@@ -47,6 +47,7 @@ await git("branch", "base-branch");
 await writeFile(join(repo, "b.txt"), "b\n");
 await git("add", "-A");
 await git("commit", "-q", "-m", "second");
+const MODELS = ["fake/one"];
 const source = await resolveBase(exec, repo);
 const tree = (id: string) => join(work, ".worktrees", "proj", `sub-${id.slice(0, 8)}`);
 const fakePi = join(work, "fake-pi");
@@ -95,14 +96,17 @@ test("real supervisor with a fake pi: one small result reaches main, the session
   const tmux = createTmux(exec, socket);
   const { session, socket: path } = await ensure(id, fakePi);
   const client = await connectMain(path, timers);
-  const result = await client.start("say hi", ["--no-tools"], [], source);
+  const result = await client.start("say hi", ["--no-tools"], [], MODELS, source);
   assert.equal(result.status, "idle");
   assert.equal(result.text, "answer to: say hi\na.ts:1 fact\ntests: not run: no changed files");
   assert.deepEqual(result.usage, { tokens: 7, cost: 0.01 });
   assert.equal(result.events.length, 3);
   const shaped = shapeResult(result);
   assert.equal(shaped.content.length, 1);
-  assert.equal(shaped.content[0].text, `agent ${result.id}\nstatus: idle\nanswer to: say hi\na.ts:1 fact\ntests: not run: no changed files\n7 tokens, $0.0100`);
+  assert.equal(
+    shaped.content[0].text,
+    `agent ${result.id}\nstatus: idle\nmodel: fake/one\nanswer to: say hi\na.ts:1 fact\ntests: not run: no changed files\n7 tokens, $0.0100`,
+  );
   const register = JSON.parse(await readFile(`/tmp/${session}/register.json`, "utf8"));
   assert.deepEqual(
     register.agents.map((agent: { id: string; status: string }) => [agent.id, agent.status]),
@@ -113,17 +117,34 @@ test("real supervisor with a fake pi: one small result reaches main, the session
   assert.equal(await tmux.hasSession(session), false);
 });
 
+test("real supervisor with a fake pi: a provider error restarts on the next model", { timeout: 30_000 }, async () => {
+  const id = randomUUID();
+  sessionIds.push(id);
+  const { socket: path } = await ensure(id, fakePi);
+  const client = await connectMain(path, timers);
+  const result = await client.start("say hi", ["--no-tools"], [], ["bad/one", "fake/two"], source);
+  assert.equal(result.status, "idle");
+  assert.equal(
+    result.text,
+    "answer to: say hi\nThe previous agent stopped on a provider error. Continue the task. Changed files: none.\na.ts:1 fact\ntests: not run: no changed files",
+  );
+  assert.equal(result.model, "fake/two");
+  assert.deepEqual(result.failedModels, [{ model: "bad/one", reason: "429 rate limit on bad/one" }]);
+  assert.equal(shapeResult(result).content[0].text.split("\n")[2], "model: fake/two; failed: bad/one (429 rate limit on bad/one)");
+  client.close();
+});
+
 test("real supervisor with a fake pi: ask gives question, answer gives idle", { timeout: 30_000 }, async () => {
   const id = randomUUID();
   sessionIds.push(id);
   const { session, socket: path } = await ensure(id, fakePi);
   const client = await connectMain(path, timers);
-  const asked = await client.start("ASK", ["--no-tools"], [], source);
+  const asked = await client.start("ASK", ["--no-tools"], [], MODELS, source);
   assert.equal(asked.status, "question");
   assert.equal(asked.text, "which db?");
   assert.equal(
     shapeResult(asked).content[0].text,
-    `agent ${asked.id}\nstatus: question\nwhich db?\nworktree: ${tree(asked.id)}\nbranch: sub/${asked.id.slice(0, 8)}`,
+    `agent ${asked.id}\nstatus: question\nmodel: fake/one\nwhich db?\nworktree: ${tree(asked.id)}\nbranch: sub/${asked.id.slice(0, 8)}`,
   );
   await assert.rejects(client.answer("nope", "x"), /no subagent/);
   const answered = await client.answer(asked.id, "sqlite");
@@ -140,14 +161,14 @@ test("real supervisor with a fake pi: blocker and handoff data reach main", { ti
   sessionIds.push(id);
   const { session, socket: path } = await ensure(id, fakePi);
   const client = await connectMain(path, timers);
-  const blocked = await client.start("BLOCK", ["--no-tools"], [], source);
+  const blocked = await client.start("BLOCK", ["--no-tools"], [], MODELS, source);
   assert.equal(blocked.status, "blocked");
   assert.deepEqual(blocked.blocker, { issue: "no access", files: ["x.ts", "y.ts"], tried: ["a", "b"] });
   assert.equal(
     shapeResult(blocked).content[0].text,
-    `agent ${blocked.id}\nstatus: blocked\nno access\nfiles: x.ts, y.ts\ntried: a; b\nworktree: ${tree(blocked.id)}\nbranch: sub/${blocked.id.slice(0, 8)}`,
+    `agent ${blocked.id}\nstatus: blocked\nmodel: fake/one\nno access\nfiles: x.ts, y.ts\ntried: a; b\nworktree: ${tree(blocked.id)}\nbranch: sub/${blocked.id.slice(0, 8)}`,
   );
-  const handed = await client.start("HANDOFF", ["--no-tools"], [], source);
+  const handed = await client.start("HANDOFF", ["--no-tools"], [], MODELS, source);
   assert.equal(handed.status, "handoff");
   assert.equal(handed.handoff?.summary, "token limit");
   assert.equal(handed.gate, undefined);
@@ -164,7 +185,7 @@ test("real supervisor with a fake pi: handoff data and gate reach main", { timeo
   sessionIds.push(id);
   const { session, socket: path } = await ensure(id, fakePi);
   const client = await connectMain(path, timers);
-  const result = await client.start("CHANGES", ["--no-tools"], [], source);
+  const result = await client.start("CHANGES", ["--no-tools"], [], MODELS, source);
   assert.equal(result.status, "idle");
   assert.equal(result.text, "It works.\na.ts: w\ntests: green: 2 pass, 0 fail; added: a.test.ts\ndecisions: d");
   assert.deepEqual(result.gate, { ok: true, files: ["a.ts", "a.test.ts"], tests: "green: 2 pass, 0 fail" });
@@ -181,7 +202,7 @@ test("real supervisor: a command that dies without a hello is reported as failed
   sessionIds.push(id);
   const { session, socket: path } = await ensure(id, "false");
   const client = await connectMain(path, timers);
-  const result = await client.start("t", ["--no-tools"], [], source);
+  const result = await client.start("t", ["--no-tools"], [], MODELS, source);
   assert.equal(result.status, "failed");
   assert.match(result.text, /window .* is gone.*tmux attach -t/);
   client.close();
@@ -196,7 +217,7 @@ test("real supervisor with a fake pi: worktree on the base, commit with trailer,
   const { session, socket: path } = await ensure(id, fakePi);
   const client = await connectMain(path, timers);
   const base = await resolveBase(exec, repo, "base-branch");
-  const result = await client.start("WRITE", ["--no-tools"], [], base);
+  const result = await client.start("WRITE", ["--no-tools"], [], MODELS, base);
   const short = result.id.slice(0, 8);
   const worktree = join(work, ".worktrees", "proj", `sub-${short}`);
   assert.equal(result.status, "idle");
@@ -225,7 +246,7 @@ test("real supervisor with a fake pi: an agent without changes loses its worktre
   sessionIds.push(id);
   const { session, socket: path } = await ensure(id, fakePi);
   const client = await connectMain(path, timers);
-  const result = await client.start("say hi", ["--no-tools"], [], source);
+  const result = await client.start("say hi", ["--no-tools"], [], MODELS, source);
   assert.equal(result.worktree, undefined);
   assert.equal(await git("branch", "--list", `sub/${result.id.slice(0, 8)}`), "");
   await assert.rejects(stat(join(work, ".worktrees", "proj", `sub-${result.id.slice(0, 8)}`)), /ENOENT/);

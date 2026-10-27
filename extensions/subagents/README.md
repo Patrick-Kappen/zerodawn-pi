@@ -63,7 +63,6 @@ After `merge` and at `session_start` of the main pi, the extension removes each 
 ```
 ---
 description: Resolves merge conflicts and nothing else
-models: [anthropic/claude-haiku-4-5]
 tools: [read, edit, write, bash]
 extensions: [files, bash]
 ---
@@ -153,14 +152,23 @@ The command is `pi -ne -ns -np -nc --no-themes -e <path> ... <profile arguments>
 - The first `-e` is the subagents extension. It connects the subagent to the supervisor.
 - The other `-e` paths come from `subagentExtensions` in `config.json`, in order. Use it for a provider login extension.
 - Without `subagentExtensions`, the tool fails. Set `[]` to start with no extra extension.
-- The profile `~/.pi/agent/agents/<name>.md` adds its tools, extensions, skills, system prompt and first model. See `PROFILES.md`. The ladder is a later step.
+- The profile `~/.pi/agent/agents/<name>.md` adds its tools, extensions, skills and system prompt. See `PROFILES.md`. A profile has no model: see "Model ladder".
+
+## Model ladder
+
+The tooling picks the model; the agent does not choose it and does not know it. One list for all agents: `subagentModels` in `config.json` (Home Manager option `programs.zerodawn-pi.subagentModels`, with a default order). A missing or empty list is an error at start that names the file and the key. Each entry is `provider/id[:thinking]`.
+
+- **Check at start:** each entry must exist in the pi model registry of the main pi, and its thinking level must exist for the model (`thinkingLevelMap` value not `null`; a non-reasoning model allows only `off`). A wrong entry is a config error that names the entry.
+- **Availability:** the first entry whose model has auth and answers a probe is used. The probe is one tiny completion with a timeout of 20 s through the registry. The main pi caches the result per entry for 5 minutes, so parallel starts share one probe. With no available entry, the error lists each entry and its reason.
+- **Restart:** when the child pi ends with a provider error (an assistant message with `stopReason` `error` after pi retries, sent as the event `provider_error`), the supervisor marks the entry unavailable for 5 minutes. It kills the window and starts a new pi in the same worktree and branch on the next entry that is not marked. The task gets one more line: "The previous agent stopped on a provider error. Continue the task. Changed files: <git status --short>." Max one restart per entry. With no entry left, the agent fails with each model and its reason.
+- **Result:** the line `model: <entry>` names the model that did the work, then `; failed: <entry> (<reason>), ...` for the entries that failed.
 
 ## Plan
 
 The steps are in `TODO.md`, one at a time.
 
-- **Profiles:** `~/.pi/agent/agents/<name>.md` defines all that a subagent gets: models, tools, extensions, skills, MCP, system prompt, extra checks. Repositories hold no profiles. Later, nullspace delivers the same files through its layer kind `agents/`.
-- **Model ladder:** a profile lists models in order, for example a free model, then IBM, then Haiku, then Sonnet. The tool takes the first available one. Later, quota decide too.
+- **Profiles:** `~/.pi/agent/agents/<name>.md` defines all that a subagent gets: tools, extensions, skills, MCP, system prompt, extra checks. Repositories hold no profiles. Later, nullspace delivers the same files through its layer kind `agents/`.
+- **Model ladder:** done, by availability only (see "Model ladder"). Later: quota, then escalation on failure.
 - **Isolation:** each subagent has its own worktree (see "Worktrees"), later in a jail. See "Merge".
 - **Retries:** max tries, and an agent reset with a handoff.
 - **UI:** last.

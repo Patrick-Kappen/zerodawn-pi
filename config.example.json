@@ -3,5 +3,6 @@
   "nixosRepo": "/home/me/nixos-config",
   "nvim": "/path/to/nvim",
   "treesitterParsers": "/path/to/dir-with-parser-subdir",
-  "subagentExtensions": ["/home/me/pi-extensions/anthropic-oauth/index.ts"]
+  "subagentExtensions": ["/home/me/pi-extensions/anthropic-oauth/index.ts"],
+  "subagentModels": ["provider/model-id:medium", "other/model-id"]
 }
