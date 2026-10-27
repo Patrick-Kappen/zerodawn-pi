@@ -40,7 +40,16 @@ test("buildState takes only the run since the last user message", () => {
   assert.deepEqual(s.edits, ["a.ts", "b.ts"]);
   assert.deepEqual(s.toolErrors, [{ tool: "run_tests", text: "1 failed" }]);
   assert.deepEqual(s.toolsUsed, { edit: 1, run_tests: 1, write: 1, bash: 1 });
-  assert.equal(s.followupsUsed, 1);
+  assert.equal(s.followupsUsed, 0);
+});
+
+test("buildState counts follow-ups in a row; a tool call sets the count back to 0", () => {
+  const followup = { type: "custom_message", customType: FOLLOWUP_TYPE, content: "x", display: false };
+  const answer = msg({ role: "assistant", content: [{ type: "text", text: "later" }] });
+  const entries = [msg({ role: "user", content: "go" }), answer, followup, answer, followup, answer];
+  assert.equal(buildState(entries)?.followupsUsed, 2);
+  entries.push(followup, msg({ role: "assistant", content: [call("1", "read", { path: "a" })] }), result("1", "read", "ok"), answer);
+  assert.equal(buildState(entries)?.followupsUsed, 0);
 });
 
 test("buildState returns undefined without a user message", () => {
