@@ -6,6 +6,8 @@ Short records of choices that shape the repository. Newest at the top.
 
 After a cut at the end of a run the agent often stood still. The 130k warning tells it to end the run, so the cut came between two steps of work, and nothing started the next run. The card model now sets `waitsForUser` and writes the half-done step in `inProgress`. The cut adds the resume message and requests one continuation only when three things are true: the warning came in the same run, the card is active, and it does not wait for the user. A run that ends without the warning ended by choice of the agent, so it waits for the user. A live test showed why: a local model invented a release as next step, and an automatic continuation would start it.
 
+The warning also promises the cut. A run that ended between 130k and 150k after the warning got no cut, and the checker sent the agent back three times. Now the end of a run after a warning cuts, a cut without resume sets `continue: false` over a checker follow-up, and the checker skips a run with a handoff warning.
+
 ## 29. The handoff card holds state, next actions and PR status, no transcript lines (2026-10-27)
 
 The first live cards were long and unclear. The last transcript lines were noise, and "done" mixed merged and open PRs. "next" was one line with alternatives. The card now has the state now and the state it must have, 1 to 3 concrete next actions, merged PRs and open work as separate fields. The card model gets the facts, so the state now comes from code. The handoff has no transcript lines and a limit of 8000 characters. This changes the card of 27.

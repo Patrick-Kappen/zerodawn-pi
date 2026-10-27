@@ -128,6 +128,11 @@ test("turn_end warns, settle cuts with the handoff as a compaction, the hard lim
   tokens = 131_000;
   assert.match((await turnEnd()).entries[0].content, /^System: context 131k of 150k/);
   assert.equal(await turnEnd(), undefined);
+  tokens = 135_000;
+  const early = await settle();
+  assert.equal(early.entries[0].type, "compaction", "the warning promises a cut at the end of the run, also below 150k");
+  assert.equal(early.continue, false, "the card waits for the user, so a checker continuation is cancelled");
+  assert.match(notes.at(-1) ?? "", /^handoff: context 135k at the end of the run after the warning/);
   tokens = 152_000;
   assert.equal((await turnEnd()).entries[0].customType, "handoff-warning");
   const cut = await settle();
@@ -139,7 +144,7 @@ test("turn_end warns, settle cuts with the handoff as a compaction, the hard lim
   card.waitsForUser = false;
   card.inProgress = ["half of README.md is done; go on at Updates"];
   handlers.get("agent_start")();
-  assert.equal((await settle()).continue, undefined, "a run that ended without the warning waits for the user");
+  assert.equal((await settle()).continue, false, "a run that ended without the warning waits for the user");
   assert.equal((await turnEnd()).entries[0].customType, "handoff-warning");
   const goOn = await settle();
   assert.deepEqual(

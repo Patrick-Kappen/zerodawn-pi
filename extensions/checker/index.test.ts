@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createEventBus } from "@earendil-works/pi-coding-agent";
-import { BACKGROUND_JOBS_QUERY, backgroundJobRunning, buildState, decide, FOLLOWUP_TYPE, followupText, shouldCheck } from "./index.ts";
+import { BACKGROUND_JOBS_QUERY, backgroundJobRunning, buildState, decide, FOLLOWUP_TYPE, followupText, HANDOFF_WARNING_TYPE, shouldCheck } from "./index.ts";
 
 test("shouldCheck runs on a completed run that ends on assistant text, not on a continuation or abort", () => {
   assert.equal(shouldCheck({ outcome: "completed", continue: false }), true);
@@ -56,6 +56,12 @@ test("buildState counts follow-ups in a row; a tool call sets the count back to 
   assert.equal(buildState(entries)?.followupsUsed, 2);
   entries.push(followup, msg({ role: "assistant", content: [call("1", "read", { path: "a" })] }), result("1", "read", "ok"), answer);
   assert.equal(buildState(entries)?.followupsUsed, 0);
+});
+
+test("buildState marks a run with a handoff warning as stop requested", () => {
+  const user = { type: "message", message: { role: "user", content: "go" } };
+  assert.equal(buildState([user])?.stopRequested, false);
+  assert.equal(buildState([user, { type: "custom_message", customType: HANDOFF_WARNING_TYPE, content: "end the run" }])?.stopRequested, true);
 });
 
 test("buildState returns undefined without a user message", () => {

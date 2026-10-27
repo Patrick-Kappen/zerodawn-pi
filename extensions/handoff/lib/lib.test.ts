@@ -230,6 +230,9 @@ test("decide: warnings at 130k and 140k on turn_end, cut at the end of a run fro
   assert.deepEqual(decide(155_000, "turn_end", 2, false), { action: "none" });
   assert.deepEqual(decide(155_000, "settle", 2, false), { action: "cut", why: "context 155k at the end of the run" });
   assert.deepEqual(decide(155_000, "settle", 2, true), { action: "none" });
+  assert.deepEqual(decide(142_000, "settle", 1, false), { action: "cut", why: "context 142k at the end of the run after the warning" });
+  assert.deepEqual(decide(142_000, "settle", 1, true), { action: "none" });
+  assert.deepEqual(decide(142_000, "settle", 0, false), { action: "none" });
   assert.deepEqual(decide(171_000, "turn_end", 2, true), { action: "cut", why: "context 171k over the hard limit of 170k" });
   assert.match(warning(132_000, true), /^System: context 132k of 150k\. Finish this step.*Running bash jobs report first\.$/);
   assert.equal(warmDecision(60_000, true), "warm");
