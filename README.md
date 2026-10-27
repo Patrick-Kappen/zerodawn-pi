@@ -91,6 +91,60 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.17.0 — 2026-10-27
+
+### shared 0.9.0
+
+- a red check shows biome errors without a position
+
+- handoffModels in config.json and the Home Manager module
+
+### checker 0.2.0
+
+- send back an offered step, no notice per follow-up
+
+- also check runs that end on assistant text
+
+- count follow-ups in a row; a tool call resets the count
+
+- shorter follow-up text, no reason for skipped tests
+
+- shorter follow-up text, no reason for skipped tests
+
+### handoff 0.1.0
+
+- First release.
+
+### subagents 0.8.3
+
+- no provider tool choice for the end tools
+
+- the model probe sends a session id for opencode-go
+
+- no start error in a repository without a commit
+
+### tests 0.6.1
+
+- a check with cd runs in the environment of that directory
+
+### ui 0.2.1
+
+- no crash when the terminal is 0 or 1 column wide
+
+### repository
+
+- handoff: short card with state, next actions and PR status
+- subagents: no provider tool choice for the end tools
+- checker: count follow-ups in a row; a tool call resets the count
+- checker: shorter follow-up text, no reason for skipped tests
+- checker: shorter follow-up text, no reason for skipped tests
+- flake: run the full test suite in a pre-commit hook
+- flake: run the full test suite in a pre-commit hook
+- handoff: card from a stripped transcript, /handoff to a new session
+- shared: handoffModels in config.json and the Home Manager module
+- docs: backlog item to restart pi sessions after a rebuild
+- docs: open points from the v0.15.0 release session
+
 ## 0.16.0 — 2026-10-27
 
 ### ast-grep 0.3.0
@@ -197,45 +251,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 - checker: classifier check before the agent settles
 - files: own grep tool on ripgrep with noIgnore, type and counts
-
-## 0.14.1 — 2026-10-27
-
-### shared 0.7.1
-
-- tests: run tests and gates in the dev environment of the project
-
-### bash 0.6.1
-
-- inline output also has a 4 KB limit
-
-- print mode waits for background jobs before it ends
-
-- short failure output inline; fail on a missing cwd
-
-### files 0.3.1
-
-- read resends a known part shorter than its note
-
-### subagents 0.8.1
-
-- tests: run tests and gates in the dev environment of the project
-
-- request id in each client request and its answer
-
-- token limit checks the context size, not a sum
-
-### tests 0.4.2
-
-- run tests and gates in the dev environment of the project
-
-- print mode waits for background runs before it ends
-
-### repository
-
-- tests: run tests and gates in the dev environment of the project
-- subagents: ladder for now is deepseek on opencode-go, then sonnet low
-- docs: subagents design with the decisions of the user
-- docs: subagents design with and without nullspace
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

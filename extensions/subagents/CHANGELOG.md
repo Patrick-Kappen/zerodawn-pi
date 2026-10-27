@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.3 — 2026-10-27
+
+- no provider tool choice for the end tools
+
+- the model probe sends a session id for opencode-go
+
+- no start error in a repository without a commit
+
 ## 0.8.2 — 2026-10-27
 
 - docs: open points of 2026-10-27 in the TODO files

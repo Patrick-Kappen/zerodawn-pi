@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1 — 2026-10-27
+
+- a check with cd runs in the environment of that directory
+
 ## 0.6.0 — 2026-10-27
 
 - core: each tool rule in one place, description or parameter

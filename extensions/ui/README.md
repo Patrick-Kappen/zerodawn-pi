@@ -22,9 +22,9 @@ The user name in `row` style is the OS user name.
 ## Changes
 
 <!-- changelog:start -->
-## 0.2.0 — 2026-10-26
+## 0.2.1 — 2026-10-27
 
-- docs: AGENTS.md of each extension as rules, facts to README
+- no crash when the terminal is 0 or 1 column wide
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
