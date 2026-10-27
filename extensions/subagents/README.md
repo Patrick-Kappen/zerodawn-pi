@@ -122,7 +122,7 @@ One schema for every case. All fields are required; an array may be empty.
 
 Git check at call time: the set of `changes[].file` must equal `changedFiles` (paths relative to the working directory). When no file changed, `changes` is empty and `findings` has at least one entry. An error names both sets. The model tries again; 2 invalid calls fail the agent.
 
-The handoff is forced in the subagent extension; the model cannot skip it. Three cases start it:
+The subagent extension asks for the handoff; only the tool `handoff` is active then. Three cases start it:
 
 - Green gate: no abort (the agent settled already).
 - 3rd red gate: no abort.
@@ -132,11 +132,7 @@ Then:
 
 1. `pi.setActiveTools(["handoff"])`: only the tool `handoff` is declared to the model.
 2. `pi.sendUserMessage(...)` starts a new run: "The checks are green. Call the tool handoff now.", "The done gate was red 3 times. Call the tool handoff now." or "You reached the token limit. Call the tool handoff now."
-3. The `before_provider_request` handler replaces the payload with `forceTool(payload, "handoff")` (`lib/force.ts`). The choice after a stop uses `forceAnyTool(payload, names)` in the same way. The shape comes from the declared tools, not from the model name:
-   - a tool with `name` and `input_schema` is the Anthropic messages API: `tool_choice: {type:"tool", name}`, or `{type:"any"}` for any tool. An enabled `thinking` field is removed, because Anthropic rejects it with a forced tool.
-   - a tool `{type:"function", function:{name}}` is OpenAI chat completions: `tool_choice: {type:"function", function:{name}}`, or `"required"`.
-   - a tool `{type:"function", name}` without `function` is OpenAI responses: `tool_choice: {type:"function", name}`, or `"required"`.
-   - Else the subagent sends an error event "<tool>: cannot force a tool for this provider payload: <keys>" and the supervisor fails the agent.
+3. The request has no provider tool choice: some models (Claude Sonnet 5.5) refuse `tool_choice`. The active tools and their schemas fix the answer. The choice after a stop works the same way, with `continue`, `done`, `ask` and `blocker`. A settle without a call of an active tool sends "You answered with text. Answer only with a call of one of the active tools."; the second time fails the agent.
 4. The tool sends `{type:"handoff", data, gate?, reason?}` to the supervisor and returns "Handoff sent. Stop.". Nothing more goes to the agent.
 
 An agent that settles during a forced handoff or choice without a call fails.
