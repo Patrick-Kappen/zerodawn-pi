@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec zd-hooks run pre-commit "$@"

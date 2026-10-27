@@ -59,7 +59,7 @@ case "$mode" in
         fail "the flake does not evaluate: $(tail -n 3 /tmp/eval.err | tr '\n' ' ')" "run nix eval .#checks.$system --apply builtins.attrNames locally"
       [ -n "$checks" ] || fail "the flake has no checks for $system" "nix eval .#checks.$system --apply builtins.attrNames"
     else
-      checks="pre-commit types"
+      checks="pre-commit hooks-config types"
       for name in $(printf '%s\n' "$changed" | grep '^extensions/' | cut -d/ -f2 | sort -u); do
         [ -d "extensions/$name" ] || fail "extensions/$name was removed or renamed in this PR" \
           "a rename needs a note in docs/decisions.md and a release; run the full checks with a change outside extensions/"

@@ -21,6 +21,10 @@ lint:
     biome check --error-on-warnings .
     shellcheck scripts/*.sh
 
+# Write the pre-commit config of the flake to .pre-commit-config.yaml; the check hooks-config fails until it matches
+hooks-config:
+    install -m 644 "$(nix build --option warn-dirty false --no-link --print-out-paths .#checks.x86_64-linux.pre-commit.config.configFile)" .pre-commit-config.yaml
+
 # Format and apply safe lint fixes
 fmt:
     biome check --write .

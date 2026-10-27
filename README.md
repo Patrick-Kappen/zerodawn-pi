@@ -30,7 +30,7 @@ This repository is a flake. It exports:
 |---|---|
 | `packages.<system>.default` | the pi package: `package.json`, `extensions/`, `shared/`, without tests |
 | `homeModules.default` | a Home Manager module, `programs.zerodawn-pi` |
-| `checks.<system>.*` | `types` (tsc), `tests-<extension>`, `tests-shared`, `pre-commit` |
+| `checks.<system>.*` | `types` (tsc), `tests-<extension>`, `tests-shared`, `pre-commit`, `hooks-config` |
 | `devShells.<system>.default` | bun, tsc, the TypeScript LSP, biome, just, shellcheck, the nix linters |
 | `formatter.<system>` | nixfmt over the tree |
 
@@ -75,7 +75,7 @@ Some extensions read `config.json` next to `package.json`; copy `config.example.
 
 ## Develop
 
-`direnv allow` loads the dev shell from `flake.nix`. The shell installs the git hooks and the pinned pi types, so `tsc` and the LSP see the same API as the installed pi.
+`direnv allow` loads the dev shell from `flake.nix`. The shell links the pinned pi types, so `tsc` and the LSP see the same API as the installed pi.
 
 | Command | What |
 |---|---|

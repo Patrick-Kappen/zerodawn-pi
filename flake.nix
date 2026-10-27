@@ -425,6 +425,16 @@
             };
           };
 
+          hooks-config = pkgs.runCommand "hooks-config" { } ''
+            if ! diff -u ${self}/.pre-commit-config.yaml ${
+              self.checks.${system}.pre-commit.config.configFile
+            }; then
+              echo "hooks-config: .pre-commit-config.yaml differs from the pre-commit config of flake.nix; run just hooks-config and commit it" >&2
+              exit 1
+            fi
+            touch "$out"
+          '';
+
           types =
             pkgs.runCommand "types"
               {
@@ -454,10 +464,11 @@
         { system, pkgs }:
         {
           default = pkgs.mkShell {
-            PRE_COMMIT_SHELL_HOOK = self.checks.${system}.pre-commit.shellHook;
+            # The tracked .pre-commit-config.yaml names store paths; this reference builds them with the shell.
+            ZD_HOOKS_CONFIG = self.checks.${system}.pre-commit.config.configFile;
             NODE_MODULES = "${piModules pkgs}/node_modules";
             PI_VERSION = (pi pkgs).version;
-            # The hook links node_modules and installs git hooks in the current directory: only in this repository.
+            # The hook links node_modules in the current directory: only in this repository.
             shellHook = "if [ -f scripts/shell-hook.sh ] && [ -f flake.nix ]; then source scripts/shell-hook.sh; fi";
             packages = [
               pkgs.nodejs_24

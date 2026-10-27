@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 31. Git hooks come from tracked files, not from the dev shell (2026-10-27)
+
+The dev shell installed the pre-commit hooks and linked `.pre-commit-config.yaml` into the directory where it started. A new worktree had the shared hooks but not the link, so every commit there failed until somebody started the dev shell in it. The install also set a local `core.hooksPath`, which bypassed the central hooks of the system. Now `.githooks/` and `.pre-commit-config.yaml` are tracked, and the central hooks run `.githooks/<name>` through `zd-hooks run`. Every checkout has them at once. The config names store paths, so the check `hooks-config` fails when it differs from `flake.nix`; `just hooks-config` writes it again. The dev shell references the config, so it builds those paths.
+
 ## 30. A handoff at the end of a run goes on unless the card waits for the user (2026-10-27)
 
 After a cut at the end of a run the agent often stood still. The 130k warning tells it to end the run, so the cut came between two steps of work, and nothing started the next run. The card model now sets `waitsForUser` and writes the half-done step in `inProgress`. The cut adds the resume message and requests one continuation only when three things are true: the warning came in the same run, the card is active, and it does not wait for the user. A run that ends without the warning ended by choice of the agent, so it waits for the user. A live test showed why: a local model invented a release as next step, and an automatic continuation would start it.
