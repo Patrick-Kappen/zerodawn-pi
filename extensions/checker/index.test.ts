@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createEventBus } from "@earendil-works/pi-coding-agent";
-import { BACKGROUND_JOBS_QUERY, backgroundJobRunning, buildState, decide, FOLLOWUP_TYPE, followupText } from "./index.ts";
+import { BACKGROUND_JOBS_QUERY, backgroundJobRunning, buildState, decide, FOLLOWUP_TYPE, followupText, shouldCheck } from "./index.ts";
+
+test("shouldCheck runs on a completed run that ends on assistant text, not on a continuation or abort", () => {
+  assert.equal(shouldCheck({ outcome: "completed", continue: false }), true);
+  assert.equal(shouldCheck({ outcome: "completed", continue: true }), false);
+  assert.equal(shouldCheck({ outcome: "aborted", continue: false }), false);
+});
 
 test("backgroundJobRunning asks the bash extension and is false without an answer", () => {
   const events = createEventBus();

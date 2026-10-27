@@ -149,9 +149,14 @@ function log(record: unknown) {
   appendFileSync(LOG, `${JSON.stringify(record)}\n`);
 }
 
+/** context.canContinue is false when the run ends on assistant text; the follow-up message makes the continuation valid. */
+export function shouldCheck(event: { outcome: string; continue?: boolean }) {
+  return event.outcome === "completed" && !event.continue;
+}
+
 export default function (pi: ExtensionAPI) {
   pi.on("agent_before_settle", async (event, ctx: ExtensionContext) => {
-    if (event.outcome !== "completed" || event.continue || !event.context.canContinue) return;
+    if (!shouldCheck(event)) return;
     if (backgroundJobRunning(pi)) return;
     const state = buildState(ctx.sessionManager.getBranch() as any[]);
     if (!state) return;
