@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Key } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { callFileId, freeId, shorten, storeDir } from "../../../shared/store.ts";
+import { callFileId, freeId, outRef, storeDir } from "../../../shared/store.ts";
 import { age } from "../../../shared/util.ts";
 import { DEFAULT_LIMIT_S, INLINE_LINES, INLINE_WAIT_S, NO_TIME_LIMIT, STREAM_LINES, STREAM_MS, STREAM_TAIL_BYTES } from "../config.ts";
 import type { State } from "../state.ts";
@@ -144,7 +144,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       widget.refresh();
       done.then((r) => reports.report(job, meta, r.text, true));
       return {
-        content: [{ type: "text", text: `job ${id}: running · log: ${shorten(log)}` }],
+        content: [{ type: "text", text: `job ${id}: running · log: ${outRef(log)}` }],
         details: { log, job: id, background: true },
         // A command that moved to the background ends the turn, so the user can chat; its message starts the next turn.
         // A command started with background: true (a server) does not: the agent works with it.

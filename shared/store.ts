@@ -59,3 +59,20 @@ export function callOutFile(ctx: ExtensionContext, toolCallId: string, kind: str
 }
 
 export const shorten = (path: string) => path.replace(homedir(), "~");
+
+const SESSION_OUT = /\/\d{4}-\d\d-\d\dT[^/]*_[0-9a-f-]{36}\/out\/([^/]+)\.(?:log|txt)$/;
+
+// The model gets "out:<name>" for a file in the out directory of a session; read and grep resolve it.
+export function outRef(path: string): string {
+  const m = path.match(SESSION_OUT);
+  return m ? `out:${m[1]}` : shorten(path);
+}
+
+export function resolveOutRef(ctx: ExtensionContext, path: string): string | undefined {
+  const m = path.match(/^out:([\w.-]+)$/);
+  if (!m) return undefined;
+  const dir = join(sessionDir(ctx), "out");
+  const file = [`${m[1]}.txt`, `${m[1]}.log`].map((f) => join(dir, f)).find((f) => existsSync(f));
+  if (!file) throw new Error(`${path} is not an output of this session (looked in ${shorten(dir)}). Run jobs list for the jobs.`);
+  return file;
+}

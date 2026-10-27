@@ -3,6 +3,7 @@ import { statSync } from "node:fs";
 import { relative } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { resolveOutRef } from "../../../shared/store.ts";
 import { absolutePath } from "../../../shared/util.ts";
 
 export const GREP_LINE_MAX = 200;
@@ -11,7 +12,7 @@ export const GREP_PER_FILE = 20;
 
 const schema = Type.Object({
   pattern: Type.String({ description: "Search pattern (regex, or literal with literal: true)" }),
-  path: Type.Optional(Type.String({ description: "Directory or file to search (default: current directory)" })),
+  path: Type.Optional(Type.String({ description: "Directory or file to search, or out:<name> for a tool output (default: current directory)" })),
   glob: Type.Optional(Type.String({ description: "Filter files by glob pattern, e.g. '*.ts' or '!**/*.test.ts'" })),
   type: Type.Optional(Type.String({ description: "Filter files by rg file type, e.g. ts, py, nix" })),
   ignoreCase: Type.Optional(Type.Boolean({ description: "Case-insensitive search (default: false)" })),
@@ -81,7 +82,7 @@ export function registerGrep(pi: ExtensionAPI, cwd: string) {
     parameters: schema,
     async execute(_id, params: Params, signal, _onUpdate, ctx) {
       const base = ctx?.cwd ?? cwd;
-      const target = absolutePath(params.path ?? ".", base);
+      const target = (params.path && resolveOutRef(ctx, params.path)) || absolutePath(params.path ?? ".", base);
       const stat = statSync(target, { throwIfNoEntry: false });
       if (!stat) throw new Error(`grep: path ${params.path ?? "."} does not exist in ${base}.`);
       const isDir = stat.isDirectory();
