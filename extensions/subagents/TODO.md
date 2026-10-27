@@ -1,5 +1,7 @@
 One step at a time. Each step is its own PR.
 
+- 2026-10-27: four coder agents used their 100k tokens on reading (AGENTS, READMEs, pi dist) and wrote no code; one stopped without a handoff call (status failed). Find out: the model of the coder profile, why it reads so wide, why the handoff was not forced.
+
 3. Merge profile: a cheap model that only fixes. The supervisor, not the agent, watches the PR (webhook or polling): green or red, more work on red, ask or blocker. `done` only when the merge succeeded; for a release only when the release succeeded.
 4. Coordination: before the final merge to main, check with the agents on other branches whether their release is ready or almost ready, or wait for "release after XYZ". One agent does the final merge and sends a message to all. On green: flake update and NixOS update on a worktree. Wait for a green PR, then a handoff to the owner.
 5. Jail with bwrap: the worktree read-write, `.git/objects` and the own `.git/worktrees/<name>`, `/nix/store` and `~/.pi/agent` read-only, network on.
