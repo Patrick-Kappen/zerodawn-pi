@@ -2,7 +2,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { DEFAULT_MAX_LINES, type ExtensionAPI, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
 import { outFile, shorten } from "../../shared/store.ts";
 import { absolutePath, textOf } from "../../shared/util.ts";
-import { GREP_LINE_MAX, registerFiles, WRITE_MAX_LINES } from "./lib/files.ts";
+import { registerFiles, WRITE_MAX_LINES } from "./lib/files.ts";
+import { GREP_LINE_MAX } from "./lib/grep.ts";
 import { registerViewGuard } from "./lib/guard.ts";
 
 const MAX_BYTES = 16 * 1024;
