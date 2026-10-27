@@ -60,11 +60,9 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 ## Changes
 
 <!-- changelog:start -->
-## 0.4.2 — 2026-10-27
+## 0.5.0 — 2026-10-27
 
-- run tests and gates in the dev environment of the project
-
-- print mode waits for background runs before it ends
+- shared: outputs as out:<name>; read and grep take it as a path
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

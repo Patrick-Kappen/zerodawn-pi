@@ -16,9 +16,9 @@
 ## Changes
 
 <!-- changelog:start -->
-## 0.3.0 — 2026-10-26
+## 0.4.0 — 2026-10-27
 
-- docs: AGENTS.md of each extension as rules, facts to README
+- shared: outputs as out:<name>; read and grep take it as a path
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

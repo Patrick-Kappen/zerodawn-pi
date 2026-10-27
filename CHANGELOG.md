@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.15.0 — 2026-10-27
+
+### shared 0.8.0
+
+- outputs as out:<name>; read and grep take it as a path
+
+### bash 0.7.0
+
+- the tool description names the out:<name> reference
+
+- jobs list gives the model only running jobs
+
+- shared: outputs as out:<name>; read and grep take it as a path
+
+### checker 0.1.0
+
+- First release.
+
+### files 0.4.0
+
+- shared: outputs as out:<name>; read and grep take it as a path
+
+- the grep and rg block points to the grep tool
+
+- own grep tool on ripgrep with noIgnore, type and counts
+
+### git 0.4.0
+
+- shared: outputs as out:<name>; read and grep take it as a path
+
+### tests 0.5.0
+
+- shared: outputs as out:<name>; read and grep take it as a path
+
+### repository
+
+- checker: classifier check before the agent settles
+- files: own grep tool on ripgrep with noIgnore, type and counts
+
 ## 0.14.1 — 2026-10-27
 
 ### shared 0.7.1

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0 — 2026-10-27
+
+- shared: outputs as out:<name>; read and grep take it as a path
+
 ## 0.3.0 — 2026-10-26
 
 - docs: AGENTS.md of each extension as rules, facts to README

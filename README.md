@@ -90,6 +90,45 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.15.0 — 2026-10-27
+
+### shared 0.8.0
+
+- outputs as out:<name>; read and grep take it as a path
+
+### bash 0.7.0
+
+- the tool description names the out:<name> reference
+
+- jobs list gives the model only running jobs
+
+- shared: outputs as out:<name>; read and grep take it as a path
+
+### checker 0.1.0
+
+- First release.
+
+### files 0.4.0
+
+- shared: outputs as out:<name>; read and grep take it as a path
+
+- the grep and rg block points to the grep tool
+
+- own grep tool on ripgrep with noIgnore, type and counts
+
+### git 0.4.0
+
+- shared: outputs as out:<name>; read and grep take it as a path
+
+### tests 0.5.0
+
+- shared: outputs as out:<name>; read and grep take it as a path
+
+### repository
+
+- checker: classifier check before the agent settles
+- files: own grep tool on ripgrep with noIgnore, type and counts
+
 ## 0.14.1 — 2026-10-27
 
 ### shared 0.7.1
@@ -145,30 +184,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 - subagents: model ladder by availability from subagentModels
 - ci: nvim in the dev shell for the files compat tests
 - docs: TODO note for a done check after every agent
-
-## 0.13.0 — 2026-10-27
-
-### shared 0.6.0
-
-- files: edit and write undo a change that adds a syntax error
-
-### bash 0.6.0
-
-- files: read sends only new lines; bash blocks file views
-
-### files 0.3.0
-
-- edit and write run the formatter of the project
-
-- edit and write undo a change that adds a syntax error
-
-- read sends only new lines; bash blocks file views
-
-### repository
-
-- files: edit and write run the formatter of the project
-- files: edit and write undo a change that adds a syntax error
-- files: read sends only new lines; bash blocks file views
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
