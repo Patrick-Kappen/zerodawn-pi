@@ -41,3 +41,18 @@ test("a prompt gets a status note only when a background job changed", () => {
   s.jobs.set("2", job("2", { group: "g", result: "exit 0 (1s)" }));
   assert.equal(start()?.message?.content, "jobs: 2 [g]: exit 0 (1s)");
 });
+
+test("jobs list gives the model only running jobs; an ended job is reported once by its message", async () => {
+  const tools: any[] = [];
+  const own = createState();
+  registerJobs({ ...pi, on() {}, registerTool: (t: any) => tools.push(t) }, own, { refresh() {}, stop() {} });
+  const list = async () => (await tools[0].execute("id", { action: "list" })).content[0].text as string;
+  assert.equal(await list(), "No running bash jobs. A message reports each result once.");
+  own.jobs.set("1", job("1", { result: "exit 0 (1s)", endedAt: 1 }));
+  own.jobs.set("2", job("2", { bg: false, result: "exit 0 (1s)", endedAt: 2 }));
+  own.jobs.set("3", job("3", { command: "sleep 9" }));
+  assert.match(await list(), /^job 3 · [^\n]*sleep 9[^\n]*$/);
+  await assert.rejects(list(), /no change since the last jobs call/);
+  own.jobs.set("4", job("4", { command: "sleep 8" }));
+  assert.match(await list(), /^job 4 · [^\n]*sleep 8[^\n]*\njob 3 · /);
+});

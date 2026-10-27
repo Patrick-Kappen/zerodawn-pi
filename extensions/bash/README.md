@@ -11,7 +11,7 @@ Replaces pi's `bash` tool. Every command runs as a job without a terminal, like 
 - A report that pi did not record is sent again after 20 s of idle time.
 - A user prompt gets one hidden line `jobs: 3: running · 4 [g]: exit 0` with the jobs that run or ended without a report in the context, only when it changed since the last line.
 
-`jobs` — `wait` (block until jobs end, at most 600 s), `list`, `kill`. `list` fails when nothing changed since the last call, to stop polling.
+`jobs` — `wait` (block until jobs end, at most 600 s), `list`, `kill`. `list` gives only the running jobs; the tool result or a `bash-job` message gives each result once. `list` fails when no job started or ended since the last call, to stop polling. `/jobs list` and the dashboard still show the ended jobs.
 
 ## Guard
 
