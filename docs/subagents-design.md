@@ -1,6 +1,13 @@
 # Design: subagents with and without nullspace
 
-Status: proposal. Owner of the code: zerodawn-pi (extension `subagents`). Review: nullspace lead agent. Decision: the user.
+Status: accepted by the user on 2026-10-27, with the decisions below. Owner of the code: zerodawn-pi (extension `subagents`). Review: nullspace lead agent.
+
+## Decisions of the user
+
+1. Extensions and rules of a child: not from the agent dir. The user manages them through nullspace (NSP). Until then, a child starts as now: `-ne -nc`, the profile's extensions and `subagentExtensions`.
+2. Model: never the model of the main pi. For now the ladder is `opencode-go/deepseek-v4.1-flash:low`, then `anthropic/claude-sonnet-5-5:low`. Later the list comes from the layer.
+3. A child never lives longer than its session.
+4. PR #73 (dev environment): it must work; no conditions from the user.
 
 ## Goal
 
@@ -49,10 +56,12 @@ The extension never connects to a process or a server that the main pi did not s
 
 - The ladder moves from `config.json` to `settings.json` of the agent dir, as the key `subagents.models` (a list of `provider/id[:thinking]`).
 - So the model comes from the same place as the main pi's model: the layer of the session.
-- No `subagents.models`: the subagent uses the model and thinking level of the main pi at the time of `start`.
+- The model of the main pi is never used (decision 2). No list is an error that names the file and the key.
 - Availability, probe and restart on a provider error stay as in decision 23.
 
-### 6. Login and extensions
+### 6. Login and extensions (not accepted: decision 1)
+
+The text below was the proposal. The user manages extensions and rules through nullspace instead.
 
 - A child starts with the same agent dir. So it has the same `auth.json` login, settings, packages and extensions as the main pi.
 - The child loads the extensions of the agent dir as the main pi does. So `-ne` and `subagentExtensions` go. A provider login extension loads by itself.
@@ -65,6 +74,7 @@ The extension never connects to a process or a server that the main pi did not s
 ```markdown
 ---
 description: One line: what this role does. The main agent sees it.
+extensions: [files, bash]
 tools: [read, edit, write, bash]
 skills: [name]            # optional, from <agent dir>/skills
 checks: [just check]      # optional, the done gate; default: the tests of the changed files
@@ -72,15 +82,16 @@ checks: [just check]      # optional, the done gate; default: the tests of the c
 The system prompt of the role.
 ```
 
-- No `models` (the model comes from `settings.json`) and no `extensions` (the child loads those of the agent dir).
+- No `models`: the model comes from the ladder.
+- `extensions` stays until nullspace manages the extensions (decision 1).
 - An unknown key is an error that names the profile path and the key.
-- Existing profiles: remove `models` and `extensions`.
+- Existing profiles: remove `models`.
 
 ## Task scope
 
 This is a separate problem, but the design must make room for it. Subagents now read too much, because the main agent writes "read AGENTS.md and the README" in the task, and nothing limits the child.
 
-- The rules come with the agent dir (point 6), so a task never has to say "read AGENTS.md".
+- A task never has to say "read AGENTS.md": the rules of the role are in the profile, and later nullspace delivers the rules.
 - The tool `start` gets a fixed task form: `goal` (one sentence), `files` (what the child may change), `done` (when it is finished), `context` (optional, short facts).
 - The child cannot leave its worktree. The extension blocks paths outside the worktree in its tools. Under nullspace, the sandbox is the outer limit.
 
@@ -92,11 +103,11 @@ This is a separate problem, but the design must make room for it. Subagents now 
 | `~/.worktrees/<repo>` | `PI_SUBAGENT_WORKTREES`, else `~/.worktrees/<repo>` |
 | `/tmp/pi-sub-<id>` | `$XDG_RUNTIME_DIR` or `/tmp`, `pi-sub-<session8>` |
 | `~/.pi/agent/agents` | `getAgentDir()/agents` |
-| `subagentModels` in config.json, Home Manager default | `subagents.models` in `settings.json`, else the main pi's model |
-| `subagentExtensions`, `-ne`, `-nc` | the extensions and rules of the agent dir |
-| profile `models`, `extensions` | removed |
+| `subagentModels` default: qwen, deepseek free, deepseek go, luna, sol, sonnet | for now: deepseek go `:low`, then sonnet 5.5 `:low`; later `subagents.models` in the layer |
+| `subagentExtensions`, `-ne`, `-nc` | no change until nullspace (decision 1) |
+| profile `models` | removed (already in 0.8.0) |
 
-Order of the work, one PR each: profiles from `getAgentDir()` and the new profile format; tmux socket and runtime dir; worktree root; model from `settings.json`; extensions and rules from the agent dir; task form and worktree limit.
+Order of the work, one PR each: the ladder for now; PR #73 working; profiles from `getAgentDir()`; tmux socket and runtime dir; worktree root; task form and worktree limit. With nullspace stage 4: model list from the layer.
 
 ## What nullspace does
 
@@ -110,4 +121,4 @@ Order of the work, one PR each: profiles from `getAgentDir()` and the new profil
 1. Does nullspace allow a tmux server with a PTY in the sandbox?
 2. Per client and repo: is a worktree dir in the state dir correct, or must it be in the repo (for example `.git/pi-worktrees`)?
 3. Must a subagent get the skills of the layer automatically, or only what the profile names (this proposal)?
-4. The extensions of the agent dir also add their prompt text to the child. Is that acceptable for context size, or does the profile need an extension denylist?
+4. How nullspace gives a child its extensions and rules (decision 1).
