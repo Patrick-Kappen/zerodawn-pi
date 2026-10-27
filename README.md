@@ -60,7 +60,7 @@ Clone the repository and add it to `~/.pi/agent/settings.json`:
 { "packages": ["/path/to/zerodawn-pi"] }
 ```
 
-Some extensions read `config.json` next to `package.json`; copy `config.example.json`. All keys are optional: `astGrep` (path of the binary; default from `PATH`), `nvim` (path of the binary for the syntax check of edit and write; default from `PATH`), `treesitterParsers` (directory with a `parser/` directory of tree-sitter grammars for that check), `nixosRepo` (checkout of your NixOS flake), `subagentExtensions` (absolute paths of extensions that every subagent loads, for example a provider login). `ZERODAWN_PI_CONFIG` points to another `config.json`; `just dev` uses it for the config of the installed package. A key with a wrong type fails at load with the file path.
+Some extensions read `config.json` next to `package.json`; copy `config.example.json`. All keys are optional: `astGrep` (path of the binary; default from `PATH`), `nvim` (path of the binary for the syntax check of edit and write; default from `PATH`), `treesitterParsers` (directory with a `parser/` directory of tree-sitter grammars for that check), `nixosRepo` (checkout of your NixOS flake), `subagentExtensions` (absolute paths of extensions that every subagent loads, for example a provider login), `subagentModels` (the model ladder of the subagents, `provider/id[:thinking]`, in order; the subagent tool needs it, Home Manager sets a default). `ZERODAWN_PI_CONFIG` points to another `config.json`; `just dev` uses it for the config of the installed package. A key with a wrong type fails at load with the file path.
 
 ## Docs
 

@@ -63,8 +63,9 @@ test("client rejects an error reply and a missing socket", async () => {
   await assert.rejects(connectMain("/tmp/pi-sub-nonexistent.sock", timers, 100), /connection to .* failed/);
 });
 
+const MODELS = ["m/x:off"];
 const SOURCE = { repo: "/r", sha: "a".repeat(40) };
-const result = '{"type":"result","id":"a1","status":"idle","text":"done","usage":{"tokens":2,"cost":0.1},"events":["e"]}';
+const result = '{"type":"result","id":"a1","status":"idle","text":"done","usage":{"tokens":2,"cost":0.1},"events":["e"],"model":"m/x:off"}';
 
 test("client start sends the task and waits for the result of its agent, even in one chunk", async () => {
   const received: string[] = [];
@@ -73,18 +74,19 @@ test("client start sends the task and waits for the result of its agent, even in
       received.push(data);
       if (data.includes('"start"'))
         write(
-          `{"type":"started","id":"a1"}\n{"type":"result","id":"zz","status":"idle","text":"other","usage":{"tokens":0,"cost":0},"events":[]}\n${result}\n`,
+          `{"type":"started","id":"a1"}\n{"type":"result","id":"zz","status":"idle","text":"other","usage":{"tokens":0,"cost":0},"events":[],"model":"m/x:off"}\n${result}\n`,
         );
     },
     async (path) => {
       const client = await connectMain(path, timers, 1000);
-      assert.deepEqual(await client.start("do it", ["--no-tools"], [], SOURCE), {
+      assert.deepEqual(await client.start("do it", ["--no-tools"], [], MODELS, SOURCE), {
         type: "result",
         id: "a1",
         status: "idle",
         text: "done",
         usage: { tokens: 2, cost: 0.1 },
         events: ["e"],
+        model: "m/x:off",
       });
       client.close();
       assert.match(received.join(""), /"task":"do it"/);
@@ -97,7 +99,7 @@ test("client start rejects an error reply, a closed connection and a missing sta
     (_data, write) => write('{"type":"error","message":"no tmux"}\n'),
     async (path) => {
       const client = await connectMain(path, timers, 1000);
-      await assert.rejects(client.start("t", ["--no-tools"], [], SOURCE), /refused the request: no tmux/);
+      await assert.rejects(client.start("t", ["--no-tools"], [], MODELS, SOURCE), /refused the request: no tmux/);
       client.close();
     },
   );
@@ -105,7 +107,7 @@ test("client start rejects an error reply, a closed connection and a missing sta
     () => {},
     async (path) => {
       const client = await connectMain(path, timers, 100);
-      await assert.rejects(client.start("t", ["--no-tools"], [], SOURCE), /did not start the subagent within 100 ms/);
+      await assert.rejects(client.start("t", ["--no-tools"], [], MODELS, SOURCE), /did not start the subagent within 100 ms/);
       client.close();
     },
   );
@@ -113,7 +115,7 @@ test("client start rejects an error reply, a closed connection and a missing sta
     (_data, write) => write('{"type":"started","id":"a1"}\n'),
     async (path) => {
       const client = await connectMain(path, timers, 1000);
-      const waiting = client.start("t", ["--no-tools"], [], SOURCE);
+      const waiting = client.start("t", ["--no-tools"], [], MODELS, SOURCE);
       setTimeout(() => client.close(), 50);
       await assert.rejects(waiting, /closed the connection/);
     },
@@ -126,7 +128,7 @@ test("client start stops waiting on abort", async () => {
     async (path) => {
       const client = await connectMain(path, timers, 1000);
       const controller = new AbortController();
-      const waiting = client.start("t", ["--no-tools"], [], SOURCE, controller.signal);
+      const waiting = client.start("t", ["--no-tools"], [], MODELS, SOURCE, controller.signal);
       setTimeout(() => controller.abort(), 50);
       await assert.rejects(waiting, /subagent a1 was aborted/);
       client.close();

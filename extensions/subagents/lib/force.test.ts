@@ -30,6 +30,14 @@ test("OpenAI responses", () => {
   assert.deepEqual(forceTool(payload, "handoff"), { ...payload, tool_choice: { type: "function", name: "handoff" } });
 });
 
+test("OpenAI Codex responses: tools in additional_tools and tool_search_output input items", () => {
+  const added = { type: "additional_tools", role: "developer", tools: [{ type: "function", name: "handoff", parameters: {} }] };
+  const payload = { model: "m", input: [added], tool_choice: "auto" };
+  assert.deepEqual(forceTool(payload, "handoff").tool_choice, { type: "function", name: "handoff" });
+  const searched = { type: "tool_search_output", call_id: "c", tools: [{ type: "function", name: "done", parameters: {} }] };
+  assert.equal(forceAnyTool({ model: "m", input: [searched] }, CHOICE).tool_choice, "required");
+});
+
 test("an unknown shape fails with the payload keys", () => {
   assert.throws(() => forceTool({ model: "m", contents: [] }, "handoff"), /cannot force a tool for this provider payload: model, contents$/);
   assert.throws(() => forceTool({ tools: [{ name: "other", input_schema: {} }] }, "handoff"), /payload: tools$/);

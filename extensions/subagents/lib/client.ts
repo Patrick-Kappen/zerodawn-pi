@@ -13,8 +13,8 @@ export interface Status {
 
 export interface Client {
   status(): Promise<Status>;
-  start(task: string, args: string[], checks: string[], source: Source, signal?: AbortSignal): Promise<AgentResult>;
-  begin(task: string, args: string[], checks: string[], source: Source): Promise<string>;
+  start(task: string, args: string[], checks: string[], models: string[], source: Source, signal?: AbortSignal): Promise<AgentResult>;
+  begin(task: string, args: string[], checks: string[], models: string[], source: Source): Promise<string>;
   discard(id: string): Promise<string>;
   answer(id: string, text: string, signal?: AbortSignal): Promise<AgentResult>;
   isOpen(): boolean;
@@ -101,12 +101,12 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
       });
     }
 
-    function start(task: string, args: string[], checks: string[], source: Source, signal?: AbortSignal): Promise<AgentResult> {
-      return run({ type: "start", task, args, checks, repo: source.repo, sha: source.sha }, signal);
+    function start(task: string, args: string[], checks: string[], models: string[], source: Source, signal?: AbortSignal): Promise<AgentResult> {
+      return run({ type: "start", task, args, checks, models, repo: source.repo, sha: source.sha }, signal);
     }
 
     // Starts an agent and returns its id at once; the result message is not awaited.
-    function begin(task: string, args: string[], checks: string[], source: Source): Promise<string> {
+    function begin(task: string, args: string[], checks: string[], models: string[], source: Source): Promise<string> {
       return new Promise<string>((resolve, reject) => {
         if (!open) {
           reject(new Error(`subagents: the connection to "${path}" is closed. Call the tool again to reconnect.`));
@@ -127,7 +127,7 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
             reject(error);
           },
         });
-        write({ type: "start", task, args, checks, repo: source.repo, sha: source.sha });
+        write({ type: "start", task, args, checks, models, repo: source.repo, sha: source.sha });
       });
     }
 

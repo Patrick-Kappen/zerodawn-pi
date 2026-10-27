@@ -95,7 +95,12 @@ export function createGit(exec: Exec) {
     await git(exec, ["-C", repo, "branch", "-D", branch], `could not delete the branch "${branch}"`);
   }
 
-  return { addWorktree, state, removeWorktree };
+  async function changed(path: string): Promise<string[]> {
+    const out = await git(exec, ["-C", path, "status", "--short"], `could not read the status of "${path}"`);
+    return out === "" ? [] : out.split("\n").map((line) => line.trim());
+  }
+
+  return { addWorktree, state, removeWorktree, changed };
 }
 
 export type Git = ReturnType<typeof createGit>;

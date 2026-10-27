@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { CONFIG_ENV, CONFIG_FILE, configFile, readConfig } from "./config.ts";
+import { CONFIG_ENV, CONFIG_FILE, configFile, readConfig, subagentModels } from "./config.ts";
 
 test("config.json lives next to package.json", () => {
   assert.equal(CONFIG_FILE, join(import.meta.dirname, "..", "config.json"));
@@ -62,4 +62,20 @@ test("configFile: without ZERODAWN_PI_CONFIG it is the file next to package.json
 test("configFile: ZERODAWN_PI_CONFIG points to another absolute file, a relative path fails", () => {
   assert.equal(configFile({ [CONFIG_ENV]: "/etc/pi/config.json" }), "/etc/pi/config.json");
   assert.throws(() => configFile({ [CONFIG_ENV]: "config.json" }), /must be an absolute path/);
+});
+
+test("subagentModels: returns the list, fails with the file and key when missing, empty or wrong", () => {
+  const dir = mkdtempSync(join(tmpdir(), "config-"));
+  const file = join(dir, "config.json");
+  try {
+    assert.throws(() => subagentModels(file), new RegExp(`${file} needs "subagentModels"`));
+    for (const bad of [[], "a/b", [3], [""]]) {
+      writeFileSync(file, JSON.stringify({ subagentModels: bad }));
+      assert.throws(() => subagentModels(file), new RegExp(`${file} needs "subagentModels"`));
+    }
+    writeFileSync(file, JSON.stringify({ subagentModels: ["a/b:low", "c/d"] }));
+    assert.deepEqual(subagentModels(file), ["a/b:low", "c/d"]);
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
 });

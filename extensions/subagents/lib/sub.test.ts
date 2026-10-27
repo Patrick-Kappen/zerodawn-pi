@@ -443,3 +443,34 @@ test("a refused commit throws the git output, sends nothing and counts as an inv
     })() === "abc123",
   );
 });
+
+test("a settle after an assistant message with stopReason error sends a provider error and nothing else", async () => {
+  const { sent, user, calls, handlers } = setup();
+  handlers.messageEnd({ role: "assistant", content: [], usage, stopReason: "error", errorMessage: "429 rate limit" });
+  await handlers.settled();
+  assert.deepEqual(sent.at(-1), { type: "event", event: { kind: "provider_error", text: "429 rate limit" } });
+  assert.deepEqual(user, []);
+  assert.deepEqual(calls, []);
+  await handlers.settled();
+  assert.equal(sent.filter((message) => message.type === "event" && message.event.kind === "provider_error").length, 1);
+});
+
+test("a good message after an error message (a pi retry) and a new task clear the provider error", async () => {
+  const retried = setup();
+  retried.handlers.messageEnd({ role: "assistant", content: [], usage, stopReason: "error" });
+  retried.handlers.messageEnd({ role: "assistant", content: [], usage, stopReason: "stop" });
+  await retried.handlers.settled();
+  assert.deepEqual(retried.user, [CHOICE_PROMPT]);
+  const renewed = setup();
+  renewed.handlers.messageEnd({ role: "assistant", content: [], usage, stopReason: "error" });
+  renewed.handlers.onServerMessage({ type: "task", task: "again" });
+  await renewed.handlers.settled();
+  assert.deepEqual(renewed.user, ["again", CHOICE_PROMPT]);
+});
+
+test("a provider error without a message text still reports", async () => {
+  const { sent, handlers } = setup();
+  handlers.messageEnd({ role: "assistant", content: [], usage, stopReason: "error" });
+  await handlers.settled();
+  assert.deepEqual(sent.at(-1), { type: "event", event: { kind: "provider_error", text: "the provider returned an error" } });
+});
