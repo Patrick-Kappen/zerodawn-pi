@@ -60,7 +60,7 @@ export function nearest(text: string, oldText: string): { from: number; to: numb
   return { from: best.from + 1, to: best.from + n, score: best.score, region };
 }
 
-export function freshLines(text: string, newTexts: string[], margin = 3): string | undefined {
+export function freshRanges(text: string, newTexts: string[], margin = 3): [number, number][] {
   const lines = text.split("\n");
   const ranges: [number, number][] = [];
   for (const n of newTexts) {
@@ -84,7 +84,12 @@ export function freshLines(text: string, newTexts: string[], margin = 3): string
     if (prev && r[0] <= prev[1] + 1) prev[1] = Math.max(prev[1], r[1]);
     else merged.push([...r]);
   }
-  const parts = merged.map(([from, to]) =>
+  return merged;
+}
+
+export function freshLines(text: string, newTexts: string[], margin = 3): string | undefined {
+  const lines = text.split("\n");
+  const parts = freshRanges(text, newTexts, margin).map(([from, to]) =>
     lines
       .slice(from - 1, to)
       .map((l, k) => `${from + k}| ${l}`)

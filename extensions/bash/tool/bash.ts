@@ -32,7 +32,8 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
     description: `Run a bash command. Returns the exit status; output up to ${INLINE_LINES} lines, else its size and path. A failure adds every distinct error line. Over ${INLINE_WAIT_S} s it continues as a job and a message reports it. Use it for builds, scripts and tools; not to read or search files.`,
     promptSnippet: "Run a bash command; short output back, long commands continue in the background",
     promptGuidelines: [
-      "Use bash to run things, not to read: read for a file or an output path, grep for a search, git for a diff or log.",
+      "Use bash to run things, not to read: read for a range of a file, grep for a search, git for a diff or log.",
+      "A success needs no output. To see a cut output, grep the output path or read it with offset=-N.",
       "A command over 15 s ends your turn; its result comes as a message.",
       "Put independent commands in one message with the same group; they report once.",
       "Dependent steps: chain them in one command with &&. A wait for a condition is part of that command: timeout 30 bash -c 'until CHECK; do sleep 1; done' && NEXT. Never a separate sleep or a repeated check.",

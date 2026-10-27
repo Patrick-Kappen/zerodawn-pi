@@ -3,12 +3,14 @@ import { DEFAULT_MAX_LINES, type ExtensionAPI, formatSize, truncateHead } from "
 import { outFile, shorten } from "../../shared/store.ts";
 import { absolutePath, textOf } from "../../shared/util.ts";
 import { GREP_LINE_MAX, registerFiles, WRITE_MAX_LINES } from "./lib/files.ts";
+import { registerViewGuard } from "./lib/guard.ts";
 
 const MAX_BYTES = 16 * 1024;
 const WORKFLOW = `A codemode result above ${DEFAULT_MAX_LINES} lines or ${formatSize(MAX_BYTES)} is cut. The full text goes to a log file. Return only the data you need from codemode.`;
 
 export default function (pi: ExtensionAPI) {
   registerFiles(pi);
+  registerViewGuard(pi);
 
   pi.on("before_agent_start", (event) => {
     event.systemPromptOptions.sections.tool_workflow = WORKFLOW;
