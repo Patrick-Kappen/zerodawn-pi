@@ -1,4 +1,3 @@
-import { forceAnyTool, forceTool } from "./force.ts";
 import type { Blocker, GateInfo, Handoff } from "./format.ts";
 import type { GateResult } from "./gate.ts";
 import type { CommitSpec } from "./git.ts";
@@ -65,6 +64,7 @@ export const GATE_HANDOFF_PROMPT = `The done gate was red ${MAX_GATE_TRIES} time
 export const CHOICE_PROMPT =
   "You stopped. Call continue to keep working, done when the task is finished, ask for a question, or blocker when you cannot go on.";
 export const CHOICE_TOOLS = ["continue", "done", "ask", "blocker"];
+export const NO_CALL_PROMPT = "You answered with text. Answer only with a call of one of the active tools.";
 
 export interface SubHandlerOptions {
   send: (message: ClientMessage) => void;
@@ -78,7 +78,8 @@ export interface SubHandlerOptions {
   gate: (sendUserMessage: (text: string) => void) => Promise<GateResult>;
 }
 
-// off: no forced tool. choice: only the CHOICE_TOOLS, one is forced. waiting: aborted, the handoff run starts at the next settle. forced: the handoff is forced. done: handoff sent or agent failed.
+// off: all tools of the role. choice: only the CHOICE_TOOLS are active. waiting: aborted, the handoff run starts at the next settle. forced: only handoff is active. done: handoff sent or agent failed.
+// No provider tool choice: some models (Claude Sonnet 5.5) refuse it. Only the expected tools are active, and their schemas fix the answer.
 type State = "off" | "choice" | "waiting" | "forced" | "done";
 
 export function createSubHandlers(options: SubHandlerOptions) {
@@ -109,12 +110,14 @@ export function createSubHandlers(options: SubHandlerOptions) {
     saveTools();
     options.setActiveTools(["handoff"]);
     state = "forced";
+    invalidCalls = 0;
     options.sendUserMessage(prompt);
   };
   const leaveChoice = () => {
     if (state !== "choice") return;
     restoreTools();
     state = "off";
+    invalidCalls = 0;
   };
 
   return {
@@ -219,16 +222,6 @@ export function createSubHandlers(options: SubHandlerOptions) {
       state = "done";
       return "Handoff sent. Stop.";
     },
-    // Returns a changed copy of the payload, or undefined when pi must send it as it is.
-    beforeRequest(payload: unknown): unknown {
-      if (state !== "waiting" && state !== "forced" && state !== "choice") return undefined;
-      try {
-        return state === "choice" ? forceAnyTool(payload, CHOICE_TOOLS) : forceTool(payload, "handoff");
-      } catch (error) {
-        fail((error as Error).message);
-        return undefined;
-      }
-    },
     async settled(): Promise<void> {
       if (providerError !== undefined) {
         const text = providerError;
@@ -243,12 +236,13 @@ export function createSubHandlers(options: SubHandlerOptions) {
         options.sendUserMessage(HANDOFF_PROMPT);
         return;
       }
-      if (state === "forced") {
-        fail("handoff: the agent stopped without a call of the tool handoff. Read the subagent window.");
-        return;
-      }
-      if (state === "choice") {
-        fail("the agent stopped without a call of continue, done, ask or blocker. Read the subagent window.");
+      if (state === "forced" || state === "choice") {
+        if (++invalidCalls >= MAX_INVALID_CALLS) {
+          const tools = state === "forced" ? "the tool handoff" : "continue, done, ask or blocker";
+          fail(`the agent stopped ${MAX_INVALID_CALLS} times without a call of ${tools}. Read the subagent window.`);
+          return;
+        }
+        options.sendUserMessage(NO_CALL_PROMPT);
         return;
       }
       if (state === "done") return;

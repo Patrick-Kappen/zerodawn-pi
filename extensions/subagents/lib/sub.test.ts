@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { GateResult } from "./gate.ts";
 import type { CommitSpec } from "./git.ts";
 import type { ClientMessage } from "./protocol.ts";
-import { CHOICE_PROMPT, createSubHandlers, GATE_HANDOFF_PROMPT, GREEN_HANDOFF_PROMPT, HANDOFF_PROMPT, readSubEnv, shorten } from "./sub.ts";
+import { CHOICE_PROMPT, createSubHandlers, GATE_HANDOFF_PROMPT, GREEN_HANDOFF_PROMPT, HANDOFF_PROMPT, NO_CALL_PROMPT, readSubEnv, shorten } from "./sub.ts";
 
 const GREEN: GateResult = { ok: true, reason: "tests and checks green", files: ["a.ts", "a.test.ts"], tests: "green: 3 pass, 0 fail" };
 const SCOUT_GREEN: GateResult = { ok: true, reason: "no changed files", files: [], tests: "not run: no changed files" };
@@ -23,8 +23,6 @@ const HANDOFF = {
   risks: [],
 };
 const FINDINGS = { ...HANDOFF, changes: [], tests: [], findings: ["a.ts:1 x"] };
-const ANTHROPIC = { tools: [{ name: "done", input_schema: {} }] };
-
 function setup(result: GateResult | Error = GREEN, idle = false, changed = ["a.ts", "a.test.ts"]) {
   const sent: ClientMessage[] = [];
   const user: string[] = [];
@@ -116,7 +114,6 @@ test("a settle without done, ask or blocker forces a choice between continue, do
   assert.deepEqual(calls, ["tools continue,done,ask,blocker"]);
   assert.equal(gates(), 0);
   assert.deepEqual(sent, []);
-  assert.deepEqual(handlers.beforeRequest(ANTHROPIC), { ...ANTHROPIC, tool_choice: { type: "any" } });
 });
 
 test("continue restores the tools, stops the forcing and returns the text; the next settle asks again", async () => {
@@ -124,19 +121,20 @@ test("continue restores the tools, stops the forcing and returns the text; the n
   await handlers.settled();
   assert.equal(handlers.continue(), "Continue with the task.");
   assert.deepEqual(calls, ["tools continue,done,ask,blocker", "tools read,ask"]);
-  assert.equal(handlers.beforeRequest(ANTHROPIC), undefined);
   await handlers.settled();
   await handlers.settled();
-  assert.deepEqual(user, [CHOICE_PROMPT, CHOICE_PROMPT]);
+  assert.deepEqual(user, [CHOICE_PROMPT, CHOICE_PROMPT, NO_CALL_PROMPT]);
 });
 
 test("continue outside a choice fails", () => {
   assert.throws(() => setup().handlers.continue(), /not active/);
 });
 
-test("settled while the choice is forced and no tool call came is an error event", async () => {
-  const { handlers, sent } = setup();
+test("a text answer in the choice asks once more; the second is an error event", async () => {
+  const { handlers, sent, user } = setup();
   await handlers.settled();
+  await handlers.settled();
+  assert.equal(user.at(-1), NO_CALL_PROMPT);
   await handlers.settled();
   const error = sent.at(-1);
   assert.ok(error?.type === "event" && error.event.kind === "error");
@@ -147,14 +145,11 @@ test("done in the choice restores the tools and the next settle runs the gate; t
   const { sent, user, calls, handlers, gates } = setup();
   await handlers.settled();
   assert.match(handlers.done(), /checks run now/);
-  assert.equal(handlers.beforeRequest(ANTHROPIC), undefined);
   await handlers.settled();
   assert.equal(gates(), 1);
   assert.deepEqual(sent, [{ type: "event", event: { kind: "gate", ok: true, text: "tests and checks green" } }]);
   assert.deepEqual(user, [CHOICE_PROMPT, GREEN_HANDOFF_PROMPT]);
   assert.deepEqual(calls, ["tools continue,done,ask,blocker", "tools read,ask", "tools handoff"]);
-  const tools = { tools: [{ name: "handoff", input_schema: {} }] };
-  assert.deepEqual(handlers.beforeRequest(tools), { ...tools, tool_choice: { type: "tool", name: "handoff" } });
 });
 
 test("done without a prior stop (the model chose it) runs the gate at the settle", async () => {
@@ -179,7 +174,6 @@ test("a valid handoff after a green gate sends the gate data and nothing more go
   assert.equal(user.length, users);
   assert.equal(calls.length, toolCalls);
   assert.equal(sent.length, 1);
-  assert.equal(handlers.beforeRequest({ tools: [{ name: "handoff", input_schema: {} }] }), undefined);
 });
 
 test("a new task after the handoff restores the tools and resets the gate data", async () => {
@@ -251,12 +245,10 @@ test("ask and blocker in the choice restore the tools and stop the forcing", asy
   await handlers.settled();
   handlers.ask("which db?");
   assert.deepEqual(calls, ["tools continue,done,ask,blocker", "tools read,ask"]);
-  assert.equal(handlers.beforeRequest(ANTHROPIC), undefined);
   await handlers.settled();
   const again = setup();
   await again.handlers.settled();
   again.handlers.blocker({ issue: "i", files: [], tried: ["x"] });
-  assert.equal(again.handlers.beforeRequest(ANTHROPIC), undefined);
 });
 
 test("ask and blocker send their text and tell the model to stop", () => {
@@ -354,26 +346,15 @@ test("two invalid handoff calls send an error event", () => {
   assert.match(error.event.text, /2 invalid calls of the tool handoff/);
 });
 
-test("settled while a handoff is forced and no tool call came is an error event", async () => {
-  const { handlers, sent } = setup(undefined, true);
+test("a text answer while a handoff is asked asks once more; the second is an error event", async () => {
+  const { handlers, sent, user } = setup(undefined, true);
   handlers.onServerMessage({ type: "handoff" });
+  await handlers.settled();
+  assert.equal(user.at(-1), NO_CALL_PROMPT);
   await handlers.settled();
   const error = sent.at(-1);
   assert.ok(error?.type === "event" && error.event.kind === "error");
   assert.match(error.event.text, /without a call of the tool handoff/);
-});
-
-test("beforeRequest forces the tool only while a handoff runs; an unknown payload is an error event", () => {
-  const { handlers, sent } = setup(undefined, true);
-  const payload = { model: "m", tools: [{ name: "handoff", input_schema: {} }] };
-  assert.equal(handlers.beforeRequest(payload), undefined);
-  handlers.onServerMessage({ type: "handoff" });
-  assert.deepEqual(handlers.beforeRequest(payload), { ...payload, tool_choice: { type: "tool", name: "handoff" } });
-  assert.equal(handlers.beforeRequest({ model: "m" }), undefined);
-  assert.deepEqual(sent.at(-1), {
-    type: "event",
-    event: { kind: "error", text: "handoff: cannot force a tool for this provider payload: model" },
-  });
 });
 
 test("shorten keeps short text", () => {

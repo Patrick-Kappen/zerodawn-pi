@@ -115,7 +115,6 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
       return { content: [{ type: "text", text: handlers.done() }], details: {} };
     },
   });
-  pi.on("before_provider_request", (event) => handlers.beforeRequest(event.payload));
   pi.on("session_shutdown", () => connection?.close());
   pi.on("tool_execution_start", (event) => handlers.toolStart(event));
   pi.on("tool_execution_end", (event) => handlers.toolEnd(event));
