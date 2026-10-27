@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 — 2026-10-27
+
+- files: edit and write undo a change that adds a syntax error
+
 ## 0.5.0 — 2026-10-26
 
 - keep diagnostics and warningCount as released

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 — 2026-10-27
+
+- files: read sends only new lines; bash blocks file views
+
 ## 0.5.1 — 2026-10-26
 
 - a command that moves to the background ends the turn

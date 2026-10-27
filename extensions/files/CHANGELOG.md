@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 — 2026-10-27
+
+- edit and write run the formatter of the project
+
+- edit and write undo a change that adds a syntax error
+
+- read sends only new lines; bash blocks file views
+
 ## 0.2.0 — 2026-10-26
 
 - docs: AGENTS.md of each extension as rules, facts to README
