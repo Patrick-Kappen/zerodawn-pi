@@ -41,3 +41,28 @@ test("a prompt gets a status note only when a background job changed", () => {
   s.jobs.set("2", job("2", { group: "g", result: "exit 0 (1s)" }));
   assert.equal(start()?.message?.content, "jobs: 2 [g]: exit 0 (1s)");
 });
+
+test("print mode: before settle waits for a running background job and sends its report", async () => {
+  const own = new Map<string, (event: any, ctx?: any) => unknown>();
+  const sent: string[] = [];
+  const api = {
+    on: (name: string, fn: (event: any, ctx?: any) => unknown) => own.set(name, fn),
+    registerTool() {},
+    registerShortcut() {},
+    registerCommand() {},
+    sendMessage: (message: { content: string }) => sent.push(message.content),
+  } as any;
+  const state = createState();
+  const reports = registerJobs(api, state, { refresh() {}, stop() {} });
+  const settle = own.get("agent_before_settle") as (event: unknown, ctx: unknown) => Promise<unknown>;
+  assert.equal(await settle({}, { mode: "tui" }), undefined);
+  assert.equal(await settle({}, { mode: "print" }), undefined, "no running job: nothing to wait for");
+  own.get("agent_start")?.({});
+  const running = job("7", {});
+  state.jobs.set("7", running);
+  const waiting = settle({}, { mode: "print" });
+  reports.report(running, {} as any, "exit 0 (20s)", true);
+  assert.deepEqual(await waiting, { continue: true });
+  assert.deepEqual(sent, ["job 7: exit 0 (20s)"]);
+  own.get("session_shutdown")?.({ reason: "quit" });
+});
