@@ -1,6 +1,6 @@
 {
   "name": "checker",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "asks a classifier before the agent finishes whether the work is done; sends it back with a hidden message when not",
   "type": "module"
 }
