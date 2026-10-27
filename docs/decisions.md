@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 26. The full test suite runs before each commit (2026-10-27)
+
+The pre-commit hook `tests` runs `bun test` over the whole repository, with the same tools on PATH as the nix test checks. Reason: a failing test shows at the commit, not after the push in CI. The checker extension therefore does not ask whether tests ran. Cost: every commit waits for the suite, and the nix `pre-commit` check runs the suite again next to the `tests-<name>` checks.
+
 ## 25. A classifier decides at settle time whether the agent is done (2026-10-27)
 
 Agents report an error in scope, ask a question they can answer themselves, or stop halfway, and call that done. The `checker` asks a classifier model on `agent_before_settle`, so it sees the whole run once and can request one more turn through pi, without a user message. The classifier only answers typed questions with probabilities. Fixed thresholds in code make the decision, so a change of behaviour is a code change with a test. A limit of 3 follow-ups per user message stops a loop between agent and classifier. Every check goes to a JSONL log, to tune the thresholds on real runs. Cost: one classify call per finished run.
