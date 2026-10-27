@@ -43,4 +43,6 @@
 - Speed: model time 59%, tool time 41%. A model call takes 4.5 s median, plus 1.6 s per 100 output tokens. One call less saves about 5 s.
 - Output: 3.8k tokens per task, 32% reasoning. New context per task 18.8k, of which tool output 3.8k.
 - Cache rewrites after idle: $403 in the week (24% of the cost), after the warming change $5. Keep it.
+- Thinking level per step: `pi.setThinkingLevel()` exists. On Anthropic models with mid-conversation effort, low/medium/high switches keep the cache (11 of 11 within 5 min). Only off to on breaks it (haiku, 2 of 3). Do not switch to or from off.
+- Tool output: median per result bash 42, edit 237, grep 338, read 472, codemode 769 tokens. codemode is 35% of all tool output with 175 calls; 11 results hit the 16 KB cut. Lower the codemode cut or make it return only what it needs.
 - Edit rework is rare: 25 of 540 tasks with edits change one file 4 times or more.
