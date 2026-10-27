@@ -150,3 +150,15 @@ test("createMarks: a mark ends after 5 minutes", () => {
   time = CACHE_MS;
   assert.equal(marks.marked("a/1"), false);
 });
+
+test("probeModel: sends a session id, which opencode-go needs", async () => {
+  const ids: string[] = [];
+  await probeModel(
+    fakeRegistry(async (_m, _c, options) => {
+      ids.push(options.sessionId);
+      return { stopReason: "stop" };
+    }),
+    models["p/open"] as ModelLike,
+  );
+  assert.match(ids[0] ?? "", /^[0-9a-f-]{36}$/);
+});

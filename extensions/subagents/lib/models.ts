@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 export const LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 export const CACHE_MS = 5 * 60_000;
 export const PROBE_TIMEOUT_MS = 20_000;
@@ -21,7 +22,7 @@ export interface Registry<M extends ModelLike> {
   complete(
     model: M,
     context: { messages: { role: "user"; content: string; timestamp: number }[] },
-    options: { signal: AbortSignal; maxTokens: number },
+    options: { signal: AbortSignal; maxTokens: number; sessionId: string },
   ): Promise<{ stopReason: string; errorMessage?: string }>;
 }
 
@@ -63,7 +64,8 @@ export async function probeModel<M extends ModelLike>(registry: Registry<M>, mod
   const message = await registry.complete(
     model,
     { messages: [{ role: "user", content: "Reply with: ok", timestamp: Date.now() }] },
-    { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS), maxTokens: 16 },
+    // opencode-go refuses a request without a session id (x-opencode-session).
+    { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS), maxTokens: 16, sessionId: randomUUID() },
   );
   if (message.stopReason === "aborted") throw new Error(`no answer within ${PROBE_TIMEOUT_MS / 1000} s`);
   if (message.stopReason === "error") throw new Error(message.errorMessage ?? "the provider returned an error");
