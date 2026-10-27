@@ -273,6 +273,7 @@
               default = [
                 "ibm-next/qwen38-flash-next:medium"
                 "opencode/deepseek-v4.1-flash-free:low"
+                "opencode-go/deepseek-v4.1-flash:low"
                 "openai-codex/gpt-6-luna:high"
                 "openai-codex/gpt-6.1-sol:medium"
                 "anthropic/claude-sonnet-5-5:medium"
