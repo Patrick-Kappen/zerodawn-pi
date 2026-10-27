@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 22. edit and write run the formatter of the project (2026-10-27)
+
+A syntax error has no safe automatic fix: tree-sitter knows where the error is, not what the agent meant. Format is safe, and it removes lint errors that came up only later in `just check`. Only the formatter that the project configures runs, so a repository without one keeps its own style. Its binary comes from the project (`node_modules/.bin`) or `PATH`, so the version is the one the project uses, not one from the Home Manager module. A configured formatter that is missing fails before the change, so the file does not change. Cost: lines that the formatter changed are no longer the same as the model's copy. The result says so, and the read check of decision 20 sends those lines again.
+
 ## 21. edit and write undo a change that adds a syntax error (2026-10-27)
 
 SWE-agent rejects an edit that breaks the syntax, and its agents then fix the edit at once. Here 7.6% of edits failed, and an edit with broken syntax shows up only later, in a test or a check. The check uses tree-sitter in headless nvim: one `nvim --clean -l` call parses the old and the new content in about 50 ms. nvim is a program on the machine, like ast-grep, not an npm dependency. Only errors that the old content did not have count, so a file that was already broken can still change. A change with new errors is undone, so the file and the model's copy of it stay the same. A missing nvim or grammar fails the tool with the Home Manager option to set, because a check that skips itself hides a broken setup. The Lua script is a string in `syntax.ts`, because the package contains only `.ts` files. Rejected: a type check with tsc or an LSP, because it is slow, it needs the project, and a type error in the middle of a change of several edits is normal.
