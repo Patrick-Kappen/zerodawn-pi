@@ -114,25 +114,26 @@
         };
       # The job tests spawn bash and script in a PTY; the sandbox has /dev/pts. The subagents tests start their own tmux server.
       # The run_tests tests make a git repository.
+      testInputs = pkgs: [
+        pkgs.bun
+        pkgs.tmux
+        pkgs.bashInteractive
+        pkgs.util-linux
+        pkgs.coreutils
+        pkgs.gnused
+        pkgs.gnugrep
+        pkgs.git
+        # The grep tool of files; pi brings rg on PATH at run time.
+        pkgs.ripgrep
+        # The syntax check of edit and write; its tests use the lua parser that nvim brings.
+        pkgs.neovim-unwrapped
+      ];
       runTests =
         pkgs: name: src:
         pkgs.runCommand "tests-${name}"
           {
             inherit src;
-            nativeBuildInputs = [
-              pkgs.bun
-              pkgs.tmux
-              pkgs.bashInteractive
-              pkgs.util-linux
-              pkgs.coreutils
-              pkgs.gnused
-              pkgs.gnugrep
-              pkgs.git
-              # The grep tool of files; pi brings rg on PATH at run time.
-              pkgs.ripgrep
-              # The syntax check of edit and write; its tests use the lua parser that nvim brings.
-              pkgs.neovim-unwrapped
-            ];
+            nativeBuildInputs = testInputs pkgs;
           }
           ''
             cp -r "$src" src
@@ -396,6 +397,22 @@
                   exec scripts/sync-branch.sh
                 ''}";
                 stages = [ "pre-push" ];
+                pass_filenames = false;
+                always_run = true;
+              };
+              # The full unit test suite before each commit; CI runs it again with the other checks.
+              tests = {
+                enable = true;
+                name = "tests: the full unit test suite";
+                entry = "${pkgs.writeShellScript "tests" ''
+                  export PATH=${pkgs.lib.makeBinPath (testInputs pkgs)}:$PATH
+                  [ -e node_modules ] || ln -s ${piModules pkgs}/node_modules node_modules
+                  # git gives a hook GIT_INDEX_FILE and more; a test that makes its own repository then changes this index.
+                  unset $(${pkgs.git}/bin/git rev-parse --local-env-vars)
+                  # The nix check sandbox has no writable HOME.
+                  [ -w "$HOME" ] || export HOME="$TMPDIR"
+                  exec bun test
+                ''}";
                 pass_filenames = false;
                 always_run = true;
               };
