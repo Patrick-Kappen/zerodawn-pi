@@ -35,3 +35,12 @@
 - Debug tool: no extension has one. Only an old `debugger.ts` in the trash (`test_for_improve_agents`).
 - Files: edit returns the changed lines with line numbers; write and read (outside the outline) give none. Force a read before an edit, with line-based and multi-file edits; read then must give line numbers.
 - gpt-6-astra: $0.105 per call, $2.44 for input outside the cache. Find out why its cache misses.
+
+### Tokens, speed and first time right (per user prompt, after 2026-10-27 19:40)
+
+- First time right (no tool error, no checker follow-up, no user correction): 54% (week: 73%). A task that is not right the first time costs 3x ($0.51 vs $0.17), takes 9.5 calls instead of 2 and 1.4 min instead of 0.3 min.
+- Guardrail blocks are 75 of 145 tool errors. Second: exit codes (28), codemode script failures (17).
+- Speed: model time 59%, tool time 41%. A model call takes 4.5 s median, plus 1.6 s per 100 output tokens. One call less saves about 5 s.
+- Output: 3.8k tokens per task, 32% reasoning. New context per task 18.8k, of which tool output 3.8k.
+- Cache rewrites after idle: $403 in the week (24% of the cost), after the warming change $5. Keep it.
+- Edit rework is rare: 25 of 540 tasks with edits change one file 4 times or more.
