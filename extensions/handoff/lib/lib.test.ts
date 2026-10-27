@@ -142,6 +142,8 @@ test("gitFacts reads branch, dirty files, worktrees and PRs, and names a failing
     return args[0] === "branch" ? "main" : "";
   };
   assert.deepEqual(gitFacts("/l", local), ["branch: main in /l"]);
+  const withPr = (_cmd: string, args: string[]) => (args[0] === "branch" ? "main" : args[0] === "pr" ? "#7 x (branch x, checks green)" : "");
+  assert.deepEqual(gitFacts("/p", withPr), ["branch: main in /p", "open PRs in this repository (all sessions): #7 x (branch x, checks green)"]);
   assert.deepEqual(
     gitFacts("/x", () => {
       throw new Error("no git");

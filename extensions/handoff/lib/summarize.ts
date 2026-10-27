@@ -8,6 +8,7 @@ const SYSTEM = [
   "You keep the handoff card of a coding session up to date. The next agent reads only this card.",
   "Call write_card once with the full new card. Keep only what the next actions need. Drop finished history, chat and tool output.",
   "Take the goal and the next actions only from what the user asked and what the agent said it does next. Never invent work.",
+  "The next actions are the most important part. Make them exact: the first action is what the next agent does first.",
   "The facts show all PRs and worktrees of the repository, also of other sessions. Name only those that this session worked on.",
   "Use the facts for the current state. Mark each PR as merged or open; do not guess a status that the transcript does not show.",
   "Write short lines in plain English. Use only the facts, the transcript and the previous card.",

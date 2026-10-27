@@ -16,6 +16,10 @@ function tryRun(exec: Run, label: string, cmd: string, args: string[], cwd: stri
   }
 }
 
+const PR_CHECKS =
+  '(.statusCheckRollup | map(.conclusion // .state) | if length == 0 then "none" elif any(. == "FAILURE" or . == "ERROR" or . == "CANCELLED" or . == "TIMED_OUT") then "red" elif all(. == "SUCCESS" or . == "NEUTRAL" or . == "SKIPPED") then "green" else "pending" end)';
+const PR_LINE = `.[] | "#\\(.number) \\(.title) (branch \\(.headRefName)\\(if .isDraft then ", draft" else "" end), checks \\${PR_CHECKS})"`;
+
 export function gitFacts(cwd: string, exec: Run = run): string[] {
   const branch = tryRun(exec, "branch", "git", ["branch", "--show-current"], cwd);
   if (typeof branch === "string") return [`git: not a repository (${cwd})`];
@@ -42,12 +46,12 @@ export function gitFacts(cwd: string, exec: Run = run): string[] {
     exec,
     "open PRs",
     "gh",
-    ["pr", "list", "--author", "@me", "--state", "open", "--json", "number,title", "-q", '.[]|"#\\(.number) \\(.title)"'],
+    ["pr", "list", "--author", "@me", "--state", "open", "--json", "number,title,headRefName,isDraft,statusCheckRollup", "-q", PR_LINE],
     cwd,
   );
   if (typeof prs === "string") {
     if (!/no git remotes/.test(prs)) out.push(prs);
-  } else if (prs.length) out.push(`open PRs: ${prs.join("; ")}`);
+  } else if (prs.length) out.push(`open PRs in this repository (all sessions): ${prs.join("; ")}`);
   return out;
 }
 

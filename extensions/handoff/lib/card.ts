@@ -33,7 +33,8 @@ export const CARD_PARAMETERS = Type.Object({
   next: Type.Array(line(""), {
     minItems: 1,
     maxItems: LIMITS.next,
-    description: "The next concrete actions in order, each one command or one change. No alternatives.",
+    description:
+      "The next actions in order. Each names the exact command, file, PR or branch, so the next agent can start at once. No alternatives, no checks of finished work.",
   }),
   merged: list(LIMITS.merged, '"#<nr> <title>" of the merged PRs that the next steps depend on. Leave out finished history.'),
   open: list(LIMITS.open, "Work that is not merged: where it is (PR number, branch or file) and what blocks it."),
