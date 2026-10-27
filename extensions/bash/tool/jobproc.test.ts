@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -25,7 +25,7 @@ test("a job runs without a terminal, keeps the output and reports its exit code"
   const out = render(r.log, 1 << 20);
   assert.deepEqual(out.plain, ["no-tty", "ok", "b"]);
   assert.match(out.lines[1], /\x1b\[32mok\x1b\[0m/);
-  assert.match(resultText(r.log, "exit 3 (1s)"), /^exit 3 \(1s\) · 3 lines, \d+ bytes · output: .*\.txt\nlast 3 lines:\nno-tty\nok\nb$/);
+  assert.equal(resultText(r.log, "exit 3 (1s)"), "exit 3 (1s)\nno-tty\nok\nb");
 });
 
 test("a prompt gets EOF at once and an editor fails instead of waiting", async () => {
@@ -53,7 +53,7 @@ test("summarizeFromDisk reads the exit code from the script footer of an old log
   const log = join(dir, "job.log");
   writeFileSync(log, 'Script started on x\nhi\r\n\nScript done on y [COMMAND_EXIT_CODE="5"]\n');
   const meta = { id: "x", command: "echo hi", log, status: join(dir, "missing"), start: Date.now(), limit: 0, bg: true, reported: false };
-  assert.match(summarizeFromDisk(meta), /^exit 5 · 1 lines, \d+ bytes · output: .*\.txt\nlast 1 lines:\nhi$/);
+  assert.equal(summarizeFromDisk(meta), "exit 5\nhi");
 });
 
 test("a failure returns the status, the path and the error lines", async () => {
@@ -65,11 +65,24 @@ test("a failure returns the status, the path and the error lines", async () => {
   assert.equal(readFileSync(txt, "utf8").split("\n")[1499], "error: thing 1500 broke");
 });
 
-test("a failure without error lines returns the last lines", async () => {
+test("a failure with short output returns it inline, without a file", async () => {
   const r = await run("seq 1 10; exit 2");
+  assert.equal(resultText(r.log, "exit 2 (1s)"), `exit 2 (1s)\n${Array.from({ length: 10 }, (_, i) => i + 1).join("\n")}`);
+  assert.equal(existsSync(r.log.replace(/\.log$/, ".txt")), false);
+});
+
+test("output of few but long lines over 4 KB goes to a file", async () => {
+  const r = await run("for i in 1 2 3; do printf 'x%.0s' $(seq 1500); echo; done");
+  assert.match(resultText(r.log, "exit 0 (1s)"), /^exit 0 \(1s\) \u00b7 3 lines, \d+ bytes \u00b7 output: .*\.txt$/);
+  const short = await run("printf 'x%.0s' $(seq 4000); echo");
+  assert.equal(resultText(short.log, "exit 0 (1s)"), `exit 0 (1s)\n${"x".repeat(4000)}`);
+});
+
+test("a long failure without error lines returns the last lines", async () => {
+  const r = await run("seq 1 60; exit 2");
   const lines = resultText(r.log, "exit 2 (1s)").split("\n");
-  assert.match(lines[0], /^exit 2 \(1s\) \u00b7 10 lines/);
-  assert.deepEqual(lines.slice(1), ["last 3 lines:", "8", "9", "10"]);
+  assert.match(lines[0], /^exit 2 \(1s\) \u00b7 60 lines/);
+  assert.deepEqual(lines.slice(1), ["last 3 lines:", "58", "59", "60"]);
 });
 
 test("a success returns short output inline, else only the status and the path", async () => {

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { callFileId, callNumber, callOutFile, freeId, outFile, sessionDir, shorten, storeDir } from "./store.ts";
+import { callFileId, callNumber, callOutFile, freeId, outFile, outRef, resolveOutRef, sessionDir, shorten, storeDir } from "./store.ts";
 
 const ctx = (file: string | undefined, branch: unknown[] = []) => ({ sessionManager: { getSessionFile: () => file, getBranch: () => branch } }) as any;
 
@@ -63,4 +63,21 @@ test("storeDir and outFile create <session>/out and <session>/jobs and number th
 test("shorten replaces the home directory", () => {
   assert.equal(shorten(`${homedir()}/a`), "~/a");
   assert.equal(shorten("/tmp/a"), "/tmp/a");
+});
+
+test("outRef names a session output as out:<name>; resolveOutRef finds its .txt, else its .log", () => {
+  const root = mkdtempSync(join(tmpdir(), "store-ref-"));
+  const session = join(root, "2026-10-27T09-21-57-511Z_01a17caa-9907-7437-aa19-54145f7d36c4");
+  mkdirSync(join(session, "out"), { recursive: true });
+  writeFileSync(join(session, "out", "3.2-C1.bash.log"), "raw");
+  writeFileSync(join(session, "out", "4.1-C1.check.log"), "raw");
+  writeFileSync(join(session, "out", "3.2-C1.bash.txt"), "clean");
+  assert.equal(outRef(join(session, "out", "3.2-C1.bash.txt")), "out:3.2-C1.bash");
+  assert.equal(outRef(join(root, "out", "x.log")), shorten(join(root, "out", "x.log")));
+  const c = ctx(`${session}.jsonl`);
+  assert.equal(resolveOutRef(c, "out:3.2-C1.bash"), join(session, "out", "3.2-C1.bash.txt"));
+  assert.equal(resolveOutRef(c, "out:4.1-C1.check"), join(session, "out", "4.1-C1.check.log"));
+  assert.equal(resolveOutRef(c, "src/a.ts"), undefined);
+  assert.throws(() => resolveOutRef(c, "out:9.9-C1.bash"), /out:9\.9-C1\.bash is not an output of this session .*Run jobs list/);
+  rmSync(root, { recursive: true, force: true });
 });

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createReadToolDefinition, type ExtensionAPI, type ExtensionToolContext, formatSize } from "@earendil-works/pi-coding-agent";
+import { resolveOutRef } from "../../../shared/store.ts";
 import { absolutePath } from "../../../shared/util.ts";
 import { fileLines, linesInContext, type Seen, type SeenRange, seenRanges, segments } from "./lines.ts";
 import { OUTLINE_MAX, outline } from "./outline.ts";
@@ -8,6 +9,7 @@ export const READ_MAX_LINES = 200;
 export const READ_MAX_BYTES = 16 * 1024;
 const IMAGE = /\.(jpe?g|png|gif|webp|bmp)$/i;
 const BINARY_PROBE = 8000;
+const NOTE_BYTES = 100;
 
 type Range = [number, number];
 const list = (ranges: Range[]) => ranges.map(([a, b]) => (a === b ? `${a}` : `${a}-${b}`)).join(", ");
@@ -37,7 +39,11 @@ export function renderRead(
     throw new Error(`read: offset ${offset} is beyond the end of ${name} (${total} lines). Use a lower offset, or offset=-N for the last N lines.`);
   const asked = limit ?? (offset !== undefined && offset < 0 ? -offset : READ_MAX_LINES);
   const to = Math.min(total, from + Math.min(asked, READ_MAX_LINES) - 1);
-  const missing = segments(from, to, inContext);
+  const lineSet = (ranges: Range[]) => new Set(ranges.flatMap(([a, b]) => Array.from({ length: b - a + 1 }, (_, i) => a + i)));
+  // A known part shorter than the note about it costs more context than the lines, so it is sent again.
+  const short = segments(from, to, lineSet(segments(from, to, inContext))).filter(([a, b]) => Buffer.byteLength(lines.slice(a - 1, b).join("\n")) < NOTE_BYTES);
+  const skip = lineSet(short);
+  const missing = segments(from, to, new Set([...inContext].filter((n) => !skip.has(n))));
   if (!missing.length) return { text: `[${name} lines ${from}-${to} are unchanged and already in your context. Use that copy.]`, shown: [] };
 
   const shown: Range[] = [];
@@ -66,12 +72,13 @@ export function renderRead(
   }
 
   const text = (a: number, b: number) => lines.slice(a - 1, b).join("\n");
-  const known = segments(from, to, new Set(missing.flatMap(([a, b]) => Array.from({ length: b - a + 1 }, (_, i) => a + i))));
+  const known = segments(from, to, lineSet(missing));
+  const one = known.length === 1 && known[0][0] === known[0][1];
   const body =
     known.length === 0 && shown.length === 1
       ? text(...shown[0])
       : [
-          `[Lines ${list(known)} are unchanged and already in your context; not sent again.]`,
+          `[${one ? "Line" : "Lines"} ${list(known)} ${one ? "is" : "are"} unchanged and already in your context; not sent again.]`,
           ...shown.map(([a, b]) => `[lines ${a}-${b}]\n${text(a, b)}`),
         ].join("\n");
   const last = shown[shown.length - 1][1];
@@ -110,11 +117,11 @@ export function registerRead(pi: ExtensionAPI, cwd: string) {
     promptGuidelines: [
       "Use read to examine files, not cat, head, tail or sed in bash.",
       "Find the lines with grep or the outline first. Then read only that range.",
-      "For the end of a log or an output path, use offset=-N.",
+      "For the end of a log or an output path, use offset=-N. An output named out:<name> is a path for read and grep.",
     ],
     async execute(toolCallId: string, params: any, signal: any, onUpdate: any, ctx: ExtensionToolContext) {
       if (IMAGE.test(String(params.path))) return base.execute(toolCallId, params, signal, onUpdate, ctx);
-      const file = absolutePath(String(params.path), ctx?.cwd ?? cwd);
+      const file = resolveOutRef(ctx, String(params.path)) ?? absolutePath(String(params.path), ctx?.cwd ?? cwd);
       let raw: string;
       try {
         raw = readFileSync(file, "utf8");

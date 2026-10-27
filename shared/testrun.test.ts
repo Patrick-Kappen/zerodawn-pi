@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
-import { changedFiles, execute, plan, type Run, uncoveredOf, verdict } from "./testrun.ts";
+import { changedFiles, execute, inProjectEnv, plan, type Run, uncoveredOf, verdict } from "./testrun.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "shared-testrun-"));
 after(() => rmSync(dir, { recursive: true, force: true }));
@@ -65,4 +65,17 @@ test("verdict: a warning gives only the diagnostics, once, without context or ni
     ok: false,
     text: "1 warning lines. A warning is an error: fix each one.\nsrc/a.ts:3:5: lint/x (\u00d72)\n! warn here",
   });
+});
+
+test("inProjectEnv: direnv exec at the git root when it has an .envrc, also from a subdir; else the command as is", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "shared-testrun-env-")));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    mkdirSync(join(root, "sub"));
+    assert.deepEqual(inProjectEnv(["just", "test"], join(root, "sub")), ["just", "test"]);
+    writeFileSync(join(root, ".envrc"), "use flake\n");
+    assert.deepEqual(inProjectEnv(["just", "test"], join(root, "sub")), ["direnv", "exec", root, "just", "test"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

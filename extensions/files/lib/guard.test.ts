@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fileView } from "./guard.ts";
+import { fileView, registerViewGuard } from "./guard.ts";
 
 test("file views in bash are found", () => {
   for (const [command, cmd] of [
@@ -37,4 +37,15 @@ test("other uses of these programs are allowed", () => {
     "sleep 1 & cat",
   ])
     assert.equal(fileView(command), undefined, command);
+});
+
+test("the block reason sends grep and rg to the grep tool, and other viewers to read", () => {
+  let handler: any;
+  registerViewGuard({ on: (_e: string, h: any) => (handler = h) } as any);
+  const reason = (command: string) => handler({ toolName: "bash", input: { command } })?.reason as string | undefined;
+  assert.match(reason("grep -rn x node_modules/pkg") ?? "", /^"grep" on a file or directory in bash: use the grep tool\..*noIgnore/);
+  assert.match(reason("rg -n x . | head") ?? "", /^"rg" .*use the grep tool/);
+  assert.match(reason("cat a.ts") ?? "", /^"cat" on a file in bash: use grep to find the lines, then read/);
+  assert.equal(reason("sed -i 's|a|b|' a.ts"), undefined);
+  assert.equal(reason("cat >> a.ts <<'EOF'\nx\nEOF"), undefined);
 });

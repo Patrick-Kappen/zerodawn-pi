@@ -128,6 +128,8 @@
               pkgs.gnused
               pkgs.gnugrep
               pkgs.git
+              # The grep tool of files; pi brings rg on PATH at run time.
+              pkgs.ripgrep
               # The syntax check of edit and write; its tests use the lua parser that nvim brings.
               pkgs.neovim-unwrapped
             ];
@@ -271,12 +273,8 @@
             subagentModels = lib.mkOption {
               type = lib.types.listOf lib.types.str;
               default = [
-                "ibm-next/qwen38-flash-next:medium"
-                "opencode/deepseek-v4.1-flash-free:low"
                 "opencode-go/deepseek-v4.1-flash:low"
-                "openai-codex/gpt-6-luna:high"
-                "openai-codex/gpt-6.1-sol:medium"
-                "anthropic/claude-sonnet-5-5:medium"
+                "anthropic/claude-sonnet-5-5:low"
               ];
               description = "Models for every subagent as provider/id[:thinking], in order. A subagent gets the first one that is available.";
             };

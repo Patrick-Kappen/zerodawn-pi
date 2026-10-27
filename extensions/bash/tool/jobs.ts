@@ -36,6 +36,11 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
     const shown = visible();
     return shown.length ? shown.map(describe).join("\n") : "No bash jobs in this session.";
   };
+  // The model gets each result once, from the tool result or the bash-job message, so its list has only running jobs.
+  const runningList = () => {
+    const running = visible().filter((j) => !j.result);
+    return running.length ? running.map(describe).join("\n") : "No running bash jobs. A message reports each result once.";
+  };
   const delivered = new Set<string>();
   const statusLine = () =>
     [...jobs.values()]
@@ -60,7 +65,7 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
 
   const pollers = new Set<ReturnType<typeof setInterval>>();
   let changes = 0;
-  let listedAt = -1;
+  let listedAt = "";
   let agentRunning = false;
   const held: { job: Job; m: Meta; text: string }[] = [];
   let stale = false;
@@ -125,8 +130,11 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
       if (job.result) return resolve();
       waiters.set(job.id, [...(waiters.get(job.id) ?? []), resolve]);
     });
+  const reported: (() => void)[] = [];
+  const nextReport = () => new Promise<void>((resolve) => reported.push(resolve));
   const report = (job: Job, m: Meta, text: string, triggerTurn: boolean) => {
     changes++;
+    for (const resolve of reported.splice(0)) resolve();
     job.result = text;
     job.ok ??= /^exit 0\b/.test(text);
     job.endedAt = Date.now();
@@ -146,6 +154,14 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
   };
   pi.on("agent_start", () => {
     agentRunning = true;
+  });
+  // Print and json mode end when the agent settles, so a background report has nobody to read it: keep the run open for it.
+  pi.on("agent_before_settle", async (_event, ctx) => {
+    if (ctx.mode !== "print" && ctx.mode !== "json") return;
+    while (!held.length && [...jobs.values()].some((j) => j.bg && !j.result)) await nextReport();
+    if (!held.length) return;
+    send(held.splice(0), true);
+    return { continue: true };
   });
   pi.on("agent_end", () => {
     agentRunning = false;
@@ -242,7 +258,7 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
   pi.registerTool({
     name: "jobs",
     label: "jobs",
-    description: `wait: block until the given jobs (default: all running) end and return their results; the user cannot chat while you wait, so only for a short job whose result the next step needs, at most ${WAIT_MAX_S} s. list: the jobs of this session. kill: stop a job.`,
+    description: `wait: block until the given jobs (default: all running) end and return their results; the user cannot chat while you wait, so only for a short job whose result the next step needs, at most ${WAIT_MAX_S} s. list: the running jobs; a message reports each result once. kill: stop a job.`,
     promptSnippet: "Wait for, list or kill background jobs",
     parameters: Type.Object({
       action: StringEnum(["wait", "list", "kill"] as const),
@@ -281,9 +297,10 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
         const head = outcome === "done" ? "" : outcome === "timeout" ? `wait limit ${limit / 1000}s\n` : "wait stopped\n";
         return { content: [{ type: "text", text: `${head}${lines.join("\n")}` }], details: { jobs: targets.map((j) => j.id) } };
       }
-      if (hasBackgroundJob(s) && listedAt === changes) throw new Error("no change since the last jobs call; a message reports each result");
-      listedAt = changes;
-      return { content: [{ type: "text", text: list() }], details: { jobs: [] as string[] } };
+      const now = `${changes}/${jobs.size}`;
+      if (hasBackgroundJob(s) && listedAt === now) throw new Error("no change since the last jobs call; a message reports each result");
+      listedAt = now;
+      return { content: [{ type: "text", text: runningList() }], details: { jobs: [] as string[] } };
     },
   });
 

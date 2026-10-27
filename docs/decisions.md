@@ -2,9 +2,13 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
-## 24. A classifier decides at settle time whether the agent is done (2026-10-27)
+## 25. A classifier decides at settle time whether the agent is done (2026-10-27)
 
 Agents report an error in scope, ask a question they can answer themselves, or stop halfway, and call that done. The `checker` asks a classifier model on `agent_before_settle`, so it sees the whole run once and can request one more turn through pi, without a user message. The classifier only answers typed questions with probabilities. Fixed thresholds in code make the decision, so a change of behaviour is a code change with a test. A limit of 3 follow-ups per user message stops a loop between agent and classifier. Every check goes to a JSONL log, to tune the thresholds on real runs. Cost: one classify call per finished run.
+
+## 24. Tests and gates run in the dev environment of the project (2026-10-27)
+
+pi keeps the environment of the shell it started in. A test run in another project, or in a subagent worktree, got that environment and missed the tools of its own dev shell (for example `bun`). `run_tests`, the check commands and the done gate now run the command through `direnv exec <git root>` when the git root has an `.envrc`. direnv allows an `.envrc` per path, so a new subagent worktree is blocked; the supervisor runs `direnv allow` on it only when the repo has the same `.envrc` content and the user allowed it there. This adds no new trust. A blocked `.envrc` fails the run with the direnv message; there is no fallback to the pi environment.
 
 ## 23. The tooling picks the subagent model, by availability only (2026-10-27)
 

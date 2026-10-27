@@ -4,7 +4,7 @@ import type { ExecOptions, ExtensionAPI, ExtensionContext } from "@earendil-work
 import { Type } from "typebox";
 import { config, subagentModels } from "../../shared/config.ts";
 import { loadRecipes } from "../../shared/recipes.ts";
-import { changedFiles, execute, plan, uncoveredOf } from "../../shared/testrun.ts";
+import { changedFiles, execute, inProjectEnv, plan, uncoveredOf } from "../../shared/testrun.ts";
 import { type Client, connectMain } from "./lib/client.ts";
 import { ensureSupervisor } from "./lib/ensure.ts";
 import { runGate } from "./lib/gate.ts";
@@ -57,7 +57,7 @@ function registerSub(pi: ExtensionAPI, env: SubEnv): void {
           if (!("run" in all)) throw new Error(`subagents: plan for every test gave no command in ${cwd}.`);
           return all.run;
         },
-        run: (argv) => execute(argv, cwd, undefined),
+        run: (argv) => execute(inProjectEnv(argv, cwd), cwd, undefined),
         sendUserMessage,
       }),
   });
