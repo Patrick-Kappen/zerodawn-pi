@@ -22,9 +22,9 @@ Core sets pi's custom prompt (`lib/prompt.ts`): a short preamble, `<workflow>` w
 ## Changes
 
 <!-- changelog:start -->
-## 0.2.0 — 2026-10-26
+## 0.3.0 — 2026-10-27
 
-- docs: AGENTS.md of each extension as rules, facts to README
+- workflow prompt replaces pi rules; tool descriptions complete
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

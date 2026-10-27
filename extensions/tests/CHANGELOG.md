@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0 — 2026-10-27
+
+- core: each tool rule in one place, description or parameter
+
+- core: workflow prompt replaces pi rules; tool descriptions complete
+
 ## 0.5.0 — 2026-10-27
 
 - shared: outputs as out:<name>; read and grep take it as a path

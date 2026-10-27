@@ -11,9 +11,11 @@ Needs `opencode` in `PATH`. No config. Tests: `events.test.ts`.
 ## Changes
 
 <!-- changelog:start -->
-## 0.2.0 — 2026-10-26
+## 0.3.0 — 2026-10-27
 
-- docs: AGENTS.md of each extension as rules, facts to README
+- core: each tool rule in one place, description or parameter
+
+- core: workflow prompt replaces pi rules; tool descriptions complete
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

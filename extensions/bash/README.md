@@ -52,13 +52,17 @@ Jobs survive a pi restart: `session_start` reads the job files, reports jobs tha
 ## Changes
 
 <!-- changelog:start -->
-## 0.7.0 — 2026-10-27
+## 0.8.0 — 2026-10-27
 
-- the tool description names the out:<name> reference
+- checker: skip the check while a bash job runs in the background
 
-- jobs list gives the model only running jobs
+- docs: open points of 2026-10-27 in the TODO files
 
-- shared: outputs as out:<name>; read and grep take it as a path
+- core: each tool rule in one place, description or parameter
+
+- a reported job stays out of the status note after a restart
+
+- core: workflow prompt replaces pi rules; tool descriptions complete
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 — 2026-10-27
+
+- docs: open points of 2026-10-27 in the TODO files
+
 ## 0.2.0 — 2026-10-26
 
 - bash: background after 15 s, status line result, errors only on failure

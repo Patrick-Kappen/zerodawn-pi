@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0 — 2026-10-27
+
+- workflow prompt replaces pi rules; tool descriptions complete
+
 ## 0.2.0 — 2026-10-26
 
 - docs: AGENTS.md of each extension as rules, facts to README

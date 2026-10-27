@@ -60,9 +60,11 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 ## Changes
 
 <!-- changelog:start -->
-## 0.5.0 — 2026-10-27
+## 0.6.0 — 2026-10-27
 
-- shared: outputs as out:<name>; read and grep take it as a path
+- core: each tool rule in one place, description or parameter
+
+- core: workflow prompt replaces pi rules; tool descriptions complete
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
