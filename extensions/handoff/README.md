@@ -23,9 +23,23 @@ The card is updated in the background, so the state is there when a handoff come
 
 A command that moved to the background (over 15 s) does not count: its tool result says only that the job runs. The next trigger catches its effect.
 
+## Context limit
+
+The extension keeps the context between about 100k and 150k tokens:
+
+| When | What |
+|---|---|
+| `turn_end`, from 130k and again from 140k | One system warning per level, visible in the chat: finish this step and end the run; running bash jobs report first. |
+| End of a run (`agent_before_settle`), from 150k, no bash job runs | Hard cut: the card is written, and a `compaction` with `firstKeptEntryId: null` makes the handoff the whole context. |
+| End of a run from 150k while a bash job runs | No cut yet: the job report starts a new run, and the cut comes at its end. |
+| `turn_end` from 170k | Hard cut in the middle of a run, then a system message to continue with the Next step of the handoff. |
+| Cache warming, under 100k while a bash job runs | Pi's decision becomes `warm`; pi stops warming after 30 idle minutes. |
+
+A notification names each cut and the handoff file. A failing card write is an error, and the context stays as it is.
+
 ## Constants
 
-`index.ts`: `RECENT_MAX_CHARS`. `lib/triggers.ts`: `UPDATE_CHARS`. `lib/card.ts`: `LIMITS`, `HANDOFF_MAX_CHARS`. `lib/summarize.ts`: `TRANSCRIPT_MAX_CHARS`. `lib/transcript.ts`: `TEXT_MAX`.
+`index.ts`: `RECENT_MAX_CHARS`. `lib/triggers.ts`: `UPDATE_CHARS`. `lib/decider.ts`: `WARN_AT`, `CUT_AT`, `HARD_AT`, `WARM_BELOW`. `lib/card.ts`: `LIMITS`, `HANDOFF_MAX_CHARS`. `lib/summarize.ts`: `TRANSCRIPT_MAX_CHARS`. `lib/transcript.ts`: `TEXT_MAX`.
 
 ## Changes
 

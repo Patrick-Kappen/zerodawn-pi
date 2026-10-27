@@ -51,10 +51,12 @@ export function gitFacts(cwd: string, exec: Run = run): string[] {
   return out;
 }
 
-export function jobFacts(sessionDir: string): string[] {
+type OpenJob = { id: string; running: boolean; command: string };
+
+export function openJobs(sessionDir: string): OpenJob[] {
   const dir = join(sessionDir, "jobs");
   if (!existsSync(dir)) return [];
-  const open: string[] = [];
+  const open: OpenJob[] = [];
   for (const name of readdirSync(dir).filter((n) => n.endsWith(".json"))) {
     const path = join(dir, name);
     let m: { id: string; command: string; bg?: boolean; reported?: boolean; status: string };
@@ -64,7 +66,14 @@ export function jobFacts(sessionDir: string): string[] {
       throw new Error(`handoff: cannot read the job file ${path}: ${(err as Error).message}. Remove or fix the file.`, { cause: err });
     }
     if (!m.bg || m.reported) continue;
-    open.push(`${m.id} (${existsSync(m.status) ? "ended, report pending" : "running"}): ${m.command.replace(/\s+/g, " ").slice(0, 80)}`);
+    open.push({ id: m.id, running: !existsSync(m.status), command: m.command.replace(/\s+/g, " ").slice(0, 80) });
   }
+  return open;
+}
+
+export const jobsRunning = (sessionDir: string) => openJobs(sessionDir).some((j) => j.running);
+
+export function jobFacts(sessionDir: string): string[] {
+  const open = openJobs(sessionDir).map((j) => `${j.id} (${j.running ? "running" : "ended, report pending"}): ${j.command}`);
   return open.length ? [`bash jobs: ${open.join("; ")}`] : [];
 }

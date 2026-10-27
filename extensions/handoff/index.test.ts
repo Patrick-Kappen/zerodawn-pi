@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -93,4 +93,51 @@ test("agent_end updates the card in the background after a commit; /quit and /ne
   entries.push({ id: "u2", type: "message", message: { role: "user", content: "One more" } });
   await handlers.get("session_shutdown")({ reason: "new" }, own);
   assert.match(notes[1], /^handoff: card updated \(\/new\) by p\/m: .*handoff\/2\.json$/);
+});
+
+test("turn_end warns, settle cuts with the handoff as a compaction, the hard limit cuts and continues, warming follows jobs", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "handoff-decider-"));
+  const config = join(dir, "config.json");
+  writeFileSync(config, JSON.stringify({ handoffModels: ["p/m"] }));
+  process.env.ZERODAWN_PI_CONFIG = config;
+  let tokens = 0;
+  const notes: string[] = [];
+  const own = {
+    cwd: dir,
+    sessionManager: { getSessionFile: () => join(dir, "s.jsonl"), getBranch: () => branch },
+    modelRegistry: ctx([]).modelRegistry,
+    ui: { notify: (text: string) => notes.push(text) },
+    getContextUsage: () => ({ tokens }),
+  } as any;
+  const handlers = new Map<string, any>();
+  register({ registerCommand() {}, on: (name: string, fn: any) => handlers.set(name, fn) } as any);
+  const turnEnd = () => handlers.get("turn_end")({}, own);
+  const settle = () => handlers.get("agent_before_settle")({}, own);
+
+  tokens = 131_000;
+  assert.match((await turnEnd()).entries[0].content, /^System: context 131k of 150k/);
+  assert.equal(await turnEnd(), undefined);
+  tokens = 152_000;
+  assert.equal((await turnEnd()).entries[0].customType, "handoff-warning");
+  const cut = await settle();
+  assert.equal(cut.entries.length, 1);
+  assert.equal(cut.entries[0].type, "compaction");
+  assert.equal(cut.entries[0].firstKeptEntryId, null);
+  assert.match(cut.entries[0].summary, /^# Handoff\nGoal: Ship it/);
+  assert.match(notes.at(-1) ?? "", /^handoff: context 152k at the end of the run; the context is now the handoff/);
+
+  tokens = 175_000;
+  const hard = await turnEnd();
+  assert.deepEqual(
+    hard.entries.map((e: any) => e.type),
+    ["compaction", "custom_message"],
+  );
+  assert.equal(hard.continue, true);
+
+  mkdirSync(join(dir, "s", "jobs"), { recursive: true });
+  writeFileSync(join(dir, "s", "jobs", "1.json"), JSON.stringify({ id: "1", command: "just check", bg: true, status: join(dir, "1.status") }));
+  tokens = 155_000;
+  assert.equal(await settle(), undefined);
+  tokens = 50_000;
+  assert.deepEqual(handlers.get("cache_warming_decision")({}, own), { action: "warm" });
 });

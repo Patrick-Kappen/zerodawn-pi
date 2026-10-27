@@ -2,7 +2,8 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { handoffModels } from "../../shared/config.ts";
 import { sessionDir } from "../../shared/store.ts";
 import { render } from "./lib/card.ts";
-import { gitFacts, jobFacts } from "./lib/facts.ts";
+import { type Boundary, decide, RESUME, warmDecision, warning } from "./lib/decider.ts";
+import { gitFacts, jobFacts, jobsRunning } from "./lib/facts.ts";
 import { type Handoff, lastHandoff, saveHandoff } from "./lib/store.ts";
 import { type Registry, writeCard } from "./lib/summarize.ts";
 import { type Entry, strip, tail } from "./lib/transcript.ts";
@@ -48,6 +49,37 @@ export default function (pi: ExtensionAPI) {
       });
     return running;
   };
+
+  let warned = 0;
+  const boundary = async (ctx: ExtensionContext, at: Boundary) => {
+    const tokens = ctx.getContextUsage()?.tokens;
+    if (tokens === undefined || tokens === null) return undefined;
+    const jobs = jobsRunning(sessionDir(ctx));
+    const decision = decide(tokens, at, warned, jobs);
+    if (decision.action === "warn") {
+      warned = decision.level;
+      return { entries: [{ type: "custom_message" as const, customType: "handoff-warning", content: warning(tokens, jobs), display: true }] };
+    }
+    if (decision.action !== "cut") return undefined;
+    if (running) await running;
+    const { handoff, path } = await buildHandoff(ctx, handoffModels());
+    warned = 0;
+    ctx.ui.notify(`handoff: ${decision.why}; the context is now the handoff (${path}).`, "warning");
+    const cut = { type: "compaction" as const, summary: handoff.text, firstKeptEntryId: null, details: { path } };
+    if (at === "settle") return { entries: [cut] };
+    return { entries: [cut, { type: "custom_message" as const, customType: "handoff-resume", content: RESUME, display: true }], continue: true };
+  };
+
+  pi.on("turn_end", (_event, ctx) => boundary(ctx, "turn_end"));
+  pi.on("agent_before_settle", (_event, ctx) => boundary(ctx, "settle"));
+  pi.on("session_start", () => {
+    warned = 0;
+  });
+  pi.on("cache_warming_decision", (_event, ctx) => {
+    const tokens = ctx.getContextUsage()?.tokens;
+    const action = tokens ? warmDecision(tokens, jobsRunning(sessionDir(ctx))) : undefined;
+    return action ? { action } : undefined;
+  });
 
   pi.on("agent_end", (_event, ctx) => {
     if (running) return;
