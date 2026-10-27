@@ -275,10 +275,10 @@
             handoffModels = lib.mkOption {
               type = lib.types.listOf lib.types.str;
               default = [
+                "openai-codex/gpt-6-luna:low"
                 "local/qwen3.6-35b-a3b"
                 "ibm-next/qwen38-flash-next"
                 "opencode/deepseek-v4.1-flash-free"
-                "openai-codex/gpt-6-luna:low"
               ];
               description = "Models that write the handoff card, as provider/id[:thinking], in order. The first one with auth and a valid card is used.";
             };
