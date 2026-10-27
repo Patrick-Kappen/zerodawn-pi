@@ -210,9 +210,13 @@ The main pi connects to the supervisor when the first subagent starts. At `sessi
 ## Changes
 
 <!-- changelog:start -->
-## 0.8.0 — 2026-10-27
+## 0.8.1 — 2026-10-27
 
-- model ladder by availability from subagentModels (breaking)
+- tests: run tests and gates in the dev environment of the project
+
+- request id in each client request and its answer
+
+- token limit checks the context size, not a sum
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

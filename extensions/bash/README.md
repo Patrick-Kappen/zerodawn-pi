@@ -51,9 +51,13 @@ Jobs survive a pi restart: `session_start` reads the job files, reports jobs tha
 ## Changes
 
 <!-- changelog:start -->
-## 0.6.0 — 2026-10-27
+## 0.6.1 — 2026-10-27
 
-- files: read sends only new lines; bash blocks file views
+- inline output also has a 4 KB limit
+
+- print mode waits for background jobs before it ends
+
+- short failure output inline; fail on a missing cwd
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
