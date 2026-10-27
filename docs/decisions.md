@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 32. Git hooks come from tracked files, not from the dev shell (2026-10-27)
+
+The dev shell installed the pre-commit hooks and linked `.pre-commit-config.yaml` into the directory where it started. A new worktree had the shared hooks but not the link, so every commit there failed until somebody started the dev shell in it. The install also set a local `core.hooksPath`, which bypassed the central hooks of the system. Now `.githooks/` and `.pre-commit-config.yaml` are tracked, and the central hooks run `.githooks/<name>` through `zd-hooks run`. Every checkout has them at once. The config names store paths, so the check `hooks-config` fails when it differs from `flake.nix`; `just hooks-config` writes it again. The dev shell references the config, so it builds those paths.
+
 ## 31. The checker takes a rebuttal and counts follow-ups per user message (2026-10-27)
 
 A live run went in circles. The agent answered a follow-up with a rebuttal, the classifier judged that rebuttal against the old answer, and the same "Finish the task" came again. Every tool call reset the count, so a look into the problem made the loop longer. The state now keeps the answer from before the first follow-up and the rebuttal as separate fields. A text-only run after a follow-up is a rebuttal: the checker stops. A run with tool calls is checked again, but reasons that an earlier follow-up already sent are dropped. The limit counts all follow-ups of the user message. A handoff warning skips the check because the handoff resumes the work after its cut.
