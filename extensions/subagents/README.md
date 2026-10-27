@@ -208,17 +208,9 @@ The main pi connects to the supervisor when the first subagent starts. At `sessi
 ## Changes
 
 <!-- changelog:start -->
-## 0.7.0 — 2026-10-26
+## 0.8.0 — 2026-10-27
 
-- merge action with a merge agent on a conflict
-
-- the subagent commits with its own subject
-
-- a git worktree and branch per subagent
-
-- agent calls done, gate runs, green forces a handoff
-
-- enforced done tool with a git check of the changes
+- model ladder by availability from subagentModels (breaking)
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0 — 2026-10-27
+
+- model ladder by availability from subagentModels (breaking)
+
 ## 0.7.0 — 2026-10-26
 
 - merge action with a merge agent on a conflict

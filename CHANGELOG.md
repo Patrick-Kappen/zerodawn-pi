@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.14.0 — 2026-10-27
+
+### shared 0.7.0
+
+- subagents: model ladder by availability from subagentModels (breaking)
+
+### subagents 0.8.0
+
+- model ladder by availability from subagentModels (breaking)
+
+### repository
+
+- subagents: opencode-go deepseek after the free one in the ladder
+- subagents: model ladder by availability from subagentModels
+- ci: nvim in the dev shell for the files compat tests
+- docs: TODO note for a done check after every agent
+
 ## 0.13.0 — 2026-10-27
 
 ### shared 0.6.0
