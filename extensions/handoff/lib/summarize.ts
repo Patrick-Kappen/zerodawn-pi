@@ -1,4 +1,4 @@
-import { CARD_PARAMETERS, type Card, checkCard } from "./card.ts";
+import { CARD_PARAMETERS, type Card, checkCard, openPrNumbers } from "./card.ts";
 
 export const TRANSCRIPT_MAX_CHARS = 120_000;
 const CALL_TIMEOUT_MS = 120_000;
@@ -8,6 +8,7 @@ const SYSTEM = [
   "You keep the handoff card of a coding session up to date. The next agent reads only this card.",
   "Call write_card once with the full new card. Keep only what the next actions need. Drop finished history, chat and tool output.",
   "Take the goal and the next actions only from what the user asked and what the agent said it does next. Never invent work.",
+  "When the agent stopped in the middle of a step, write in inProgress what is half done and where to go on, so the next agent goes on without a question.",
   "The next actions are the most important part. Make them exact: the first action is what the next agent does first.",
   "The facts show all PRs and worktrees of the repository, also of other sessions. Name only those that this session worked on.",
   "Use the facts for the current state. Mark each PR as merged or open; do not guess a status that the transcript does not show.",
@@ -51,11 +52,9 @@ export async function writeCard(
   signal?: AbortSignal,
 ): Promise<{ card: Card; model: string }> {
   const failed: string[] = [];
-  const context = {
-    systemPrompt: SYSTEM,
-    messages: [{ role: "user", content: prompt(previous, facts, transcript), timestamp: Date.now() }],
-    tools: [{ name: "write_card", description: "Write the full handoff card.", parameters: CARD_PARAMETERS }],
-  };
+  const first = { role: "user", content: prompt(previous, facts, transcript), timestamp: Date.now() };
+  const tools = [{ name: "write_card", description: "Write the full handoff card.", parameters: CARD_PARAMETERS }];
+  const openPrs = openPrNumbers(facts);
   for (const entry of ladder) {
     const { provider, id, thinking } = parseEntry(entry);
     const model = registry.find(provider, id);
@@ -67,31 +66,44 @@ export async function writeCard(
       failed.push(`${entry}: no auth`);
       continue;
     }
-    const timeout = AbortSignal.timeout(CALL_TIMEOUT_MS);
-    let message: Message;
-    try {
-      message = await registry.complete(model, context, {
-        maxTokens: 4000,
-        reasoning: thinking === "off" ? undefined : thinking,
-        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-      });
-    } catch (err) {
-      failed.push(`${entry}: ${(err as Error).message}`);
-      continue;
-    }
-    if (message.stopReason === "error" || message.stopReason === "aborted") {
-      failed.push(`${entry}: ${message.errorMessage ?? message.stopReason}`);
-      continue;
-    }
-    const call = message.content.find((c) => c.type === "toolCall" && c.name === "write_card");
-    if (!call) {
-      failed.push(`${entry}: no write_card call`);
-      continue;
-    }
-    try {
-      return { card: checkCard(call.arguments), model: entry };
-    } catch (err) {
-      failed.push(`${entry}: ${(err as Error).message}`);
+    const messages: unknown[] = [first];
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const timeout = AbortSignal.timeout(CALL_TIMEOUT_MS);
+      let message: Message;
+      try {
+        message = await registry.complete(
+          model,
+          { systemPrompt: SYSTEM, messages, tools },
+          {
+            maxTokens: 4000,
+            reasoning: thinking === "off" ? undefined : thinking,
+            signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+          },
+        );
+      } catch (err) {
+        failed.push(`${entry}: ${(err as Error).message}`);
+        break;
+      }
+      if (message.stopReason === "error" || message.stopReason === "aborted") {
+        failed.push(`${entry}: ${message.errorMessage ?? message.stopReason}`);
+        break;
+      }
+      const call = message.content.find((c) => c.type === "toolCall" && c.name === "write_card");
+      if (!call) {
+        failed.push(`${entry}: no write_card call`);
+        break;
+      }
+      try {
+        return { card: checkCard(call.arguments, openPrs), model: entry };
+      } catch (err) {
+        const why = (err as Error).message;
+        if (attempt === 2) failed.push(`${entry}: ${why}`);
+        messages.push({
+          role: "user",
+          content: `Your card ${JSON.stringify(call.arguments)} is wrong. ${why} Call write_card again with the full correct card.`,
+          timestamp: Date.now(),
+        });
+      }
     }
   }
   throw new Error(`handoff: no model wrote a valid card. ${failed.join("; ")}. Check "handoffModels" in config.json and the auth of these models.`);

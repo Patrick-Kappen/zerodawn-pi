@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { type Card, checkCard, HANDOFF_MAX_CHARS, render } from "./card.ts";
+import { type Card, checkCard, HANDOFF_MAX_CHARS, openPrNumbers, render } from "./card.ts";
 import { decide, warmDecision, warning } from "./decider.ts";
 import { gitFacts, jobFacts, systemFacts } from "./facts.ts";
 import { ask, readSession, select } from "./recall.ts";
@@ -15,6 +15,8 @@ import { UPDATE_CHARS, updateReasons } from "./triggers.ts";
 const card: Card = {
   goal: "Ship the handoff",
   status: "active",
+  waitsForUser: false,
+  inProgress: [],
   state: [
     { now: "package 0.16.0 installed", target: "package 0.17.0 installed" },
     { now: "main clean", target: "main clean" },
@@ -50,10 +52,16 @@ test("strip keeps text and one line per tool call with the first result line, wi
 test("checkCard accepts a valid card and names every invalid field", () => {
   assert.equal(checkCard(card), card);
   assert.throws(
-    () => checkCard({ ...card, status: "half", state: [{ now: "x" }], decisions: Array(4).fill("x"), next: [] }),
-    /status: .*state: .*decisions: at most 3.*next: at least 1/,
+    () => checkCard({ ...card, status: "half", waitsForUser: "no", state: [{ now: "x" }], decisions: Array(4).fill("x"), next: [] }),
+    /status: .*waitsForUser: .*state: .*decisions: at most 3.*next: at least 1/,
   );
   assert.throws(() => checkCard(null), /not an object/);
+  assert.throws(() => checkCard({ ...card, status: "done" }), /status done with open work/);
+  assert.throws(() => checkCard({ ...card, open: ["#7 x"], merged: ["#8 y", "Nixos#9 z"] }, [8, 9]), /open: #7 is not open.*merged: #8 is still open/);
+  assert.equal(checkCard({ ...card, open: ["#7 x"] }, undefined).open[0], "#7 x");
+  assert.deepEqual(openPrNumbers(["open PRs in this repository (all sessions): #1 a (branch b, checks green); #22 c (branch d, checks red)"]), [1, 22]);
+  assert.equal(openPrNumbers(["open PRs: unknown (gh failed: x)"]), undefined);
+  assert.deepEqual(openPrNumbers(["open PRs in this repository (all sessions): none"]), []);
 });
 
 test("render puts next actions, state now and target, open, merged, facts and source in the handoff and fails above the limit", () => {
@@ -63,6 +71,7 @@ test("render puts next actions, state now and target, open, merged, facts and so
       "# Handoff",
       "Goal: Ship the handoff",
       "Status: active",
+      "Resume: go on at once with Next 1, without a question to the user",
       "Next:",
       "1. Merge #102",
       "2. Rebuild gaia",
@@ -115,11 +124,24 @@ test("writeCard walks the ladder until a model returns a valid write_card call",
   };
   const result = await writeCard(registry, ["a/missing", "a/noauth", "a/broken", "a/text", "a/bad", "a/good:low"], undefined, [], ["user: hi"]);
   assert.deepEqual(result, { card, model: "a/good:low" });
-  assert.deepEqual(calls, ["a/broken", "a/text", "a/bad", "a/good"]);
+  assert.deepEqual(calls, ["a/broken", "a/text", "a/bad", "a/bad", "a/good"]);
   await assert.rejects(
     writeCard(registry, ["a/missing", "a/broken"], undefined, [], []),
     /no model wrote a valid card\. a\/missing: not in the pi model registry; a\/broken: down/,
   );
+  const seen: unknown[][] = [];
+  const fixes: Registry = {
+    find: (p, id) => `${p}/${id}`,
+    hasConfiguredAuth: () => true,
+    complete: async (_m, context: any) => {
+      seen.push([...context.messages]);
+      const open = seen.length === 1 ? ["#93 shorter text"] : ["#105 short card"];
+      return { stopReason: "toolUse", content: [{ type: "toolCall", name: "write_card", arguments: { ...card, open, merged: [] } }] };
+    },
+  };
+  const fixed = await writeCard(fixes, ["a/m"], undefined, ["open PRs in this repository (all sessions): #105 x (branch y, checks green)"], []);
+  assert.deepEqual(fixed.card.open, ["#105 short card"]);
+  assert.match(String((seen[1][1] as any).content), /open: #93 is not open on GitHub/);
   assert.deepEqual(parseEntry("p/m:high"), { provider: "p", id: "m", thinking: "high" });
   assert.throws(() => parseEntry("nope"), /not "provider\/id\[:thinking\]"/);
 });
@@ -143,6 +165,8 @@ test("gitFacts reads branch, dirty files, worktrees and PRs, and names a failing
   };
   assert.deepEqual(gitFacts("/l", local), ["branch: main in /l"]);
   const withPr = (_cmd: string, args: string[]) => (args[0] === "branch" ? "main" : args[0] === "pr" ? "#7 x (branch x, checks green)" : "");
+  const noPr = (_cmd: string, args: string[]) => (args[0] === "branch" ? "main" : "");
+  assert.deepEqual(gitFacts("/n", noPr), ["branch: main in /n", "open PRs in this repository (all sessions): none"]);
   assert.deepEqual(gitFacts("/p", withPr), ["branch: main in /p", "open PRs in this repository (all sessions): #7 x (branch x, checks green)"]);
   assert.deepEqual(
     gitFacts("/x", () => {

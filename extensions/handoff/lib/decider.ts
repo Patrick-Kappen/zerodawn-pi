@@ -21,7 +21,7 @@ export function warning(tokens: number, jobsRunning: boolean): string {
   return `System: context ${k(tokens)} of ${k(CUT_AT)}. Finish this step, then end the run; a handoff replaces the context when the run ends.${wait}`;
 }
 
-export const RESUME = "System: the context was replaced by the handoff above. Continue with its Next step.";
+export const RESUME = "System: the context was replaced by the handoff above. Go on now with In progress and Next 1. Do not ask the user to continue.";
 
 export function warmDecision(tokens: number, jobsRunning: boolean): "warm" | undefined {
   return jobsRunning && tokens > 0 && tokens < WARM_BELOW ? "warm" : undefined;

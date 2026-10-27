@@ -5,7 +5,18 @@ import { join } from "node:path";
 import { test } from "node:test";
 import register, { buildHandoff } from "./index.ts";
 
-const card = { goal: "Ship it", status: "active", state: [], next: ["Merge"], merged: [], open: [], decisions: [], avoid: [] };
+const card = {
+  goal: "Ship it",
+  status: "active",
+  waitsForUser: true,
+  inProgress: [] as string[],
+  state: [],
+  next: ["Merge"],
+  merged: [],
+  open: [],
+  decisions: [],
+  avoid: [],
+};
 const root = mkdtempSync(join(tmpdir(), "handoff-cmd-"));
 const branch = [
   { id: "e1", type: "message", message: { role: "user", content: "Ship it" } },
@@ -125,6 +136,20 @@ test("turn_end warns, settle cuts with the handoff as a compaction, the hard lim
   assert.equal(cut.entries[0].firstKeptEntryId, null);
   assert.match(cut.entries[0].summary, /^# Handoff\nGoal: Ship it/);
   assert.match(notes.at(-1) ?? "", /^handoff: context 152k at the end of the run; the context is now the handoff/);
+  card.waitsForUser = false;
+  card.inProgress = ["half of README.md is done; go on at Updates"];
+  handlers.get("agent_start")();
+  assert.equal((await settle()).continue, undefined, "a run that ended without the warning waits for the user");
+  assert.equal((await turnEnd()).entries[0].customType, "handoff-warning");
+  const goOn = await settle();
+  assert.deepEqual(
+    goOn.entries.map((e: any) => e.customType ?? e.type),
+    ["compaction", "handoff-resume"],
+  );
+  assert.equal(goOn.continue, true);
+  assert.match(goOn.entries[0].summary, /\nResume: go on at once with Next 1, without a question to the user\nIn progress:\n- half of README\.md/);
+  assert.match(goOn.entries[1].content, /Do not ask the user to continue/);
+  card.waitsForUser = true;
 
   tokens = 175_000;
   const hard = await turnEnd();
