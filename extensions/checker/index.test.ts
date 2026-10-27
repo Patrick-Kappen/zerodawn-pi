@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createEventBus } from "@earendil-works/pi-coding-agent";
-import { BACKGROUND_JOBS_QUERY, backgroundJobRunning, buildState, decide, FOLLOWUP_TYPE, followupText, HANDOFF_WARNING_TYPE, shouldCheck } from "./index.ts";
+import {
+  BACKGROUND_JOBS_QUERY,
+  backgroundJobRunning,
+  buildState,
+  decide,
+  FOLLOWUP_TYPE,
+  followupText,
+  HANDOFF_WARNING_TYPE,
+  QUESTIONS,
+  shouldCheck,
+} from "./index.ts";
 
 test("shouldCheck runs on a completed run that ends on assistant text, not on a continuation or abort", () => {
   assert.equal(shouldCheck({ outcome: "completed", continue: false }), true);
@@ -77,6 +87,11 @@ const done = {
   completeness: { type: "score", score: 3, confidence: 0.9 },
   rule_violation: bool(0.9),
 };
+
+test("QUESTIONS tell the classifier that a step for the user is not an open point", () => {
+  for (const text of [QUESTIONS.status.criteria.incomplete, QUESTIONS.open_error.instructions, QUESTIONS.in_scope.instructions])
+    assert.match(text, /step left for the user, such as a merge, rebuild, restart or decision, is not an open point/);
+});
 
 test("decide settles a finished run, also with a rule violation", () => {
   assert.deepEqual(decide(done), []);
