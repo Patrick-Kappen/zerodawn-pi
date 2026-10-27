@@ -15,6 +15,7 @@ for f in "$@"; do
   case "$f" in
     *.md) ;;
     extensions/*/*) dirs+=("./extensions/$(cut -d/ -f2 <<<"$f")") ;;
+    integration/*) dirs+=("./integration") ;;
     shared/* | package.json | tsconfig.json) all=true ;;
     *) nix=true ;;
   esac
@@ -30,5 +31,6 @@ if [ ${#dirs[@]} -eq 0 ]; then
   echo "test-changed: only documentation changed: $*"
   exit 0
 fi
+dirs+=("./integration")
 mapfile -t unique < <(printf '%s\n' "${dirs[@]}" | sort -u)
 exec bun test "${unique[@]}"

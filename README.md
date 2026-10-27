@@ -67,6 +67,7 @@ Some extensions read `config.json` next to `package.json`; copy `config.example.
 ## Docs
 
 - [docs/decisions.md](docs/decisions.md): the choices that shape this repository, with reasons.
+- [docs/ci-baseline.md](docs/ci-baseline.md): measured test coverage, behavior contracts, and CI gaps.
 - [docs/todo.md](docs/todo.md): open points.
 - [shared/README.md](shared/README.md): the shared helpers and their compatibility rule.
 - [CONTRIBUTING.md](CONTRIBUTING.md): branch, commit, test and release workflow.
@@ -79,12 +80,16 @@ Some extensions read `config.json` next to `package.json`; copy `config.example.
 
 | Command | What |
 |---|---|
-| `just test` | unit tests (`bun test`) |
+| `just test` | all tests (`bun test`) |
+| `just test-integration` | contracts between extensions and release scripts |
 | `just types` | type check (`tsc`) |
 | `just lint` | biome and shellcheck |
 | `just fmt` | format and apply safe fixes |
 | `just check` | lint, types, tests, `nix flake check` |
 | `just dev` | pi in a tmux sandbox with all extensions; `just dev-screen`, `just dev-send "…"`, `just dev-key C-c`, `just dev-stop`. `PI_DEV=<name>` on each of them gives a separate session and sandbox |
+
+The tests in `integration/` use real local processes and fixed model responses. They do not call paid providers.
+Affected extension tests also run this group. Nix runs it as `tests-integration`.
 
 Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 

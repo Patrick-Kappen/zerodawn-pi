@@ -84,26 +84,9 @@ async function createHarness() {
     registerToolRenderer() {},
     registerMessageRenderer() {},
     registerEntryRenderer() {},
-    registerMarkdownTransformer() {},
-    appendEntry() {},
     sendMessage(message: any) {
       sent.push(message);
     },
-    sendUserMessage() {},
-    setSessionName() {},
-    getSessionName() {},
-    setLabel() {},
-    exec() {},
-    getActiveTools() {
-      return [];
-    },
-    getAllTools() {
-      return [];
-    },
-    getSettings() {
-      return {};
-    },
-    setActiveTools() {},
   } as any;
 
   const notes: string[] = [];
@@ -111,7 +94,6 @@ async function createHarness() {
     cwd: root,
     mode: "tui",
     hasUI: true,
-    signal: undefined,
     ui: {
       theme: { fg: (_color: string, text: string) => text, bold: (text: string) => text },
       notify: (message: string, level?: string) => notes.push(`${level ?? "info"}: ${message}`),
@@ -132,14 +114,6 @@ async function createHarness() {
       },
     },
     isIdle: () => true,
-    isProjectTrusted: () => true,
-    hasPendingMessages: () => false,
-    getContextUsage: () => undefined,
-    getSystemPrompt: () => "",
-    abort() {},
-    shutdown() {},
-    compact() {},
-    getContextUsageSnapshot: () => undefined,
   } as any;
 
   bashExtension(api);
@@ -283,8 +257,8 @@ test("checker resumes after a failed background job, keeps its failure output, a
     assert.equal(outcome.continue, true);
     assert.equal(outcome.entries[0].customType, "checker");
     assert.equal(outcome.entries[1].type, "custom_message");
-    assert.equal(outcome.entries[1].customType, checker.FOLLOWUP_TYPE);
-    assert.equal(outcome.entries[1].content, checker.followupText(["Finish the task."]));
+    assert.equal(outcome.entries[1].customType, "checker-followup");
+    assert.equal(outcome.entries[1].content, "checker:\n- Finish the task.\nIf wrong, say why in one sentence.");
     assert.equal(h.reports().length, 1);
     await h.deliver();
     await delay(100);

@@ -39,14 +39,9 @@ interface RepoOptions {
 type Change = "fix" | "feature" | "breaking";
 
 interface Fixture {
-  root: string;
-  repo: string;
-  run(command: string, args: string[]): Promise<Result>;
   git(...args: string[]): Promise<string>;
   script(name: string, ...args: string[]): Promise<Result>;
-  write(path: string, content: string): Promise<void>;
   commit(files: Record<string, string>, subject: string, change?: Change): Promise<void>;
-  tag(name: string): Promise<void>;
   read(path: string): Promise<string>;
   json(path: string): Promise<Component>;
   head(): Promise<string>;
@@ -54,10 +49,13 @@ interface Fixture {
 }
 
 function exec(command: string, args: string[], cwd: string, env: Record<string, string | undefined>): Promise<Result> {
-  return new Promise((resolve) => {
-    execFile(command, args, { cwd, env, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
-      const code = error === null ? 0 : typeof error.code === "number" ? error.code : 127;
-      resolve({ code, stdout, stderr });
+  return new Promise((resolve, reject) => {
+    execFile(command, args, { cwd, env, timeout: 30_000, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+      if (error !== null && typeof error.code !== "number") {
+        reject(new Error(`Could not run ${command} in ${cwd}; check the test environment.`, { cause: error }));
+        return;
+      }
+      resolve({ code: error === null ? 0 : (error.code as number), stdout, stderr });
     });
   });
 }
@@ -72,7 +70,7 @@ async function createFixture(t: { after(fn: () => Promise<void>): void }, option
   await mkdir(configHome);
   await mkdir(hooks);
   const env: Record<string, string | undefined> = {
-    ...process.env,
+    ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_"))),
     GIT_CONFIG_GLOBAL: "/dev/null",
     GIT_CONFIG_SYSTEM: "/dev/null",
     GIT_CONFIG_NOSYSTEM: "1",
@@ -101,7 +99,12 @@ async function createFixture(t: { after(fn: () => Promise<void>): void }, option
 
   await cp(join(SOURCE_ROOT, "biome.json"), join(repo, "biome.json"));
   await mkdir(join(repo, "scripts"));
-  for (const name of SCRIPTS) await cp(join(SOURCE_SCRIPTS, name), join(repo, "scripts", name));
+  const shell = await run("bash", ["-c", 'printf "%s" "$BASH"']);
+  assert.equal(shell.code, 0, shell.stderr);
+  for (const name of SCRIPTS) {
+    const source = await readFile(join(SOURCE_SCRIPTS, name), "utf8");
+    await writeFile(join(repo, "scripts", name), source.replace(/^#!.*$/m, `#!${shell.stdout}`), { mode: 0o755 });
+  }
 
   const writeJSON = async (path: string, value: unknown) => write(path, `${JSON.stringify(value, null, 2)}\n`);
   const changelog = (version: string) => `# Changelog\n\n## ${version} — 2026-01-01\n\n- old\n`;
@@ -126,21 +129,14 @@ async function createFixture(t: { after(fn: () => Promise<void>): void }, option
   for (const extension of options.extensions) await git("tag", `${extension.name}-v${extension.version}`);
 
   const fixture: Fixture = {
-    root,
-    repo,
-    run,
     git,
     script: (name, ...args) => run("bash", [join(repo, "scripts", name), ...args]),
-    write,
     commit: async (files, subject, change) => {
       for (const [path, content] of Object.entries(files)) await write(path, content);
       await git("add", "-A");
       const args = ["commit", "-q", "-m", subject];
       if (change) args.push("-m", `Change: ${change}`);
       await git(...args);
-    },
-    tag: async (name) => {
-      await git("tag", name);
     },
     read: (path) => readFile(join(repo, path), "utf8"),
     json: async (path) => JSON.parse(await readFile(join(repo, path), "utf8")) as Component,

@@ -2,6 +2,15 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 33. Integration tests protect contracts between extensions and release scripts (2026-10-27)
+
+Separate mocks accepted different event names in the checker and bash tests. No test called the release scripts.
+The new `integration/` group uses actual extension registration and local Git repositories to check externally visible behavior.
+Fixed classifier responses keep provider cost and model changes outside these tests.
+A separate Nix check supplies the existing script tools and tests the same group without network access.
+Affected extension tests include this group because an isolated extension test cannot protect a shared event contract.
+This step does not replace the existing tests or change the release policy. The measured baseline records the remaining gaps.
+
 ## 32. Git hooks come from tracked files, not from the dev shell (2026-10-27)
 
 The dev shell installed the pre-commit hooks and linked `.pre-commit-config.yaml` into the directory where it started. A new worktree had the shared hooks but not the link, so every commit there failed until somebody started the dev shell in it. The install also set a local `core.hooksPath`, which bypassed the central hooks of the system. Now `.githooks/` and `.pre-commit-config.yaml` are tracked, and the central hooks run `.githooks/<name>` through `zd-hooks run`. Every checkout has them at once. The config names store paths, so the check `hooks-config` fails when it differs from `flake.nix`; `just hooks-config` writes it again. The dev shell references the config, so it builds those paths.

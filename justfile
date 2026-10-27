@@ -1,8 +1,12 @@
 sibling := "zerodawn-pi-private"
 
-# Run the unit tests, after a check that they use the installed pi version
+# Run all tests with the installed pi version
 test: pi-version
     bun test
+
+# Test contracts between extensions and release scripts
+test-integration: pi-version
+    bun test ./integration
 
 # Run the tests for these changed files; run_tests calls it: just test-changed FILE...
 test-changed *files: pi-version
@@ -28,7 +32,7 @@ hooks-config:
 # Format and apply safe lint fixes
 fmt:
     biome check --write .
-    nix fmt
+    nix fmt --option warn-dirty false
 
 # Run every check: lint, types, tests, nix (nix flake check includes tsc and the tests per extension)
 check: lint types test
