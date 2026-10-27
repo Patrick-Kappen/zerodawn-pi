@@ -56,6 +56,11 @@ last="$(git tag --list 'v*' --sort=-v:refname | head -n1)"
 [ -n "$last" ] || { echo "bump-changed: no package tag v* exists; tag the first release by hand" >&2; exit 1; }
 change="$(change_of "$last..HEAD")"
 new="$(next "$version" "$change")"
+repo="$(git log --no-merges --format='- %s' "$last..HEAD" -- . ':(exclude)shared' ':(exclude)extensions')"
+if [ ${#bumped[@]} -eq 0 ] && [ -z "$repo" ]; then
+  echo "bump-changed: no commit since $last; nothing to release" >&2
+  exit 1
+fi
 # Write only after every level is known, so a failure leaves no half release.
 for entry in "${bumped[@]}"; do
   read -r _ _ _ to dir <<< "$entry"
@@ -77,10 +82,7 @@ for entry in "${bumped[@]}"; do
   prepend "$dir/CHANGELOG.md" "$(printf '## %s — %s\n\n%s' "$to" "$today" "$lines")"
   root="$(printf '%s\n\n### %s %s\n\n%s' "$root" "$name" "$to" "$lines")"
 done
-# Commits outside the components (repo, flake, ci, docs) go into the package section, so that it is never empty.
-repo="$(git log --no-merges --format='- %s' "$last..HEAD" -- . ':(exclude)shared' ':(exclude)extensions')"
 [ -z "$repo" ] || root="$(printf '%s\n\n### repository\n\n%s' "$root" "$repo")"
-[ "$root" != "## $new — $today" ] || { echo "bump-changed: no commit since $last; nothing to release" >&2; exit 1; }
 [ -f CHANGELOG.md ] || printf '# Changelog\n' > CHANGELOG.md
 prepend CHANGELOG.md "$root"
 scripts/notes.sh

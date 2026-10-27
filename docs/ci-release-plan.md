@@ -8,6 +8,13 @@ Keep the existing test tools, component versions, and merge method. Do not add a
 
 Keep extension behaviour unchanged during this work. This plan does not authorize a release or deployment.
 
+## Baseline record
+
+[The baseline](ci-baseline.md) records measurements, rollback points, merge settings, and missing behavior tests.
+The first delivery adds contract tests and fixes mutation during an empty release request.
+The owner accepts the known NixOS output warnings for continued pi work, not as successful checks.
+Later stages remain open; this delivery does not authorize refactoring or publication.
+
 ## 1. Record the baseline
 
 - Create rollback tags in both pi repositories and the NixOS repository. Use names outside the release tag patterns.

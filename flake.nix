@@ -122,6 +122,8 @@
         pkgs.coreutils
         pkgs.gnused
         pkgs.gnugrep
+        pkgs.jq
+        pkgs.biome
         pkgs.git
         # The grep tool of files; pi brings rg on PATH at run time.
         pkgs.ripgrep
@@ -400,10 +402,10 @@
                 pass_filenames = false;
                 always_run = true;
               };
-              # The full unit test suite before each commit; CI runs it again with the other checks.
+              # The full test suite before each commit; CI runs it again with the other checks.
               tests = {
                 enable = true;
-                name = "tests: the full unit test suite";
+                name = "tests: the full test suite";
                 entry = "${pkgs.writeShellScript "tests" ''
                   export PATH=${pkgs.lib.makeBinPath (testInputs pkgs)}:$PATH
                   [ -e node_modules ] || ln -s ${piModules pkgs}/node_modules node_modules
@@ -448,6 +450,31 @@
                 ln -s ${piModules pkgs}/node_modules src/node_modules
                 cd src
                 tsc
+                touch "$out"
+              '';
+
+          tests-integration =
+            pkgs.runCommand "tests-integration"
+              {
+                src = lib.fileset.toSource {
+                  root = ./.;
+                  fileset = lib.fileset.unions [
+                    ./package.json
+                    ./biome.json
+                    ./integration
+                    ./scripts
+                    ./extensions
+                    ./shared
+                  ];
+                };
+                nativeBuildInputs = testInputs pkgs;
+              }
+              ''
+                cp -r "$src" src
+                chmod -R u+w src
+                ln -s ${piModules pkgs}/node_modules src/node_modules
+                cd src
+                HOME="$TMPDIR" bun test ./integration
                 touch "$out"
               '';
 
