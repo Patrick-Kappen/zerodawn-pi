@@ -78,10 +78,10 @@ const ERROR = /(?<![-\w])(error|fail(ed|ure)?)\b|\bnix log\b|not found|not forma
 const LOCATION = /\S+\.\w+(:\d+(:\d+)?|\(\d+,\d+\))/;
 /** A line that starts with a location: file, position, message. */
 const LEADING = /^(\S+?\.\w+)(:\d+(?::\d+)?|\(\d+,\d+\)):?\s+(.*)$/;
-/** A location on its own line, for the message lines under it: shellcheck "In a.sh line 3:", miette "╭─[a.nix:2:5]". */
-const HEADER = [/^In (\S+) line (\d+):$/, /^╭─\[(\S+?):(\d+(?::\d+)?)\]$/];
-/** A message line under a HEADER: shellcheck "^-- SC2086 (info): …", miette "╰─ …". */
-const UNDER = /(SC\d{4} \(\w+\): .*)$|╰─ (.*)$/;
+/** A location on its own line, for the message lines under it: shellcheck "In a.sh line 3:", miette "╭─[a.nix:2:5]", biome "a.ts format ━━━" (no position). */
+const HEADER = [/^In (\S+) line (\d+):$/, /^╭─\[(\S+?):(\d+(?::\d+)?)\]$/, /^(\S+?\.\w+) (?:format|organizeImports|(?:lint|assist)\/\S+)$/];
+/** A message line under a HEADER: shellcheck "^-- SC2086 (info): …", miette "╰─ …", biome "× …". */
+const UNDER = /(SC\d{4} \(\w+\): .*)$|╰─ (.*)$|^[×!] (.*)$/;
 const DECORATION = /\s+(FIXABLE\s+)?━+$/;
 const LAST = 20;
 const PLACES = 10;
@@ -118,12 +118,12 @@ export function diagnose(output: string): Diagnosis {
     if (!t || SUMMARY.test(t) || NO_WARNING.test(t) || COUNT.test(t)) continue;
     const h = HEADER.map((r) => t.match(r)).find((m) => m);
     if (h) {
-      header = { file: h[1], place: `:${h[2]}` };
+      header = { file: h[1], place: h[2] ? `:${h[2]}` : "" };
       continue;
     }
     const under = t.match(UNDER);
     if (under && header) {
-      add(header.file, header.place, under[1] ?? under[2]);
+      add(header.file, header.place, under[1] ?? under[2] ?? under[3]);
       continue;
     }
     const lead = t.match(LEADING);
@@ -137,7 +137,7 @@ export function diagnose(output: string): Diagnosis {
     if (!file) return count > 1 ? `${message} (×${count})` : message;
     const shown = places.slice(0, PLACES).join(", ");
     const more = places.length > PLACES ? `, +${places.length - PLACES} more` : "";
-    const times = count > places.length ? ` (×${count})` : "";
+    const times = count > Math.max(places.length, 1) ? ` (×${count})` : "";
     return `${file}${shown}${more}: ${message}${times}`;
   });
   const text = cap(out);
