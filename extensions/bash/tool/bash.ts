@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Key } from "@earendil-works/pi-tui";
@@ -49,6 +49,8 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
     }),
 
     async execute(toolCallId, params, signal, onUpdate, ctx) {
+      if (!statSync(ctx.cwd, { throwIfNoEntry: false })?.isDirectory())
+        throw new Error(`bash: the working directory ${ctx.cwd} does not exist. Restart pi in an existing directory.`);
       const outDir = storeDir(ctx, "out");
       const jobsDir = storeDir(ctx, "jobs");
       const id = freeId(callFileId(ctx, toolCallId), (i) => existsSync(join(outDir, `${i}.bash.log`)) || existsSync(join(jobsDir, `${i}.json`)));
