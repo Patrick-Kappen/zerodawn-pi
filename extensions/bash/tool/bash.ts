@@ -29,16 +29,8 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
   pi.registerTool({
     name: "bash",
     label: "bash",
-    description: `Run a bash command. Returns the exit status; output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB, else its size and an out:<name> reference for read and grep. A failure adds every distinct error line. Over ${INLINE_WAIT_S} s it continues as a job and a message reports it. Use it for builds, scripts and tools; not to read or search files.`,
+    description: `Run a bash command for builds, scripts and tools. Read files with read, search with grep, and look at git history with git. Returns the exit status and the output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB; longer output gives its size and an out:<name> reference for read (offset=-N for the end) and grep. A failure adds every distinct error line. A command over ${INLINE_WAIT_S} s continues as a job and ends your turn; a message reports its result. Put independent commands in one message with the same group: they report once. Chain dependent steps in one command with &&, also a wait for a condition: timeout 30 bash -c 'until CHECK; do sleep 1; done' && NEXT. A command stops after ${DEFAULT_LIMIT_S / 3600} hour; add "${NO_TIME_LIMIT}" for a longer run.`,
     promptSnippet: "Run a bash command; short output back, long commands continue in the background",
-    promptGuidelines: [
-      "Use bash to run things, not to read: read for a range of a file, grep for a search, git for a diff or log.",
-      "A success needs no output. To see a cut output, grep the output path or read it with offset=-N.",
-      "A command over 15 s ends your turn; its result comes as a message.",
-      "Put independent commands in one message with the same group; they report once.",
-      "Dependent steps: chain them in one command with &&. A wait for a condition is part of that command: timeout 30 bash -c 'until CHECK; do sleep 1; done' && NEXT. Never a separate sleep or a repeated check.",
-      `A command stops after ${DEFAULT_LIMIT_S / 3600} hour; add "${NO_TIME_LIMIT}" when it must run longer.`,
-    ],
     parameters: Type.Object({
       command: Type.String({ description: "Bash command to execute" }),
       timeout: Type.Optional(

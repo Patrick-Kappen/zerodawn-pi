@@ -46,15 +46,8 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "ast_grep",
     label: "ast-grep",
-    description: `Structural code search with ast-grep. Matches syntax tree patterns, not text. Read-only: rewrite is a preview. Output: matches grouped per file as 'line: first line of match'. Truncated to ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)}; the full output is then saved to a temp file.`,
+    description: `Structural code search with ast-grep. Use it to find code by structure: calls, imports, function or class shapes, argument patterns. Use grep for plain text, strings, comments, config and file names. Write the pattern as valid code in lang: $NAME matches one node, $$$ matches many. Set a narrow path. On a pattern warning or no match, simplify the pattern before you widen the path. Read-only: rewrite only previews a change; apply it with edit. Output: matches grouped per file as 'line: first line of match'. Cut at ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)}; the full output then goes to a temp file.`,
     promptSnippet: "Structural code search (calls, imports, function and class shapes) with ast-grep",
-    promptGuidelines: [
-      "Use ast_grep to find code by structure: calls, imports, function or class shapes, argument patterns. Use grep for plain text, strings, comments, config and file names.",
-      "Always set lang and a narrow path. Search the smallest directory that can contain the answer.",
-      "Write the pattern as valid code in the target language. Use $NAME for one node and $$$ for many nodes.",
-      "If ast_grep returns a pattern warning or no matches, simplify the pattern before you widen the path.",
-      "Use rewrite only to preview a change. Apply changes with the edit tool.",
-    ],
     parameters: Params,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 

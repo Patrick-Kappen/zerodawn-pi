@@ -91,9 +91,8 @@ export function registerGit(pi: ExtensionAPI) {
     name: "git",
     label: "git",
     description:
-      "Compact read-only git: status, diff, log, show. diff and show return a file summary (+added -deleted per file, large directories merged) unless you give paths; with paths they return the patch with 1 line of context. Large output goes to a log file. Use bash for git commands that change state (add, commit, checkout, rebase).",
+      "Compact read-only git: status, diff, log, show. diff and show return a file summary (+added -deleted per file, large directories merged) unless you give paths; then ask for the patch of the paths you need, with 1 line of context. Large output goes to a log file. Use bash for git commands that change state (add, commit, checkout, rebase).",
     promptSnippet: "Compact git status, diff, log and show",
-    promptGuidelines: ["git diff and show give a file summary first. Then ask for the patch of the paths you need."],
     parameters: Type.Object({
       action: StringEnum(["status", "diff", "log", "show"] as const),
       repo: Type.Optional(Type.String({ description: "Repository path. Default: current directory." })),

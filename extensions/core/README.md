@@ -15,6 +15,10 @@ A name that exists more than once needs its origin: `name@user`, `name@project`,
 
 `lib/settings.ts` starts with a description of what `pi config` writes, found by running it.
 
+## System prompt
+
+Core sets pi's custom prompt (`lib/prompt.ts`): a short preamble, `<workflow>` with the way of work, and `<pi_docs>` with the paths of the pi README, docs and examples. Pi then leaves out its own `<tools>`, `<rules>` and `<docs>` sections, so the tool guidelines and pi's default rules are gone. Each tool description is complete: what the tool does, when and how to use it, and what it returns. Project context, skills, cwd and the sections of other extensions stay. A SYSTEM.md or `--system-prompt` makes core fail with an error.
+
 ## Changes
 
 <!-- changelog:start -->

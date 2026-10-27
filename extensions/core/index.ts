@@ -1,5 +1,6 @@
 import { type ExtensionAPI, type ExtensionCommandContext, getAgentDir, getSettingsListTheme } from "@earendil-works/pi-coding-agent";
 import { Container, Key, matchesKey, type SettingItem, SettingsList, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { customPrompt } from "./lib/prompt.ts";
 import { type Env, findRow, loadRows, type Row, refOf, type Scope, settingsPath, toggle } from "./lib/settings.ts";
 
 const USAGE = "Usage: /ext | /ext list | /ext on <name> [--project] | /ext off <name> [--project]";
@@ -103,6 +104,14 @@ function parseArgs(args: string): { verb: string; name: string; scope: Scope } {
 }
 
 export default function (pi: ExtensionAPI) {
+  pi.on("before_agent_start", (event) => {
+    const options = event.systemPromptOptions;
+    const prompt = customPrompt();
+    if (options.customPrompt && options.customPrompt !== prompt)
+      throw new Error("core: a SYSTEM.md or --system-prompt sets a custom prompt, and core sets the workflow prompt. Remove one of them.");
+    options.customPrompt = prompt;
+  });
+
   pi.registerCommand("ext", {
     description: "Enable or disable extensions, skills, prompts and themes, then reload",
     getArgumentCompletions: (prefix) => ["list", "on", "off"].filter((v) => v.startsWith(prefix)).map((v) => ({ value: v, label: v })),

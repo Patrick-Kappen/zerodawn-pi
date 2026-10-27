@@ -86,8 +86,7 @@ export function registerFiles(pi: ExtensionAPI, checker: Checker = fromConfig())
         details: { ...(result.details as object | undefined), ...seenDetails(file, lines, lines.length ? [[1, lines.length]] : []) },
       } as any;
     },
-    description: `Create a file, or replace a file of up to ${WRITE_MAX_LINES} lines. Creates parent directories. A larger existing file is blocked: use edit, or rm the file with bash first.`,
+    description: `Create a new file, or replace a file of up to ${WRITE_MAX_LINES} lines. Use edit to change an existing file. Creates parent directories. A larger existing file is blocked: use edit, or rm the file with bash first.`,
     promptSnippet: "Create files or replace small files",
-    promptGuidelines: ["Use write for new files. Use edit to change an existing file."],
   });
 }

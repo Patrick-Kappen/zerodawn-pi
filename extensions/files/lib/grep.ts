@@ -73,12 +73,8 @@ export function registerGrep(pi: ExtensionAPI, cwd: string) {
   pi.registerTool({
     name: "grep",
     label: "grep",
-    description: `Search file contents with ripgrep. Returns matching lines with file paths and line numbers, sorted by path. Searches hidden files, not .git. Respects .gitignore unless noIgnore. Max ${GREP_PER_FILE} matches per file in a directory, ${GREP_LIMIT} lines in total by default. Lines are cut at ${GREP_LINE_MAX} chars.`,
+    description: `Search file contents with ripgrep. Use it to find code and text before you read; then read the found range with offset and limit. filesOnly or count give an overview first. noIgnore: true also searches node_modules, dist and other ignored paths. Returns matching lines with file paths and line numbers, sorted by path. Searches hidden files, not .git. Respects .gitignore unless noIgnore. Max ${GREP_PER_FILE} matches per file in a directory, ${GREP_LIMIT} lines in total by default. Lines are cut at ${GREP_LINE_MAX} chars.`,
     promptSnippet: "Search file contents with ripgrep (respects .gitignore; noIgnore for ignored paths)",
-    promptGuidelines: [
-      "Find code with grep or ast_grep first. Then read the found range with offset and limit.",
-      "Use grep with noIgnore: true for node_modules, dist and other ignored paths. Use filesOnly or count for an overview first.",
-    ],
     parameters: schema,
     async execute(_id, params: Params, signal, _onUpdate, ctx) {
       const base = ctx?.cwd ?? cwd;

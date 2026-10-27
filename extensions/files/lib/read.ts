@@ -112,13 +112,8 @@ export function registerRead(pi: ExtensionAPI, cwd: string) {
   const base = createReadToolDefinition(cwd);
   pi.registerTool({
     ...base,
-    description: `Read a file. Without offset and limit, a file over ${READ_MAX_LINES} lines gives an outline with line numbers. limit is capped at ${READ_MAX_LINES} lines. offset=-N gives the last N lines. Lines that are unchanged and still in your context are not sent again. Images (jpg, png, gif, webp, bmp) are sent as attachments.`,
+    description: `Read a line range of a file (offset, limit), after grep or the outline found it. Without offset and limit, a file over ${READ_MAX_LINES} lines gives an outline with line numbers. limit is capped at ${READ_MAX_LINES} lines. offset=-N gives the last N lines, also for a log or an out:<name> output. Lines that are unchanged and still in your context are not sent again. Images (jpg, png, gif, webp, bmp) are sent as attachments.`,
     promptSnippet: "Read a line range of a file, or the outline of a big file",
-    promptGuidelines: [
-      "Use read to examine files, not cat, head, tail or sed in bash.",
-      "Find the lines with grep or the outline first. Then read only that range.",
-      "For the end of a log or an output path, use offset=-N. An output named out:<name> is a path for read and grep.",
-    ],
     async execute(toolCallId: string, params: any, signal: any, onUpdate: any, ctx: ExtensionToolContext) {
       if (IMAGE.test(String(params.path))) return base.execute(toolCallId, params, signal, onUpdate, ctx);
       const file = resolveOutRef(ctx, String(params.path)) ?? absolutePath(String(params.path), ctx?.cwd ?? cwd);
