@@ -45,4 +45,5 @@
 - Cache rewrites after idle: $403 in the week (24% of the cost), after the warming change $5. Keep it.
 - Thinking level per step: `pi.setThinkingLevel()` exists. On Anthropic models with mid-conversation effort, low/medium/high switches keep the cache (11 of 11 within 5 min). Only off to on breaks it (haiku, 2 of 3). Do not switch to or from off.
 - Tool output: median per result bash 42, edit 237, grep 338, read 472, codemode 769 tokens. codemode is 35% of all tool output with 175 calls; 11 results hit the 16 KB cut. Lower the codemode cut or make it return only what it needs.
+- Rules for repeated mistakes: semgrep and ast-grep are installed; agents ran semgrep about 30 times by hand, ast-grep 31 times. zerodawn-pi has no rule files (other repositories not checked). Put a mistake that comes back as a rule in the repository and run it after each edit and in `just check`: ast-grep for code, semgrep for security and IaC (taint, Terraform, Dockerfile, Kubernetes).
 - Edit rework is rare: 25 of 540 tasks with edits change one file 4 times or more.
