@@ -4,14 +4,13 @@ import { handoffModels } from "../../shared/config.ts";
 import { sessionDir } from "../../shared/store.ts";
 import { render } from "./lib/card.ts";
 import { type Boundary, decide, RESUME, warmDecision, warning } from "./lib/decider.ts";
-import { gitFacts, jobFacts, jobsRunning } from "./lib/facts.ts";
+import { gitFacts, jobFacts, jobsRunning, systemFacts } from "./lib/facts.ts";
 import { ask, RECALL_MAX_CHARS, RECALL_TEXT_MAX, readSession, select } from "./lib/recall.ts";
 import { type Handoff, lastHandoff, saveHandoff } from "./lib/store.ts";
 import { type Registry, writeCard } from "./lib/summarize.ts";
-import { type Entry, strip, tail } from "./lib/transcript.ts";
+import { type Entry, strip } from "./lib/transcript.ts";
 import { updateReasons } from "./lib/triggers.ts";
 
-export const RECENT_MAX_CHARS = 6_000;
 const USAGE = "Usage: /handoff (a new session with the handoff) | /handoff card (update the card only)";
 
 export function sinceLastCard(ctx: ExtensionContext) {
@@ -24,16 +23,14 @@ export function sinceLastCard(ctx: ExtensionContext) {
 
 export async function buildHandoff(ctx: ExtensionContext, ladder: string[]): Promise<{ handoff: Handoff; path: string }> {
   const { dir, previous, branch, lines } = sinceLastCard(ctx);
-  const { card, model } = await writeCard(ctx.modelRegistry as unknown as Registry, ladder, previous?.card, lines, ctx.signal);
-  const facts = [...gitFacts(ctx.cwd), ...jobFacts(dir)];
-  const recent = tail(strip(branch), RECENT_MAX_CHARS);
+  const facts = [...systemFacts(), ...gitFacts(ctx.cwd), ...jobFacts(dir)];
+  const { card, model } = await writeCard(ctx.modelRegistry as unknown as Registry, ladder, previous?.card, facts, lines, ctx.signal);
   const source = `${ctx.sessionManager.getSessionFile()} (entries up to ${branch.at(-1)?.id})`;
   const handoff: Handoff = {
     card,
     model,
     facts,
-    recent,
-    text: render(card, facts, recent, source),
+    text: render(card, facts, source),
     untilEntry: branch.at(-1)?.id ?? "",
     createdAt: new Date().toISOString(),
   };

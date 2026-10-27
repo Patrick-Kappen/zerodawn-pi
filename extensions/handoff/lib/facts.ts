@@ -16,6 +16,10 @@ function tryRun(exec: Run, label: string, cmd: string, args: string[], cwd: stri
   }
 }
 
+const PR_CHECKS =
+  '(.statusCheckRollup | map(.conclusion // .state) | if length == 0 then "none" elif any(. == "FAILURE" or . == "ERROR" or . == "CANCELLED" or . == "TIMED_OUT") then "red" elif all(. == "SUCCESS" or . == "NEUTRAL" or . == "SKIPPED") then "green" else "pending" end)';
+const PR_LINE = `.[] | "#\\(.number) \\(.title) (branch \\(.headRefName)\\(if .isDraft then ", draft" else "" end), checks \\${PR_CHECKS})"`;
+
 export function gitFacts(cwd: string, exec: Run = run): string[] {
   const branch = tryRun(exec, "branch", "git", ["branch", "--show-current"], cwd);
   if (typeof branch === "string") return [`git: not a repository (${cwd})`];
@@ -35,20 +39,29 @@ export function gitFacts(cwd: string, exec: Run = run): string[] {
     out.push(
       `worktrees: ${trees
         .slice(1)
-        .map((l) => l.split(/\s+/)[0])
+        .map((l) => `${l.split(/\s+/)[0]} (${/\[(.+)\]$/.exec(l)?.[1] ?? "detached"})`)
         .join(", ")}`,
     );
   const prs = tryRun(
     exec,
     "open PRs",
     "gh",
-    ["pr", "list", "--author", "@me", "--state", "open", "--json", "number,title", "-q", '.[]|"#\\(.number) \\(.title)"'],
+    ["pr", "list", "--author", "@me", "--state", "open", "--json", "number,title,headRefName,isDraft,statusCheckRollup", "-q", PR_LINE],
     cwd,
   );
   if (typeof prs === "string") {
     if (!/no git remotes/.test(prs)) out.push(prs);
-  } else if (prs.length) out.push(`open PRs: ${prs.join("; ")}`);
+  } else if (prs.length) out.push(`open PRs in this repository (all sessions): ${prs.join("; ")}`);
   return out;
+}
+
+export function systemFacts(exec: Run = run): string[] {
+  const system = tryRun(exec, "system", "readlink", ["/run/current-system"], "/");
+  if (typeof system === "string") return [system];
+  const version = tryRun(exec, "system revision", "nixos-version", ["--json"], "/");
+  if (typeof version === "string") return [`system: ${system[0]}`, version];
+  const rev = String(JSON.parse(version.join("\n")).configurationRevision ?? "unknown");
+  return [`system: ${system[0]} (config revision ${rev.slice(0, 8)}${rev.endsWith("-dirty") ? ", dirty" : ""})`];
 }
 
 type OpenJob = { id: string; running: boolean; command: string };

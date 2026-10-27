@@ -5,9 +5,13 @@ const CALL_TIMEOUT_MS = 120_000;
 const LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 
 const SYSTEM = [
-  "You keep the handoff card of a coding session up to date.",
-  "Call write_card once with the full new card. Keep what still counts from the previous card; drop what is finished or no longer true.",
-  "Write short lines in plain English. Use only facts from the transcript and the previous card.",
+  "You keep the handoff card of a coding session up to date. The next agent reads only this card.",
+  "Call write_card once with the full new card. Keep only what the next actions need. Drop finished history, chat and tool output.",
+  "Take the goal and the next actions only from what the user asked and what the agent said it does next. Never invent work.",
+  "The next actions are the most important part. Make them exact: the first action is what the next agent does first.",
+  "The facts show all PRs and worktrees of the repository, also of other sessions. Name only those that this session worked on.",
+  "Use the facts for the current state. Mark each PR as merged or open; do not guess a status that the transcript does not show.",
+  "Write short lines in plain English. Use only the facts, the transcript and the previous card.",
 ].join("\n");
 
 export type Message = { stopReason: string; errorMessage?: string; content: { type: string; name?: string; arguments?: unknown }[] };
@@ -28,23 +32,28 @@ export function parseEntry(entry: string): { provider: string; id: string; think
   return { provider: entry.slice(0, slash), id: rest };
 }
 
-export function prompt(previous: Card | undefined, transcript: string[]): string {
+export function prompt(previous: Card | undefined, facts: string[], transcript: string[]): string {
   const text = transcript.join("\n");
   const cut = text.length > TRANSCRIPT_MAX_CHARS ? `[earlier lines left out]\n${text.slice(-TRANSCRIPT_MAX_CHARS)}` : text;
-  return [`Previous card:\n${previous ? JSON.stringify(previous) : "(none)"}`, `Transcript since the previous card:\n${cut || "(nothing new)"}`].join("\n\n");
+  return [
+    `Facts now:\n${facts.join("\n") || "(none)"}`,
+    `Previous card:\n${previous ? JSON.stringify(previous) : "(none)"}`,
+    `Transcript since the previous card:\n${cut || "(nothing new)"}`,
+  ].join("\n\n");
 }
 
 export async function writeCard(
   registry: Registry,
   ladder: string[],
   previous: Card | undefined,
+  facts: string[],
   transcript: string[],
   signal?: AbortSignal,
 ): Promise<{ card: Card; model: string }> {
   const failed: string[] = [];
   const context = {
     systemPrompt: SYSTEM,
-    messages: [{ role: "user", content: prompt(previous, transcript), timestamp: Date.now() }],
+    messages: [{ role: "user", content: prompt(previous, facts, transcript), timestamp: Date.now() }],
     tools: [{ name: "write_card", description: "Write the full handoff card.", parameters: CARD_PARAMETERS }],
   };
   for (const entry of ladder) {

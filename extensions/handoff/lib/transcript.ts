@@ -55,14 +55,3 @@ export function strip(entries: Entry[], { ids = false, textMax = TEXT_MAX } = {}
   }
   return lines;
 }
-
-export function tail(lines: string[], maxChars: number): string[] {
-  const out: string[] = [];
-  let size = 0;
-  for (let i = lines.length - 1; i >= 0; i--) {
-    size += lines[i].length + 1;
-    if (size > maxChars) break;
-    out.unshift(lines[i]);
-  }
-  return out;
-}

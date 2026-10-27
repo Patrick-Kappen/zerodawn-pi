@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import register, { buildHandoff } from "./index.ts";
 
-const card = { goal: "Ship it", status: "active", decisions: [], open: [], next: "Merge", avoid: [], done: [] };
+const card = { goal: "Ship it", status: "active", state: [], next: ["Merge"], merged: [], open: [], decisions: [], avoid: [] };
 const root = mkdtempSync(join(tmpdir(), "handoff-cmd-"));
 const branch = [
   { id: "e1", type: "message", message: { role: "user", content: "Ship it" } },
