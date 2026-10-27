@@ -4,7 +4,7 @@
  * On agent_before_settle it builds a state of the run since the last user message
  * and asks all questions in one classify() call. Fixed thresholds in decide() turn the
  * answers into reasons. With a reason, a hidden message asks the agent for one more turn.
- * At most MAX_FOLLOWUPS per user message. Every check goes to the session and to a JSONL log.
+ * At most MAX_FOLLOWUPS in a row without a tool call in between. Every check goes to the session and to a JSONL log.
  *
  * Env:
  *   PI_CHECKER_CLASSIFIER  classifier model as provider/model (default typesafe/Decision-1)
@@ -68,6 +68,7 @@ export function buildState(entries: any[]) {
       if (t.trim()) finalAnswer = t;
       for (const c of Array.isArray(m.content) ? m.content : []) {
         if (c.type !== "toolCall") continue;
+        followups = 0;
         calls.set(c.id, { name: c.name, args: c.arguments });
         toolsUsed[c.name] = (toolsUsed[c.name] ?? 0) + 1;
       }
