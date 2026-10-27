@@ -87,6 +87,11 @@ test("decide sends back a question the agent can answer, not one for the user", 
   assert.equal(decide({ ...q, question_answerable: bool(0.2) }).length, 0);
 });
 
+test("decide sends back an offered step the agent can do, not one that needs a user choice", () => {
+  assert.deepEqual(decide({ ...done, next_step_offered: bool(0.9) }), ["Do the step that you offered."]);
+  assert.equal(decide({ ...done, next_step_offered: bool(0.3) }).length, 0);
+});
+
 test("decide sends back incomplete work", () => {
   assert.equal(decide({ ...done, status: { type: "choice", choice: "incomplete", confidence: 0.8 } }).length, 1);
   assert.equal(decide({ ...done, status: { type: "choice", choice: "incomplete", confidence: 0.5 } }).length, 0);
