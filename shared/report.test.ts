@@ -39,3 +39,28 @@ test("failures: no nix build progress or store path lists; the nix build log wit
   const nix = "these 2 derivations will be built:\n  /nix/store/abc-a.drv\nbuilding '/nix/store/abc-a.drv'...\n       > (fail) a > b\n       > error: boom";
   assert.equal(failures(nix), "(fail) a > b\nerror: boom");
 });
+
+test("diagnose: a biome format error without a position names the file and the message", () => {
+  const output = [
+    "biome check --error-on-warnings .",
+    "extensions/handoff/lib/lib.test.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "",
+    "  × Formatter would have printed the following content:",
+    "  ",
+    "    176     │ - ··writeFileSync(file, x);",
+    "        176 │ + ··writeFileSync(",
+    "",
+    "Checked 178 files in 22ms. No fixes applied.",
+    "Found 1 error.",
+    "check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "",
+    "  × Some errors were emitted while running checks.",
+    "error: recipe `lint` failed on line 21 with exit code 1",
+  ].join("\n");
+  const d = diagnose(output);
+  assert.equal(
+    d.text,
+    "extensions/handoff/lib/lib.test.ts: Formatter would have printed the following content:\nerror: recipe `lint` failed on line 21 with exit code 1",
+  );
+  assert.equal(d.located, 1);
+});
