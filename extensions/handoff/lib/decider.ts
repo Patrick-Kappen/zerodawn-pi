@@ -9,6 +9,7 @@ export type Decision = { action: "none" } | { action: "warn"; level: number } | 
 export function decide(tokens: number, boundary: Boundary, warned: number, jobsRunning: boolean): Decision {
   if (tokens >= HARD_AT) return { action: "cut", why: `context ${k(tokens)} over the hard limit of ${k(HARD_AT)}` };
   if (boundary === "settle" && tokens >= CUT_AT && !jobsRunning) return { action: "cut", why: `context ${k(tokens)} at the end of the run` };
+  if (boundary === "settle" && warned > 0 && !jobsRunning) return { action: "cut", why: `context ${k(tokens)} at the end of the run after the warning` };
   const level = WARN_AT.filter((at) => tokens >= at).length;
   if (boundary === "turn_end" && level > warned) return { action: "warn", level };
   return { action: "none" };

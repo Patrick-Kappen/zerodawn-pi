@@ -30,7 +30,7 @@ The extension keeps the context between about 100k and 150k tokens:
 | When | What |
 |---|---|
 | `turn_end`, from 130k and again from 140k | One system warning per level, visible in the chat: finish this step and end the run; running bash jobs report first. |
-| End of a run (`agent_before_settle`), from 150k, no bash job runs | Hard cut: the card is written, and a `compaction` with `firstKeptEntryId: null` makes the handoff the whole context. When the warning came in the same run, and the card is active and does not wait for the user, a system message tells the agent to go on with In progress and Next 1, and the run continues. |
+| End of a run (`agent_before_settle`), from 150k or after a warning, no bash job runs | Hard cut: the card is written, and a `compaction` with `firstKeptEntryId: null` makes the handoff the whole context. When the warning came in the same run, and the card is active and does not wait for the user, a system message tells the agent to go on with In progress and Next 1, and the run continues. |
 | End of a run from 150k while a bash job runs | No cut yet: the job report starts a new run, and the cut comes at its end. |
 | `turn_end` from 170k | Hard cut in the middle of a run, then a system message to continue with the Next step of the handoff. |
 | Cache warming, under 100k while a bash job runs | Pi's decision becomes `warm`; pi stops warming after 30 idle minutes. |

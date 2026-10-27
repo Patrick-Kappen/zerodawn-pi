@@ -21,6 +21,7 @@ export const MAX_FOLLOWUPS = 3;
 export const FOLLOWUP_TYPE = "checker-followup";
 const EDIT_TOOLS = new Set(["edit", "write"]);
 export const BACKGROUND_JOBS_QUERY = "bash:background-jobs";
+export const HANDOFF_WARNING_TYPE = "handoff-warning";
 
 /** The bash extension answers synchronously; without it nothing answers and the result is false. */
 export function backgroundJobRunning(pi: Pick<ExtensionAPI, "events">) {
@@ -59,8 +60,10 @@ export function buildState(entries: any[]) {
   const toolsUsed: Record<string, number> = {};
   let finalAnswer = "";
   let followups = 0;
+  let stopRequested = false;
   for (const e of run) {
     if (e.type === "custom_message" && e.customType === FOLLOWUP_TYPE) followups++;
+    if (e.type === "custom_message" && e.customType === HANDOFF_WARNING_TYPE) stopRequested = true;
     if (e.type !== "message") continue;
     const m = e.message;
     if (m.role === "assistant") {
@@ -86,6 +89,7 @@ export function buildState(entries: any[]) {
     edits: [...edits],
     toolsUsed,
     followupsUsed: followups,
+    stopRequested,
   };
 }
 
@@ -166,7 +170,7 @@ export default function (pi: ExtensionAPI) {
     if (!shouldCheck(event)) return;
     if (backgroundJobRunning(pi)) return;
     const state = buildState(ctx.sessionManager.getBranch() as any[]);
-    if (!state) return;
+    if (!state || state.stopRequested) return;
     const model = ctx.modelRegistry.findOfType("classifier", ...CLASSIFIER);
     if (!model) {
       ctx.ui.notify(`checker: classifier ${CLASSIFIER.join("/")} not found; set PI_CHECKER_CLASSIFIER or add the model.`, "warning");
