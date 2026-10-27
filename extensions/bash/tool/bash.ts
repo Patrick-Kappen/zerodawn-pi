@@ -29,7 +29,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
   pi.registerTool({
     name: "bash",
     label: "bash",
-    description: `Run a bash command. Returns the exit status; output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB, else its size and path. A failure adds every distinct error line. Over ${INLINE_WAIT_S} s it continues as a job and a message reports it. Use it for builds, scripts and tools; not to read or search files.`,
+    description: `Run a bash command. Returns the exit status; output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB, else its size and an out:<name> reference for read and grep. A failure adds every distinct error line. Over ${INLINE_WAIT_S} s it continues as a job and a message reports it. Use it for builds, scripts and tools; not to read or search files.`,
     promptSnippet: "Run a bash command; short output back, long commands continue in the background",
     promptGuidelines: [
       "Use bash to run things, not to read: read for a range of a file, grep for a search, git for a diff or log.",
