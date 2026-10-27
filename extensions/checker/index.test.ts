@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createEventBus } from "@earendil-works/pi-coding-agent";
-import { BACKGROUND_JOBS_QUERY, backgroundJobRunning, buildState, decide, FOLLOWUP_TYPE, followupText } from "./index.ts";
+import { BACKGROUND_JOBS_QUERY, backgroundJobRunning, buildState, decide, FOLLOWUP_TYPE, followupText, shouldCheck } from "./index.ts";
+
+test("shouldCheck runs on a completed run that ends on assistant text, not on a continuation or abort", () => {
+  assert.equal(shouldCheck({ outcome: "completed", continue: false }), true);
+  assert.equal(shouldCheck({ outcome: "completed", continue: true }), false);
+  assert.equal(shouldCheck({ outcome: "aborted", continue: false }), false);
+});
 
 test("backgroundJobRunning asks the bash extension and is false without an answer", () => {
   const events = createEventBus();
@@ -79,6 +85,11 @@ test("decide sends back a question the agent can answer, not one for the user", 
   const q = { ...done, status: { type: "choice", choice: "question", confidence: 0.9 } };
   assert.equal(decide({ ...q, question_answerable: bool(0.9) }).length, 1);
   assert.equal(decide({ ...q, question_answerable: bool(0.2) }).length, 0);
+});
+
+test("decide sends back an offered step the agent can do, not one that needs a user choice", () => {
+  assert.deepEqual(decide({ ...done, next_step_offered: bool(0.9) }), ["Do the step that you offered."]);
+  assert.equal(decide({ ...done, next_step_offered: bool(0.3) }).length, 0);
 });
 
 test("decide sends back incomplete work", () => {

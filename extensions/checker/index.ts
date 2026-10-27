@@ -94,7 +94,7 @@ export const QUESTIONS = {
     type: "choice",
     instructions: "A coding agent ended its turn with finalAnswer for the user's request. What is the state of the work?",
     criteria: {
-      done: "The request is fully handled and the answer reports the result.",
+      done: "The request is fully handled and the answer states the result.",
       incomplete: "Parts of the request are not done, or the answer stops halfway.",
       blocked: "The agent cannot continue without something outside its reach: access, a decision of the user, a missing service.",
       question: "The answer ends with a question to the user.",
@@ -114,6 +114,12 @@ export const QUESTIONS = {
     type: "bool",
     instructions: "If finalAnswer asks the user a question, can the agent find the answer itself by reading code, docs or running tools?",
     criteria: { true: "The agent can find it itself.", false: "Only the user knows it, or there is no question." },
+  },
+  next_step_offered: {
+    type: "bool",
+    instructions:
+      "Does finalAnswer propose or offer a next step (for example 'shall I do X?') that belongs to the request, that the agent can do itself with its tools, and that needs no choice that only the user can make?",
+    criteria: { true: "The agent offers a step that it can simply do.", false: "No such step, or the step needs a choice of the user." },
   },
   completeness: {
     type: "score",
@@ -135,6 +141,7 @@ export function decide(a: Answers): string[] {
   const p = (id: string) => (a[id]?.type === "bool" ? a[id].probability : 0);
   if (p("open_error") > 0.7 && p("in_scope") > 0.6) reasons.push("Fix the error in scope.");
   if (a.status?.choice === "question" && p("question_answerable") > 0.7) reasons.push("Find the answer yourself.");
+  if (p("next_step_offered") > 0.7) reasons.push("Do the step that you offered.");
   if ((a.status?.choice === "incomplete" && a.status.confidence > 0.7) || (a.completeness?.type === "score" && a.completeness.score <= 1))
     reasons.push("Finish the task.");
   return reasons;
@@ -149,9 +156,14 @@ function log(record: unknown) {
   appendFileSync(LOG, `${JSON.stringify(record)}\n`);
 }
 
+/** context.canContinue is false when the run ends on assistant text; the follow-up message makes the continuation valid. */
+export function shouldCheck(event: { outcome: string; continue?: boolean }) {
+  return event.outcome === "completed" && !event.continue;
+}
+
 export default function (pi: ExtensionAPI) {
   pi.on("agent_before_settle", async (event, ctx: ExtensionContext) => {
-    if (event.outcome !== "completed" || event.continue || !event.context.canContinue) return;
+    if (!shouldCheck(event)) return;
     if (backgroundJobRunning(pi)) return;
     const state = buildState(ctx.sessionManager.getBranch() as any[]);
     if (!state) return;
@@ -175,7 +187,6 @@ export default function (pi: ExtensionAPI) {
       if (reasons.length > 0) ctx.ui.notify(`checker: limit of ${MAX_FOLLOWUPS} follow-ups reached; open: ${reasons.length} point(s).`, "warning");
       return { entries };
     }
-    ctx.ui.notify(`checker: follow-up ${state.followupsUsed + 1}/${MAX_FOLLOWUPS} (${reasons.length} point(s))`, "info");
     entries.push({ type: "custom_message" as const, customType: FOLLOWUP_TYPE, content: followupText(reasons), display: false } as any);
     return { entries, continue: true };
   });
