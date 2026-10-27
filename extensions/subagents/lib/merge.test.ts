@@ -217,3 +217,10 @@ test("cleanup: without a local origin/main ref nothing is checked", async () => 
 test("cleanupAt: gives nothing outside a git repository", async () => {
   assert.deepEqual(await cleanupAt({ exec, cwd: root, home, runtimeRoot: join(root, "run") }), []);
 });
+
+test("cleanupAt: gives nothing in a repository without a commit", async () => {
+  const fresh = join(root, "fresh");
+  await mkdir(fresh);
+  await sh(fresh, "init", "-q");
+  assert.deepEqual(await cleanupAt({ exec, cwd: fresh, home, runtimeRoot: join(root, "run") }), []);
+});
