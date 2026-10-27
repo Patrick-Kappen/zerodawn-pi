@@ -51,7 +51,7 @@ export function gitFacts(cwd: string, exec: Run = run): string[] {
   );
   if (typeof prs === "string") {
     if (!/no git remotes/.test(prs)) out.push(prs);
-  } else if (prs.length) out.push(`open PRs in this repository (all sessions): ${prs.join("; ")}`);
+  } else out.push(`open PRs in this repository (all sessions): ${prs.join("; ") || "none"}`);
   return out;
 }
 

@@ -50,6 +50,7 @@ export default function (pi: ExtensionAPI) {
   };
 
   let warned = 0;
+  let askedToStop = false;
   const boundary = async (ctx: ExtensionContext, at: Boundary) => {
     const tokens = ctx.getContextUsage()?.tokens;
     if (tokens === undefined || tokens === null) return undefined;
@@ -57,22 +58,29 @@ export default function (pi: ExtensionAPI) {
     const decision = decide(tokens, at, warned, jobs);
     if (decision.action === "warn") {
       warned = decision.level;
+      askedToStop = true;
       return { entries: [{ type: "custom_message" as const, customType: "handoff-warning", content: warning(tokens, jobs), display: true }] };
     }
     if (decision.action !== "cut") return undefined;
     if (running) await running;
     const { handoff, path } = await buildHandoff(ctx, handoffModels());
     warned = 0;
+    const stoppedForUs = askedToStop;
+    askedToStop = false;
     ctx.ui.notify(`handoff: ${decision.why}; the context is now the handoff (${path}).`, "warning");
     const cut = { type: "compaction" as const, summary: handoff.text, firstKeptEntryId: null, details: { path } };
-    if (at === "settle") return { entries: [cut] };
+    if (at === "settle" && (!stoppedForUs || handoff.card.waitsForUser || handoff.card.status === "done")) return { entries: [cut] };
     return { entries: [cut, { type: "custom_message" as const, customType: "handoff-resume", content: RESUME, display: true }], continue: true };
   };
 
   pi.on("turn_end", (_event, ctx) => boundary(ctx, "turn_end"));
   pi.on("agent_before_settle", (_event, ctx) => boundary(ctx, "settle"));
+  pi.on("agent_start", () => {
+    askedToStop = false;
+  });
   pi.on("session_start", () => {
     warned = 0;
+    askedToStop = false;
   });
   pi.on("cache_warming_decision", (_event, ctx) => {
     const tokens = ctx.getContextUsage()?.tokens;

@@ -6,7 +6,7 @@
 |---|---|
 | Transcript | `lib/transcript.ts` strips the session since the previous card: one line per user or assistant text (max 500 characters), one line per tool call with the first line of its result. No tool output, no thinking. |
 | Card | A model of `handoffModels` in `config.json` gets the facts, the previous card and the transcript, and calls the one tool `write_card`. The first model with auth, a valid call and a valid card wins; the error lists every failed model. |
-| Card fields | goal, status (active or done), state (max 5, each the state now and the state it must have), next (1 to 3 concrete actions), merged (max 5 PRs that the next actions depend on), open (max 5, with place and blocker), decisions (max 3), avoid (max 3). |
+| Card fields | goal, status (active or done), waitsForUser (true when the last agent message asks the user something), inProgress (max 3, the half-done step and where to go on), state (max 5, each the state now and the state it must have), next (1 to 3 concrete actions), merged (max 5 PRs that the next actions depend on), open (max 5, with place and blocker), decisions (max 3), avoid (max 3). |
 | Facts | The code adds them: the active NixOS system and its config revision, branch, dirty files, worktrees with their branch, open PRs of the user in the repository, with branch and check status (`gh`), and bash jobs without a report. A failing command gives a line with its error. |
 | Handoff | The card, the facts and the path of the session. No transcript lines. Max 8000 characters. |
 | Files | `<session>/handoff/<n>.json`: card, model, facts, text and the last entry id. The next card starts after that entry. |
@@ -30,7 +30,7 @@ The extension keeps the context between about 100k and 150k tokens:
 | When | What |
 |---|---|
 | `turn_end`, from 130k and again from 140k | One system warning per level, visible in the chat: finish this step and end the run; running bash jobs report first. |
-| End of a run (`agent_before_settle`), from 150k, no bash job runs | Hard cut: the card is written, and a `compaction` with `firstKeptEntryId: null` makes the handoff the whole context. |
+| End of a run (`agent_before_settle`), from 150k, no bash job runs | Hard cut: the card is written, and a `compaction` with `firstKeptEntryId: null` makes the handoff the whole context. When the warning came in the same run, and the card is active and does not wait for the user, a system message tells the agent to go on with In progress and Next 1, and the run continues. |
 | End of a run from 150k while a bash job runs | No cut yet: the job report starts a new run, and the cut comes at its end. |
 | `turn_end` from 170k | Hard cut in the middle of a run, then a system message to continue with the Next step of the handoff. |
 | Cache warming, under 100k while a bash job runs | Pi's decision becomes `warm`; pi stops warming after 30 idle minutes. |
