@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 24. A classifier decides at settle time whether the agent is done (2026-10-27)
+
+Agents report an error in scope, ask a question they can answer themselves, or stop halfway, and call that done. The `checker` asks a classifier model on `agent_before_settle`, so it sees the whole run once and can request one more turn through pi, without a user message. The classifier only answers typed questions with probabilities. Fixed thresholds in code make the decision, so a change of behaviour is a code change with a test. A limit of 3 follow-ups per user message stops a loop between agent and classifier. Every check goes to a JSONL log, to tune the thresholds on real runs. Cost: one classify call per finished run.
+
 ## 23. The tooling picks the subagent model, by availability only (2026-10-27)
 
 One ladder `subagentModels` in the config serves all agents; profiles have no `models`. The agent does not choose or know its model: a model that picks its own model picks the strongest, and a list per profile repeats the same order in every file. The tooling takes the first entry that exists, has auth and answers a probe, and restarts on the next entry after a provider error, in the same worktree. Reason for availability only: it works without data. Quota (use left, reset time) and escalation on failure need numbers and a failure rule that do not exist yet; they come later and obey this order. Cost: a restart loses the context of the old agent; the task line and the changed files carry the work over.
