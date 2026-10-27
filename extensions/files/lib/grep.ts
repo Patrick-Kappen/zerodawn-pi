@@ -11,18 +11,18 @@ export const GREP_LIMIT = 100;
 export const GREP_PER_FILE = 20;
 
 const schema = Type.Object({
-  pattern: Type.String({ description: "Search pattern (regex, or literal with literal: true)" }),
-  path: Type.Optional(Type.String({ description: "Directory or file to search, or out:<name> for a tool output (default: current directory)" })),
-  glob: Type.Optional(Type.String({ description: "Filter files by glob pattern, e.g. '*.ts' or '!**/*.test.ts'" })),
-  type: Type.Optional(Type.String({ description: "Filter files by rg file type, e.g. ts, py, nix" })),
-  ignoreCase: Type.Optional(Type.Boolean({ description: "Case-insensitive search (default: false)" })),
-  literal: Type.Optional(Type.Boolean({ description: "Treat pattern as literal string instead of regex (default: false)" })),
-  multiline: Type.Optional(Type.Boolean({ description: "Let the pattern match across lines (default: false)" })),
-  noIgnore: Type.Optional(Type.Boolean({ description: "Search files that .gitignore excludes, such as node_modules or dist (default: false)" })),
-  filesOnly: Type.Optional(Type.Boolean({ description: "Return only the paths of files with a match" })),
-  count: Type.Optional(Type.Boolean({ description: "Return the number of matching lines per file" })),
-  context: Type.Optional(Type.Number({ description: "Number of lines to show before and after each match (default: 0)" })),
-  limit: Type.Optional(Type.Number({ description: `Maximum number of result lines (default: ${GREP_LIMIT})` })),
+  pattern: Type.String({ description: "Regex, or plain text with literal." }),
+  path: Type.Optional(Type.String({ description: "File, directory, or out:<name> for a tool output. Default: current directory." })),
+  glob: Type.Optional(Type.String({ description: "For example '*.ts' or '!**/*.test.ts'." })),
+  type: Type.Optional(Type.String({ description: "rg file type, for example ts, py, nix." })),
+  ignoreCase: Type.Optional(Type.Boolean()),
+  literal: Type.Optional(Type.Boolean()),
+  multiline: Type.Optional(Type.Boolean({ description: "The pattern can match across lines." })),
+  noIgnore: Type.Optional(Type.Boolean({ description: "Also search ignored paths such as node_modules and dist." })),
+  filesOnly: Type.Optional(Type.Boolean({ description: "Only the paths with a match, for an overview." })),
+  count: Type.Optional(Type.Boolean({ description: "Matching lines per file, for an overview." })),
+  context: Type.Optional(Type.Number({ description: "Lines before and after each match." })),
+  limit: Type.Optional(Type.Number({ description: `Max result lines. Default: ${GREP_LIMIT}.` })),
 });
 
 type Params = {
@@ -73,12 +73,8 @@ export function registerGrep(pi: ExtensionAPI, cwd: string) {
   pi.registerTool({
     name: "grep",
     label: "grep",
-    description: `Search file contents with ripgrep. Returns matching lines with file paths and line numbers, sorted by path. Searches hidden files, not .git. Respects .gitignore unless noIgnore. Max ${GREP_PER_FILE} matches per file in a directory, ${GREP_LIMIT} lines in total by default. Lines are cut at ${GREP_LINE_MAX} chars.`,
+    description: `Find code and text with ripgrep before you read; then read the found range. Returns 'path:line: text' sorted by path. Hidden files are in, .git and .gitignore'd paths are out. Max ${GREP_PER_FILE} matches per file in a directory; lines are cut at ${GREP_LINE_MAX} chars.`,
     promptSnippet: "Search file contents with ripgrep (respects .gitignore; noIgnore for ignored paths)",
-    promptGuidelines: [
-      "Find code with grep or ast_grep first. Then read the found range with offset and limit.",
-      "Use grep with noIgnore: true for node_modules, dist and other ignored paths. Use filesOnly or count for an overview first.",
-    ],
     parameters: schema,
     async execute(_id, params: Params, signal, _onUpdate, ctx) {
       const base = ctx?.cwd ?? cwd;

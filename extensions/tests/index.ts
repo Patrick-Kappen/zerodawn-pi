@@ -20,7 +20,7 @@ export default function (pi: ExtensionAPI) {
     ...TOOL,
     parameters: Type.Object({
       scope: Type.Optional(StringEnum(["changed", "all"] as const, { description: "changed (default): tests for the changed files. all: every test." })),
-      rerun: Type.Optional(Type.Boolean({ description: "Run again when no file changed, for a flaky test." })),
+      rerun: Type.Optional(Type.Boolean({ description: "Run again when no file changed; only for a flaky test." })),
       path: Type.Optional(Type.String({ description: "Project directory, such as a git worktree. Default: the current directory." })),
     }),
     execute: (toolCallId, params, signal, _onUpdate, ctx) => runTests.execute(toolCallId, params, signal, ctx),

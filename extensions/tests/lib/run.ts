@@ -60,15 +60,11 @@ export const TOOL = {
     `The project recipe "${CHANGED_RECIPE} *files" picks the tests when it exists. Else, for a package.json project, run_tests runs with bun every test file that imports a changed file.`,
     "A changed code file that no test file imports is an error. A warning is an error.",
     "The result is one line when the tests pass. When they fail, it shows only the failures. The full output goes to a log file.",
+    "A test command in bash runs run_tests in its place, and a check command in bash (lint, types, just check) gives a short result.",
+    `A run over ${INLINE_MS / 1000} s ends your turn; a message gives the result.`,
+    "With no changed file it gives the earlier result.",
   ].join(" "),
   promptSnippet: "Run the tests for the changed files; green in one line, or only the failures",
-  promptGuidelines: [
-    "Run tests only with run_tests. A test command in bash runs run_tests in its place.",
-    "A check command in bash (lint, types, just check) gives a short result. A warning is an error: fix it.",
-    `A run longer than ${INLINE_MS / 1000} s ends your turn; a message gives the result.`,
-    "Add or change a test for each new behaviour or bug fix, then run run_tests.",
-    "run_tests gives the earlier result when no file changed. Set rerun only for a flaky test.",
-  ],
 };
 
 export type Params = { scope?: "changed" | "all"; rerun?: boolean; path?: string };

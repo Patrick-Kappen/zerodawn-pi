@@ -7,7 +7,7 @@ import { GREP_LINE_MAX } from "./lib/grep.ts";
 import { registerViewGuard } from "./lib/guard.ts";
 
 const MAX_BYTES = 16 * 1024;
-const WORKFLOW = `A codemode result above ${DEFAULT_MAX_LINES} lines or ${formatSize(MAX_BYTES)} is cut. The full text goes to a log file. Return only the data you need from codemode.`;
+const WORKFLOW = `Use codemode to run independent tool calls at once (Promise.allSettled), to chain them, or to filter large output. A codemode result above ${DEFAULT_MAX_LINES} lines or ${formatSize(MAX_BYTES)} is cut. The full text goes to a log file. Return only the data you need from codemode.`;
 
 export default function (pi: ExtensionAPI) {
   registerFiles(pi);
