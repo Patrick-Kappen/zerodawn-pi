@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { type Card, checkCard, HANDOFF_MAX_CHARS, render } from "./card.ts";
+import { decide, warmDecision, warning } from "./decider.ts";
 import { gitFacts, jobFacts } from "./facts.ts";
 import { lastHandoff, saveHandoff } from "./store.ts";
 import { parseEntry, type Registry, writeCard } from "./summarize.ts";
@@ -151,4 +152,19 @@ test("updateReasons: 20k characters, or a successful commit, push, PR create or 
     message: { role: "toolResult", toolCallId: "6", content: [{ type: "text", text: "job 3.1-C1: running · log: out:3.1-C1.bash" }] },
   };
   assert.deepEqual(updateReasons([call("6", "git push"), background], ["x"]), []);
+});
+
+test("decide: warnings at 130k and 140k on turn_end, cut at the end of a run from 150k, hard cut from 170k", () => {
+  assert.deepEqual(decide(120_000, "turn_end", 0, false), { action: "none" });
+  assert.deepEqual(decide(131_000, "turn_end", 0, false), { action: "warn", level: 1 });
+  assert.deepEqual(decide(135_000, "turn_end", 1, false), { action: "none" });
+  assert.deepEqual(decide(141_000, "turn_end", 1, false), { action: "warn", level: 2 });
+  assert.deepEqual(decide(155_000, "turn_end", 2, false), { action: "none" });
+  assert.deepEqual(decide(155_000, "settle", 2, false), { action: "cut", why: "context 155k at the end of the run" });
+  assert.deepEqual(decide(155_000, "settle", 2, true), { action: "none" });
+  assert.deepEqual(decide(171_000, "turn_end", 2, true), { action: "cut", why: "context 171k over the hard limit of 170k" });
+  assert.match(warning(132_000, true), /^System: context 132k of 150k\. Finish this step.*Running bash jobs report first\.$/);
+  assert.equal(warmDecision(60_000, true), "warm");
+  assert.equal(warmDecision(60_000, false), undefined);
+  assert.equal(warmDecision(120_000, true), undefined);
 });
