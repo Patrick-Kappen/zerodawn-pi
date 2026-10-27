@@ -77,8 +77,13 @@ function header(sender: Sender, width: number, note = ""): string[] {
   return [` ${t.fg("dim", "── ")}${title}${t.fg("dim", ` ${"─".repeat(Math.max(0, width - name.length - 6))}`)}`];
 }
 
+/** A terminal of 0 or 1 column (during a resize) gives a negative width, and pi's components then throw. */
+export function inner(width: number): number {
+  return Math.max(0, width - INDENT.length);
+}
+
 function renderBody(next: (width: number) => string[], width: number): string[] {
-  return state().style === "row" ? next(width - INDENT.length) : next(width);
+  return state().style === "row" ? next(inner(width)) : next(width);
 }
 
 function decorate(lines: string[]): string[] {
@@ -193,7 +198,7 @@ const HOOKS: Array<[object, string, Layer]> = [
               .map((c) => c.text ?? "")
               .join("\n");
       const md = cachedMarkdown(self, text, self.markdownTheme);
-      return ["", minorHeader(self.message.customType), ...elbowLines(md.render(width - INDENT.length))];
+      return ["", minorHeader(self.message.customType), ...elbowLines(md.render(inner(width)))];
     },
   ],
   [
@@ -207,7 +212,7 @@ const HOOKS: Array<[object, string, Layer]> = [
       const name = t.fg("customMessageText", self.skillBlock.name);
       if (!self.expanded) return [minorHeader("skill", `${name}${t.fg("dim", ` (${keyText("app.tools.expand")} to expand)`)}`)];
       const md = cachedMarkdown(self, self.skillBlock.content, self.markdownTheme);
-      return [minorHeader("skill", name), ...elbowLines(md.render(width - INDENT.length))];
+      return [minorHeader("skill", name), ...elbowLines(md.render(inner(width)))];
     },
   ],
   [
@@ -221,7 +226,7 @@ const HOOKS: Array<[object, string, Layer]> = [
       const render = line.render;
       line.render = function (this: unknown, width: number): string[] {
         if (state().style !== "row") return render.call(this, width);
-        return render.call(this, width - INDENT.length).map((l) => withLead(l, INDENT));
+        return render.call(this, inner(width)).map((l) => withLead(l, INDENT));
       };
     },
   ],
