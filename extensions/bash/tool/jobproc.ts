@@ -189,12 +189,12 @@ export function errorLines(lines: string[]): { n: number[]; text: string }[] {
   return [...out].map(([text, n]) => ({ n, text }));
 }
 
-// The context gets the status and the path of the output. A success adds short output. A failure adds every distinct error line.
+// The context gets the status and short output. Long output goes to a file; a failure then adds every distinct error line.
 export function resultText(log: string, status: string): string {
   const ok = /^exit 0\b/.test(status);
   const { plain, cut } = render(log, ok ? RESULT_TAIL_BYTES : Number.POSITIVE_INFINITY);
   if (plain.length === 0) return status;
-  if (ok && plain.length <= INLINE_LINES) return `${status}\n${plain.join("\n")}`;
+  if (plain.length <= INLINE_LINES) return `${status}\n${plain.join("\n")}`;
   const txt = log.replace(/\.log$/, ".txt");
   writeFileSync(txt, `${plain.join("\n")}\n`);
   const { bytes } = statsOf(log);
