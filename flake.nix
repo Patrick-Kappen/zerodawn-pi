@@ -128,6 +128,8 @@
               pkgs.gnused
               pkgs.gnugrep
               pkgs.git
+              # The syntax check of edit and write; its tests use the lua parser that nvim brings.
+              pkgs.neovim-unwrapped
             ];
           }
           ''
@@ -182,6 +184,11 @@
           cfg = config.programs.zerodawn-pi;
           settings = lib.filterAttrs (_: v: v != null) {
             astGrep = lib.getExe cfg.astGrep;
+            nvim = lib.getExe cfg.nvim;
+            treesitterParsers = "${pkgs.symlinkJoin {
+              name = "pi-treesitter-parsers";
+              paths = cfg.treesitterGrammars;
+            }}";
             inherit (cfg) nixosRepo;
             subagentExtensions = if cfg.subagentExtensions == [ ] then null else cfg.subagentExtensions;
           };
@@ -230,6 +237,25 @@
               type = lib.types.package;
               default = pkgs.ast-grep;
               description = "The ast-grep package for the ast_grep tool.";
+            };
+            nvim = lib.mkOption {
+              type = lib.types.package;
+              default = pkgs.neovim-unwrapped;
+              description = "The Neovim package for the syntax check of edit and write.";
+            };
+            treesitterGrammars = lib.mkOption {
+              type = lib.types.listOf lib.types.package;
+              default = with pkgs.vimPlugins.nvim-treesitter-parsers; [
+                bash
+                javascript
+                json
+                nix
+                python
+                tsx
+                typescript
+                yaml
+              ];
+              description = "Tree-sitter grammars (each with parser/<lang>.so) for the syntax check. A file type without its grammar fails the check.";
             };
             nixosRepo = lib.mkOption {
               type = lib.types.nullOr lib.types.str;

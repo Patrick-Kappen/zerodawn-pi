@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-export type Config = { astGrep?: string; nixosRepo?: string; subagentExtensions?: string[] };
+export type Config = { astGrep?: string; nixosRepo?: string; subagentExtensions?: string[]; nvim?: string; treesitterParsers?: string };
 
 export const CONFIG_FILE = fileURLToPath(new URL("../config.json", import.meta.url));
 
@@ -10,7 +10,7 @@ const isString = (v: unknown): v is string => typeof v === "string" && v.length 
 function check(raw: unknown, file: string): Config {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(`${file} is not a JSON object.`);
   const r = raw as Record<string, unknown>;
-  for (const key of ["astGrep", "nixosRepo"] as const) {
+  for (const key of ["astGrep", "nixosRepo", "nvim", "treesitterParsers"] as const) {
     if (r[key] !== undefined && !isString(r[key])) throw new Error(`${file}: "${key}" must be a non-empty string.`);
   }
   const list = r.subagentExtensions;

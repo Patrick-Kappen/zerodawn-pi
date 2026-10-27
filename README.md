@@ -44,7 +44,7 @@ programs.zerodawn-pi = {
 ```
 
 The module:
-- installs the package with a generated `config.json` at `~/.pi/agent/packages/zerodawn-pi` (option `path`); `astGrep` defaults to `pkgs.ast-grep`;
+- installs the package with a generated `config.json` at `~/.pi/agent/packages/zerodawn-pi` (option `path`); `astGrep` defaults to `pkgs.ast-grep`, `nvim` to `pkgs.neovim-unwrapped`, `treesitterGrammars` to the grammars for bash, javascript, json, nix, python, tsx, typescript and yaml;
 - adds that path to `~/.pi/agent/settings.json` `packages` on activation with an idempotent `jq` edit, and leaves the rest of the file alone, so `/ext` keeps working;
 - adds a daily timer that removes the tool output of sessions that are gone or unchanged for 30 days (`logCleanup.enable`, `logCleanup.days`).
 
@@ -60,7 +60,7 @@ Clone the repository and add it to `~/.pi/agent/settings.json`:
 { "packages": ["/path/to/zerodawn-pi"] }
 ```
 
-Some extensions read `config.json` next to `package.json`; copy `config.example.json`. All keys are optional: `astGrep` (path of the binary; default from `PATH`), `nixosRepo` (checkout of your NixOS flake), `subagentExtensions` (absolute paths of extensions that every subagent loads, for example a provider login). `ZERODAWN_PI_CONFIG` points to another `config.json`; `just dev` uses it for the config of the installed package. A key with a wrong type fails at load with the file path.
+Some extensions read `config.json` next to `package.json`; copy `config.example.json`. All keys are optional: `astGrep` (path of the binary; default from `PATH`), `nvim` (path of the binary for the syntax check of edit and write; default from `PATH`), `treesitterParsers` (directory with a `parser/` directory of tree-sitter grammars for that check), `nixosRepo` (checkout of your NixOS flake), `subagentExtensions` (absolute paths of extensions that every subagent loads, for example a provider login). `ZERODAWN_PI_CONFIG` points to another `config.json`; `just dev` uses it for the config of the installed package. A key with a wrong type fails at load with the file path.
 
 ## Docs
 
