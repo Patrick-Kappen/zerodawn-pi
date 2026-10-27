@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { CONFIG_ENV, CONFIG_FILE, configFile, readConfig, subagentModels } from "./config.ts";
+import { CONFIG_ENV, CONFIG_FILE, configFile, handoffModels, readConfig, subagentModels } from "./config.ts";
 
 test("config.json lives next to package.json", () => {
   assert.equal(CONFIG_FILE, join(import.meta.dirname, "..", "config.json"));
@@ -77,5 +77,20 @@ test("subagentModels: returns the list, fails with the file and key when missing
     assert.deepEqual(subagentModels(file), ["a/b:low", "c/d"]);
   } finally {
     rmSync(dir, { recursive: true });
+  }
+});
+
+test("handoffModels: returns the list, fails with the file and key when missing or wrong", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cfg-handoff-"));
+  const file = join(dir, "config.json");
+  try {
+    writeFileSync(file, "{}");
+    assert.throws(() => handoffModels(file), new RegExp(`${file} needs "handoffModels"`));
+    writeFileSync(file, JSON.stringify({ handoffModels: [] }));
+    assert.throws(() => handoffModels(file), /needs "handoffModels"/);
+    writeFileSync(file, JSON.stringify({ handoffModels: ["local/q", "p/m:low"] }));
+    assert.deepEqual(handoffModels(file), ["local/q", "p/m:low"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
