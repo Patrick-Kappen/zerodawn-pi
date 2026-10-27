@@ -5,6 +5,7 @@ Registers pi's `read`, `edit` and `write` tools again with shorter descriptions 
 ## Changes
 
 - `read`: a file over 200 lines without `offset` and `limit` gives an outline with line numbers: headings for Markdown, declarations for code (ts/js, py, sh, nix, go, rs, lua, yaml, json, toml, justfile). A file type without a rule gives the first 200 lines.
+- `read` and `grep`: a path `out:<name>` is the output `<session>/out/<name>.txt`, else `<name>.log`, of a tool call in this session. An unknown name fails with the next step.
 - `read`: `limit` is capped at 200 lines, and the output at 16 KB. The note names the next `offset`. `offset=-N` gives the last N lines.
 - `read`: lines that are unchanged and still in the model context are not sent again. A known part shorter than the note about it (100 bytes) is sent again. read, edit and write store line hashes of the lines they show in `details.seen`. A read checks the results in the current model context (after prune and compaction) and finds those lines in the file again, also when an edit moved them. A range with no new lines gives one line of text.
 - bash: the block of `grep`/`rg` sends the model to the grep tool and its options; other viewers go to grep and read.

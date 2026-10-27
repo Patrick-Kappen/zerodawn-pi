@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createReadToolDefinition, type ExtensionAPI, type ExtensionToolContext, formatSize } from "@earendil-works/pi-coding-agent";
+import { resolveOutRef } from "../../../shared/store.ts";
 import { absolutePath } from "../../../shared/util.ts";
 import { fileLines, linesInContext, type Seen, type SeenRange, seenRanges, segments } from "./lines.ts";
 import { OUTLINE_MAX, outline } from "./outline.ts";
@@ -116,11 +117,11 @@ export function registerRead(pi: ExtensionAPI, cwd: string) {
     promptGuidelines: [
       "Use read to examine files, not cat, head, tail or sed in bash.",
       "Find the lines with grep or the outline first. Then read only that range.",
-      "For the end of a log or an output path, use offset=-N.",
+      "For the end of a log or an output path, use offset=-N. An output named out:<name> is a path for read and grep.",
     ],
     async execute(toolCallId: string, params: any, signal: any, onUpdate: any, ctx: ExtensionToolContext) {
       if (IMAGE.test(String(params.path))) return base.execute(toolCallId, params, signal, onUpdate, ctx);
-      const file = absolutePath(String(params.path), ctx?.cwd ?? cwd);
+      const file = resolveOutRef(ctx, String(params.path)) ?? absolutePath(String(params.path), ctx?.cwd ?? cwd);
       let raw: string;
       try {
         raw = readFileSync(file, "utf8");

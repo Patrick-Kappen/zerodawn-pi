@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { GREP_PER_FILE, registerGrep, rgArgs } from "./grep.ts";
+import { registerRead } from "./read.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "grep-"));
 const put = (path: string, text: string) => {
@@ -48,4 +49,16 @@ test("grep reports no match, and fails loud on a missing path, a bad pattern and
   await assert.rejects(grep({ path: "nope" }), /grep: path nope does not exist/);
   await assert.rejects(grep({ pattern: "(" }), /grep: rg exited with code 2: .*regex/s);
   assert.throws(() => rgArgs({ pattern: "x", filesOnly: true, count: true }, true), /filesOnly or count, not both/);
+});
+
+test("grep and read take out:<name> as the path of a session output", async () => {
+  const session = join(dir, "2026-10-27T09-21-57-511Z_01a17caa-9907-7437-aa19-54145f7d36c4");
+  put(`${session.slice(dir.length + 1)}/out/5.1-C1.bash.txt`, "a\nneedle out\n");
+  const ctx = { cwd: dir, sessionManager: { getSessionFile: () => `${session}.jsonl`, buildSessionProjection: () => ({ entries: [] }) } };
+  const r = await tool.execute("id", { pattern: "needle", path: "out:5.1-C1.bash" }, undefined, undefined, ctx);
+  assert.equal(r.content[0].text, "out:5.1-C1.bash:2: needle out");
+  let read: any;
+  registerRead({ registerTool: (t: any) => (read = t) } as any, dir);
+  const text = (await read.execute("id", { path: "out:5.1-C1.bash", offset: -1 }, undefined, undefined, ctx)).content[0].text;
+  assert.match(text, /needle out/);
 });

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Key } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { callFileId, freeId, shorten, storeDir } from "../../../shared/store.ts";
+import { callFileId, freeId, outRef, storeDir } from "../../../shared/store.ts";
 import { age } from "../../../shared/util.ts";
 import { DEFAULT_LIMIT_S, INLINE_BYTES, INLINE_LINES, INLINE_WAIT_S, NO_TIME_LIMIT, STREAM_LINES, STREAM_MS, STREAM_TAIL_BYTES } from "../config.ts";
 import type { State } from "../state.ts";
@@ -29,7 +29,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
   pi.registerTool({
     name: "bash",
     label: "bash",
-    description: `Run a bash command. Returns the exit status; output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB, else its size and path. A failure adds every distinct error line. Over ${INLINE_WAIT_S} s it continues as a job and a message reports it. Use it for builds, scripts and tools; not to read or search files.`,
+    description: `Run a bash command. Returns the exit status; output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB, else its size and an out:<name> reference for read and grep. A failure adds every distinct error line. Over ${INLINE_WAIT_S} s it continues as a job and a message reports it. Use it for builds, scripts and tools; not to read or search files.`,
     promptSnippet: "Run a bash command; short output back, long commands continue in the background",
     promptGuidelines: [
       "Use bash to run things, not to read: read for a range of a file, grep for a search, git for a diff or log.",
@@ -144,7 +144,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       widget.refresh();
       done.then((r) => reports.report(job, meta, r.text, true));
       return {
-        content: [{ type: "text", text: `job ${id}: running · log: ${shorten(log)}` }],
+        content: [{ type: "text", text: `job ${id}: running · log: ${outRef(log)}` }],
         details: { log, job: id, background: true },
         // A command that moved to the background ends the turn, so the user can chat; its message starts the next turn.
         // A command started with background: true (a server) does not: the agent works with it.

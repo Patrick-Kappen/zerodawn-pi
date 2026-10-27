@@ -24,7 +24,7 @@ A changed JavaScript or TypeScript file without a test is an error, also with th
 The result:
 
 ```
-green: 38 pass, 0 fail · 1.2 s · log: ~/.pi/agent/sessions/…/out/3.2-C1.tests.log
+green: 38 pass, 0 fail · 1.2 s · log: out:3.2-C1.tests
 ```
 
 `red` starts the line when a test fails, a changed file has no test, or the output has a warning. A failed test run shows the failures, without passed tests and runtime stack frames. A failed check and a warning show the diagnostics: each line with a location (`file:line:col`, `file(line,col)`), a warning or an error, once, with `(×n)` for a repeat. The same message at more places is one line with at most 10 places. A location on its own line (shellcheck `In a.sh line 3:`, deadnix `╭─[a.nix:2:5]`) goes in front of its message. Summary lines (`Found 1 warning.`) and context lines do not show. When no line matches, the last 20 lines show. The nix lines `warning: Git tree '…' is dirty` and `error (ignored): SQLite database '…' is busy` do not show.
