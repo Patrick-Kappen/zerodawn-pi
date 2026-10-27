@@ -29,7 +29,7 @@ green: 38 pass, 0 fail · 1.2 s · log: ~/.pi/agent/sessions/…/out/3.2-C1.test
 
 A red check that the parser did not understand (no line matched, the result was cut, or no diagnostic has a location) is written to `check-anomalies.jsonl` in the session directory. `just check-findings` shows them. A warning line has "warn" in it (not in an option such as `--error-on-warnings`), or starts with `! ` (biome). The run stops after 10 minutes. A stop by the user ends the run and its child processes.
 
-A run that takes more than 15 s continues in the background. The tool result then says so and ends the turn, so the user can chat. When the run ends, a message gives the short result to the agent: during a run as a steer message, else it starts a new turn. A second call for the same change does not start a second run. A new session stops the background runs.
+A run that takes more than 15 s continues in the background. The tool result then says so and ends the turn, so the user can chat. When the run ends, a message gives the short result to the agent: during a run as a steer message, else it starts a new turn. A second call for the same change does not start a second run. A new session stops the background runs. In print and json mode (`pi -p`), pi ends when the agent settles, so before it settles the extension waits for the next background run; its message then continues the agent.
 
 ## Bash
 
