@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.13.0 — 2026-10-27
+
+### shared 0.6.0
+
+- files: edit and write undo a change that adds a syntax error
+
+### bash 0.6.0
+
+- files: read sends only new lines; bash blocks file views
+
+### files 0.3.0
+
+- edit and write run the formatter of the project
+
+- edit and write undo a change that adds a syntax error
+
+- read sends only new lines; bash blocks file views
+
+### repository
+
+- files: edit and write run the formatter of the project
+- files: edit and write undo a change that adds a syntax error
+- files: read sends only new lines; bash blocks file views
+
 ## 0.12.0 — 2026-10-26
 
 ### bash 0.5.1

@@ -23,9 +23,13 @@ Registers pi's `read`, `grep`, `edit` and `write` tools again with shorter descr
 ## Changes
 
 <!-- changelog:start -->
-## 0.2.0 — 2026-10-26
+## 0.3.0 — 2026-10-27
 
-- docs: AGENTS.md of each extension as rules, facts to README
+- edit and write run the formatter of the project
+
+- edit and write undo a change that adds a syntax error
+
+- read sends only new lines; bash blocks file views
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

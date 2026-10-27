@@ -27,11 +27,9 @@ Tests: `util.test.ts`, `store.test.ts`, `config.test.ts`, `testrun.test.ts`. The
 ## Changes
 
 <!-- changelog:start -->
-## 0.5.0 — 2026-10-26
+## 0.6.0 — 2026-10-27
 
-- keep diagnostics and warningCount as released
-
-- grouped diagnostics, nix noise, word-only warnings
+- files: edit and write undo a change that adds a syntax error
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

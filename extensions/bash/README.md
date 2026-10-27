@@ -49,11 +49,9 @@ Jobs survive a pi restart: `session_start` reads the job files, reports jobs tha
 ## Changes
 
 <!-- changelog:start -->
-## 0.5.1 — 2026-10-26
+## 0.6.0 — 2026-10-27
 
-- a command that moves to the background ends the turn
-
-- end the turn when only jobs are left, not jobs wait
+- files: read sends only new lines; bash blocks file views
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
