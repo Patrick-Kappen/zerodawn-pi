@@ -79,6 +79,7 @@ Resolve only the merge conflicts that the task names. Keep both changes where po
   - It sends their events to the main pi, so the tool calls show in the UI.
   - It shows an overview of all agents in window 0.
 - The main pi and the subagents are clients. They connect to one Unix socket of the supervisor. The tmux option `@pi-sub-socket` on the session holds its path.
+- Each request of the main pi (start, answer, status, discard) carries a `requestId`; the supervisor puts it in its answer (`started`, `status`, `discarded`, `error`). So more requests can wait at the same time, and an error rejects only its own request. An agent result comes later and carries the agent id.
 - Each subagent has a real pi session (`--session-id`, `--session-dir`), so the tool can resume it later. The id is a UUID.
 - The subagent loads this extension too. `PI_SUBAGENT_SOCKET` and `PI_SUBAGENT_ID` make it a client of the supervisor: it runs the task it gets and sends tool, message and settle events.
 - Agent status: `starting`, `running`, `idle`, `question`, `blocked`, `failed`. `question` and `blocked` count as not running. An agent that does not connect within 30 s, or whose window is gone without a result, is `failed`. The supervisor checks the windows every 2 s.

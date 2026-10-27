@@ -42,20 +42,20 @@ export interface AgentResult {
 export type ClientMessage =
   | { type: "hello"; role: "main" }
   | { type: "hello"; role: "sub"; id: string }
-  | { type: "status" }
-  | { type: "start"; task: string; args: string[]; checks: string[]; models: string[]; repo: string; sha: string }
-  | { type: "discard"; id: string }
-  | { type: "answer"; id: string; text: string }
+  | { type: "status"; requestId: string }
+  | { type: "start"; requestId: string; task: string; args: string[]; checks: string[]; models: string[]; repo: string; sha: string }
+  | { type: "discard"; requestId: string; id: string }
+  | { type: "answer"; requestId: string; id: string; text: string }
   | { type: "ask"; text: string }
   | { type: "blocker"; data: Blocker }
   | { type: "handoff"; data: Handoff; reason?: string; gate?: GateInfo; commit?: string }
   | { type: "event"; event: SubEvent };
 
 export type ServerMessage =
-  | { type: "status"; agents: AgentEntry[]; main: "connected" | "gone" }
-  | { type: "error"; message: string }
-  | { type: "started"; id: string }
-  | { type: "discarded"; id: string; text: string }
+  | { type: "status"; requestId: string; agents: AgentEntry[]; main: "connected" | "gone" }
+  | { type: "error"; message: string; requestId?: string }
+  | { type: "started"; requestId: string; id: string }
+  | { type: "discarded"; requestId: string; id: string; text: string }
   | { type: "task"; task: string }
   | { type: "handoff" }
   | ({ type: "result" } & AgentResult);
@@ -193,12 +193,13 @@ export function parseClientLine(line: string): ClientMessage {
   const message = parseObject(line, "client", "Send one JSON object per line.");
   switch (message.type) {
     case "status":
-      return { type: "status" };
+      return { type: "status", requestId: text(message, "requestId", "status") };
     case "hello":
       if (message.role === "main") return { type: "hello", role: "main" };
       if (message.role === "sub") return { type: "hello", role: "sub", id: text(message, "id", "hello") };
       throw new Error(`protocol: hello has role ${JSON.stringify(message.role)}. Use "main" or "sub".`);
     case "start": {
+      const requestId = text(message, "requestId", "start");
       const task = text(message, "task", "start");
       if (!Array.isArray(message.args) || message.args.some((arg) => typeof arg !== "string")) {
         throw new Error('protocol: field "args" of "start" must be a list of strings. Fix the sender.');
@@ -212,12 +213,17 @@ export function parseClientLine(line: string): ClientMessage {
       if (!repo.startsWith("/")) throw new Error('protocol: field "repo" of "start" must be an absolute path. Fix the sender.');
       const sha = text(message, "sha", "start");
       if (!/^[0-9a-f]{40,64}$/.test(sha)) throw new Error('protocol: field "sha" of "start" must be a full commit hash. Fix the sender.');
-      return { type: "start", task, args: message.args as string[], checks: message.checks as string[], models, repo, sha };
+      return { type: "start", requestId, task, args: message.args as string[], checks: message.checks as string[], models, repo, sha };
     }
     case "discard":
-      return { type: "discard", id: text(message, "id", "discard") };
+      return { type: "discard", requestId: text(message, "requestId", "discard"), id: text(message, "id", "discard") };
     case "answer":
-      return { type: "answer", id: text(message, "id", "answer"), text: text(message, "text", "answer") };
+      return {
+        type: "answer",
+        requestId: text(message, "requestId", "answer"),
+        id: text(message, "id", "answer"),
+        text: text(message, "text", "answer"),
+      };
     case "ask":
       return { type: "ask", text: text(message, "text", "ask") };
     case "blocker":
@@ -252,18 +258,27 @@ export function parseServerLine(line: string): ServerMessage {
   const message = parseObject(line, "supervisor", "Stop the supervisor and start it again.");
   switch (message.type) {
     case "error":
-      return { type: "error", message: text(message, "message", "error") };
+      return {
+        type: "error",
+        message: text(message, "message", "error"),
+        ...(message.requestId === undefined ? {} : { requestId: text(message, "requestId", "error") }),
+      };
     case "started":
-      return { type: "started", id: text(message, "id", "started") };
+      return { type: "started", requestId: text(message, "requestId", "started"), id: text(message, "id", "started") };
     case "discarded":
-      return { type: "discarded", id: text(message, "id", "discarded"), text: text(message, "text", "discarded") };
+      return {
+        type: "discarded",
+        requestId: text(message, "requestId", "discarded"),
+        id: text(message, "id", "discarded"),
+        text: text(message, "text", "discarded"),
+      };
     case "task":
       return { type: "task", task: text(message, "task", "task") };
     case "handoff":
       return { type: "handoff" };
     case "status":
       if (Array.isArray(message.agents) && (message.main === "connected" || message.main === "gone")) {
-        return { type: "status", agents: message.agents, main: message.main };
+        return { type: "status", requestId: text(message, "requestId", "status"), agents: message.agents, main: message.main };
       }
       break;
     case "result": {
