@@ -89,6 +89,23 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.14.0 — 2026-10-27
+
+### shared 0.7.0
+
+- subagents: model ladder by availability from subagentModels (breaking)
+
+### subagents 0.8.0
+
+- model ladder by availability from subagentModels (breaking)
+
+### repository
+
+- subagents: opencode-go deepseek after the free one in the ladder
+- subagents: model ladder by availability from subagentModels
+- ci: nvim in the dev shell for the files compat tests
+- docs: TODO note for a done check after every agent
+
 ## 0.13.0 — 2026-10-27
 
 ### shared 0.6.0
@@ -147,26 +164,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 - subagents: enforced done tool with a git check of the changes
 - docs: rules for found bugs and for releases
 - repo: release notes list repository commits; empty notes fail
-
-## 0.11.0 — 2026-10-26
-
-### shared 0.5.0
-
-- keep diagnostics and warningCount as released
-
-- grouped diagnostics, nix noise, word-only warnings
-
-### bash 0.5.0
-
-- just check-findings shows unhelpful check results
-
-- background true always returns the job id
-
-### tests 0.4.0
-
-- shared: keep diagnostics and warningCount as released
-
-- anomalies file, nixfmt check, results by call number
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

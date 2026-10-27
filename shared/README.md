@@ -27,9 +27,9 @@ Tests: `util.test.ts`, `store.test.ts`, `config.test.ts`, `testrun.test.ts`. The
 ## Changes
 
 <!-- changelog:start -->
-## 0.6.0 — 2026-10-27
+## 0.7.0 — 2026-10-27
 
-- files: edit and write undo a change that adds a syntax error
+- subagents: model ladder by availability from subagentModels (breaking)
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
