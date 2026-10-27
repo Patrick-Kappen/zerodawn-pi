@@ -52,4 +52,9 @@ The tool `recall { question, session? }` answers one question about earlier work
 ## Changes
 
 <!-- changelog:start -->
+## 0.1.0 — 2026-10-27
+
+- First release.
+
+[All changes](CHANGELOG.md)
 <!-- changelog:end -->

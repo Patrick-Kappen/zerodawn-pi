@@ -27,9 +27,11 @@ Tests: `util.test.ts`, `store.test.ts`, `config.test.ts`, `testrun.test.ts`. The
 ## Changes
 
 <!-- changelog:start -->
-## 0.8.0 — 2026-10-27
+## 0.9.0 — 2026-10-27
 
-- outputs as out:<name>; read and grep take it as a path
+- a red check shows biome errors without a position
+
+- handoffModels in config.json and the Home Manager module
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
