@@ -69,7 +69,7 @@ export default function (pi: ExtensionAPI) {
     askedToStop = false;
     ctx.ui.notify(`handoff: ${decision.why}; the context is now the handoff (${path}).`, "warning");
     const cut = { type: "compaction" as const, summary: handoff.text, firstKeptEntryId: null, details: { path } };
-    if (at === "settle" && (!stoppedForUs || handoff.card.waitsForUser || handoff.card.status === "done")) return { entries: [cut] };
+    if (at === "settle" && (!stoppedForUs || handoff.card.waitsForUser || handoff.card.status === "done")) return { entries: [cut], continue: false };
     return { entries: [cut, { type: "custom_message" as const, customType: "handoff-resume", content: RESUME, display: true }], continue: true };
   };
 

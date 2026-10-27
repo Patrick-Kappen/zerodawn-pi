@@ -4,11 +4,14 @@ Before pi settles after a run, the checker asks a classifier model whether the a
 
 The state for the classifier holds the data of the run since the last user message:
 - the request
-- the final answer
+- the final answer, from before the first follow-up
+- the rebuttal, the last assistant text after the last follow-up
 - the last tool errors
 - the changed files
 - the tool counts
 - the number of follow-ups
+- the reasons that earlier follow-ups already sent
+- whether a handoff warning came in the run
 
 One `classify()` call answers all questions:
 
@@ -28,7 +31,7 @@ The checker sends the agent back when one of these is true:
 - `next_step_offered` > 0.7
 - `status` is `incomplete` with confidence > 0.7, or `completeness` ≤ 1
 
-The follow-up message is hidden and lists only the reasons that apply. The checker shows no notice for a follow-up. At most 3 follow-ups in a row: a tool call of the agent sets the count back to 0, so a long run with progress is checked to the end. After 3 follow-ups without a tool call, a warning shows the open points. A run that was aborted or failed is not checked. A run is also not checked while a bash job runs in the background, because the job report starts the next turn. The checker asks the bash extension with `{ running: false }` on the `pi.events` channel `bash:background-jobs`. A missing model or a failed classify call shows a warning and does not send the agent back.
+The follow-up message is hidden and lists only the reasons that apply. The checker shows no notice for a follow-up. At most 3 follow-ups per user message: a tool call does not reset the count, because the agent that works on the points still answers the checker. After the limit, a warning shows the open points. A run after a follow-up that ends on assistant text with no tool call is a rebuttal: the checker does not check again and sends nothing. When the agent did tool calls and stops again, the checker asks again but leaves out every reason that an earlier follow-up for this user message already sent. A run with a `handoff-warning` custom message (the handoff extension asks the agent to end the run) is not checked, because the handoff resumes the work after its cut. A run that was aborted or failed is not checked. A run is also not checked while a bash job runs in the background, because the job report starts the next turn. The checker asks the bash extension with `{ running: false }` on the `pi.events` channel `bash:background-jobs`. A missing model or a failed classify call shows a warning and does not send the agent back.
 
 The checker does not ask whether tests ran. The pre-commit hook and CI run the full test suite.
 
