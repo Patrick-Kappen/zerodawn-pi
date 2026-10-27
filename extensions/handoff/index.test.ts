@@ -122,8 +122,8 @@ test("turn_end warns and cuts at the next tool turn; settle cuts and keeps the f
   } as any;
   const handlers = new Map<string, any>();
   register({ registerCommand() {}, registerTool() {}, on: (name: string, fn: any) => handlers.set(name, fn) } as any);
-  const turnEnd = (tools: boolean) => handlers.get("turn_end")({ toolResults: tools ? [{}] : [] }, own);
-  const settle = () => handlers.get("agent_before_settle")({}, own);
+  const turnEnd = (tools: boolean) => handlers.get("turn_end")({ toolResults: tools ? [{}] : [], entries: [], continue: false }, own);
+  const settle = (event = { entries: [] as any[], continue: false }) => handlers.get("agent_before_settle")(event, own);
 
   tokens = 131_000;
   assert.match((await turnEnd(true)).entries[0].content, /^System: context 131k of 150k\. After your next tool call/);
@@ -151,6 +151,13 @@ test("turn_end warns and cuts at the next tool turn; settle cuts and keeps the f
   assert.match(notes.at(-1) ?? "", /^handoff: context 135k at the end of the run after the warning/);
   tokens = 152_000;
   assert.equal((await settle()).continue, false, "a run that ended from 150k waits for the user");
+  const followup = { type: "custom_message", customType: "checker-followup", content: "Finish the task.", display: false };
+  const checked = await settle({ entries: [followup], continue: true });
+  assert.deepEqual(
+    checked.entries.map((e: any) => e.customType ?? e.type),
+    ["checker-followup", "compaction"],
+  );
+  assert.equal(checked.continue, true, "a checker follow-up goes on after the cut");
 
   tokens = 175_000;
   const hard = await turnEnd(false);
@@ -195,7 +202,7 @@ test("a cut uses the card of the background update when it covers the same entri
   const handlers = new Map<string, any>();
   register({ registerCommand() {}, registerTool() {}, on: (name: string, fn: any) => handlers.set(name, fn) } as any);
   handlers.get("agent_end")({}, own);
-  const cut = await handlers.get("agent_before_settle")({}, own);
+  const cut = await handlers.get("agent_before_settle")({ entries: [], continue: false }, own);
   assert.equal(calls.length, 1);
   assert.equal(cut.entries[0].firstKeptEntryId, "a1");
 });

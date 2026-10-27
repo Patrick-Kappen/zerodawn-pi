@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, SessionBoundaryDraft } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { handoffModels } from "../../shared/config.ts";
 import { sessionDir } from "../../shared/store.ts";
@@ -37,6 +37,8 @@ export async function buildHandoff(ctx: ExtensionContext, ladder: string[]): Pro
   return { handoff, path: saveHandoff(dir, handoff) };
 }
 
+type BoundaryEvent = { entries: SessionBoundaryDraft[]; continue: boolean };
+
 export function lastAnswerId(branch: Entry[]): string | undefined {
   return branch.findLast((e) => e.type === "message" && e.message?.role === "assistant")?.id;
 }
@@ -58,14 +60,14 @@ export default function (pi: ExtensionAPI) {
   };
 
   let warned = 0;
-  const boundary = async (ctx: ExtensionContext, at: Boundary, toolCalls: boolean) => {
+  const boundary = async (ctx: ExtensionContext, at: Boundary, event: BoundaryEvent, toolCalls: boolean) => {
     const tokens = ctx.getContextUsage()?.tokens;
     if (tokens === undefined || tokens === null) return undefined;
     const jobs = jobsRunning(sessionDir(ctx));
     const decision = decide(tokens, at, warned, jobs, toolCalls);
     if (decision.action === "warn") {
       warned = decision.level;
-      return { entries: [{ type: "custom_message" as const, customType: "handoff-warning", content: warning(tokens, jobs), display: true }] };
+      return { entries: [...event.entries, { type: "custom_message" as const, customType: "handoff-warning", content: warning(tokens, jobs), display: true }] };
     }
     if (decision.action !== "cut") return undefined;
     if (running) await running;
@@ -75,14 +77,16 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.notify(`handoff: ${decision.why}; the context is now the handoff (${path}).`, "warning");
     if (at === "settle") {
       const keep = lastAnswerId(branch) ?? null;
-      return { entries: [{ type: "compaction" as const, summary: handoff.text, firstKeptEntryId: keep, details: { path } }], continue: false };
+      const cut = { type: "compaction" as const, summary: handoff.text, firstKeptEntryId: keep, details: { path } };
+      return { entries: [...event.entries, cut], continue: event.continue };
     }
     const cut = { type: "compaction" as const, summary: handoff.text, firstKeptEntryId: null, details: { path } };
-    return { entries: [cut, { type: "custom_message" as const, customType: "handoff-resume", content: RESUME, display: true }], continue: true };
+    const resume = { type: "custom_message" as const, customType: "handoff-resume", content: RESUME, display: true };
+    return { entries: [...event.entries, cut, resume], continue: true };
   };
 
-  pi.on("turn_end", (event, ctx) => boundary(ctx, "turn_end", event.toolResults.length > 0));
-  pi.on("agent_before_settle", (_event, ctx) => boundary(ctx, "settle", false));
+  pi.on("turn_end", (event, ctx) => boundary(ctx, "turn_end", event, event.toolResults.length > 0));
+  pi.on("agent_before_settle", (event, ctx) => boundary(ctx, "settle", event, false));
   pi.on("session_start", () => {
     warned = 0;
     latest = undefined;
