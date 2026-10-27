@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { createState } from "../state.ts";
 import type { Job } from "./jobproc.ts";
@@ -80,4 +83,27 @@ test("print mode: before settle waits for a running background job and sends its
   assert.deepEqual(await waiting, { continue: true });
   assert.deepEqual(sent, ["job 7: exit 0 (20s)"]);
   own.get("session_shutdown")?.({ reason: "quit" });
+});
+
+test("after a restart, a background job that was reported does not come back in the status note", () => {
+  const root = mkdtempSync(join(tmpdir(), "jobs-restart-"));
+  const jobsDir = join(root, "s", "jobs");
+  mkdirSync(jobsDir, { recursive: true });
+  const meta = (id: string, reported: boolean) =>
+    writeFileSync(
+      join(jobsDir, `${id}.json`),
+      JSON.stringify({ id, command: "x", log: join(root, `${id}.log`), status: join(root, `${id}.status`), pid: 1, start: 1, limit: 0, bg: true, reported }),
+    );
+  meta("7.1-C1", true);
+  writeFileSync(join(root, "7.1-C1.status"), "0\n");
+  meta("7.2-C1", false);
+  writeFileSync(join(root, "7.2-C1.status"), "0\n");
+  const own = new Map<string, (event: any, ctx?: any) => unknown>();
+  registerJobs({ ...pi, on: (name: string, fn: any) => own.set(name, fn) }, createState(), { refresh() {}, stop() {} });
+  const ctx = { ui: { notify() {} }, isIdle: () => true, sessionManager: { getSessionFile: () => join(root, "s.jsonl"), getBranch: () => [] } };
+  own.get("session_start")?.({}, ctx);
+  const note = own.get("before_agent_start")?.({ messageType: "user" }) as { message?: { content: string } } | undefined;
+  assert.doesNotMatch(note?.message?.content ?? "", /7\.1-C1/);
+  own.get("session_shutdown")?.({ reason: "reload" });
+  rmSync(root, { recursive: true, force: true });
 });

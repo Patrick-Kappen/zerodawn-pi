@@ -195,6 +195,7 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
         stats: () => statsOf(m.log),
       };
       jobs.set(m.id, job);
+      if (m.reported) delivered.add(m.id);
       if (!m.bg || m.reported) {
         const status = exitStatus(m.status, m.limit);
         job.result = status ?? "ended";
