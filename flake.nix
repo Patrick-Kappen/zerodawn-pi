@@ -446,8 +446,9 @@
               pkgs.deadnix
               pkgs.shellcheck
               pkgs.util-linux
-              # just compat runs released tests outside the nix checks; the files tests need nvim and its lua parser.
+              # just compat runs released tests outside the nix checks; the files tests need nvim with its lua parser, and rg.
               pkgs.neovim-unwrapped
+              pkgs.ripgrep
             ];
           };
         }
