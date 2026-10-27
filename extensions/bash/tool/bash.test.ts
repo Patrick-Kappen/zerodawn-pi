@@ -37,7 +37,15 @@ test("a short command returns its result inline", async () => {
 });
 
 test("a failing command throws its result", async () => {
-  await assert.rejects(bash({ command: "echo bad >&2; exit 2" }, "b"), /^Error: exit 2 \(\d+s\) \u00b7 1 lines.*\nlast 1 lines:\nbad$/);
+  await assert.rejects(bash({ command: "echo bad >&2; exit 2" }, "b"), /^Error: exit 2 \(\d+s\)\nbad$/);
+});
+
+test("a missing working directory fails with its path before the command starts", async () => {
+  const gone = join(dir, "gone");
+  await assert.rejects(
+    tools[0].execute("c", { command: "true" }, undefined, undefined, { ...ctx, cwd: gone }),
+    new RegExp(`working directory ${gone} does not exist`),
+  );
 });
 
 test("background: true returns the job id at once and a report follows", async () => {
