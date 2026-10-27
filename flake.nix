@@ -128,6 +128,8 @@
               pkgs.gnused
               pkgs.gnugrep
               pkgs.git
+              # The grep tool of files; pi brings rg on PATH at run time.
+              pkgs.ripgrep
               # The syntax check of edit and write; its tests use the lua parser that nvim brings.
               pkgs.neovim-unwrapped
             ];

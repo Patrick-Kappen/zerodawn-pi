@@ -1,6 +1,6 @@
 # files
 
-Registers pi's `read`, `grep`, `edit` and `write` tools again with shorter descriptions and prompt guidelines.
+Registers pi's `read`, `edit` and `write` tools again with shorter descriptions and prompt guidelines, and an own `grep` tool on ripgrep.
 
 ## Changes
 
@@ -13,12 +13,12 @@ Registers pi's `read`, `grep`, `edit` and `write` tools again with shorter descr
 - `edit`: when `oldText` is not found, the tool looks for the same lines with other indentation. One unique match: the edit is applied with the file's indentation, and the result says so. No match: the error shows the most similar place in the file, with line numbers.
 - `edit`: the result ends with the current lines around each change, so the model does not read the file again.
 - `write`: blocked on an existing file of more than 100 lines. Use `edit`, or remove the file first.
-- `grep`: lines are cut at 200 characters.
+- `grep`: runs `rg` from `PATH`, sorted by path. It searches hidden files but not `.git/`, and respects `.gitignore` unless `noIgnore`. Max 20 matches per file in a directory search, and 100 result lines in total (`limit`); a note names the cut. Options: `glob`, `type`, `ignoreCase`, `literal`, `multiline`, `context`, `filesOnly` (paths), `count` (lines per file). Lines are cut at 200 characters.
 - `codemode`: a result above 2000 lines or 16 KB is cut. The full text goes to `<session>/out/<id>.codemode.log`.
 
 ## Constants
 
-`lib/files.ts`: `WRITE_MAX_LINES`, `GREP_LINE_MAX`. `lib/read.ts`: `READ_MAX_LINES`, `READ_MAX_BYTES`. `lib/outline.ts`: `OUTLINE_MAX`. `index.ts`: `MAX_BYTES`.
+`lib/files.ts`: `WRITE_MAX_LINES`. `lib/grep.ts`: `GREP_LINE_MAX`, `GREP_LIMIT`, `GREP_PER_FILE`. `lib/read.ts`: `READ_MAX_LINES`, `READ_MAX_BYTES`. `lib/outline.ts`: `OUTLINE_MAX`. `index.ts`: `MAX_BYTES`.
 
 ## Changes
 
