@@ -62,7 +62,7 @@ export const TOOL = {
     "The result is one line when the tests pass. When they fail, it shows only the failures. The full output goes to a log file.",
     "A test command in bash runs run_tests in its place, and a check command in bash (lint, types, just check) gives a short result.",
     `A run over ${INLINE_MS / 1000} s ends your turn; a message gives the result.`,
-    "With no changed file it gives the earlier result; set rerun only for a flaky test.",
+    "With no changed file it gives the earlier result.",
   ].join(" "),
   promptSnippet: "Run the tests for the changed files; green in one line, or only the failures",
 };

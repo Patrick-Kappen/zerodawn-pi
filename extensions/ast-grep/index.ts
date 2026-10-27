@@ -20,17 +20,14 @@ interface Details {
 
 const Params = Type.Object({
   pattern: Type.String({
-    description:
-      "ast-grep pattern written as code in the target language. $NAME matches one node, $$$ matches zero or more nodes. Example: 'console.log($$$)'.",
+    description: "Code in lang. $NAME matches one node, $$$ matches zero or more nodes. Example: 'console.log($$$)'.",
   }),
   lang: Type.String({
-    description: "Language of the pattern: ts, tsx, js, jsx, nix, py, rust, go, bash, json, yaml, html, css, java, c, cpp, lua.",
+    description: "ts, tsx, js, jsx, nix, py, rust, go, bash, json, yaml, html, css, java, c, cpp, lua.",
   }),
-  path: Type.Optional(Type.String({ description: "File or directory to search. Default: current directory. Keep it narrow." })),
-  globs: Type.Optional(Type.Array(Type.String(), { description: "Include or exclude globs, for example ['src/**', '!**/*.test.ts']." })),
-  rewrite: Type.Optional(
-    Type.String({ description: "Preview a rewrite with the captured metavariables, for example 'logger.info($$$)'. Never writes files." }),
-  ),
+  path: Type.Optional(Type.String({ description: "The smallest file or directory that can hold the answer. Default: current directory." })),
+  globs: Type.Optional(Type.Array(Type.String(), { description: "Include or exclude, for example ['src/**', '!**/*.test.ts']." })),
+  rewrite: Type.Optional(Type.String({ description: "Preview a rewrite with the captured names, for example 'logger.info($$$)'. Apply it with edit." })),
 });
 
 function run(args: string[], cwd: string, signal?: AbortSignal): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -46,7 +43,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "ast_grep",
     label: "ast-grep",
-    description: `Structural code search with ast-grep. Use it to find code by structure: calls, imports, function or class shapes, argument patterns. Use grep for plain text, strings, comments, config and file names. Write the pattern as valid code in lang: $NAME matches one node, $$$ matches many. Set a narrow path. On a pattern warning or no match, simplify the pattern before you widen the path. Read-only: rewrite only previews a change; apply it with edit. Output: matches grouped per file as 'line: first line of match'. Cut at ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)}; the full output then goes to a temp file.`,
+    description: `Find code by structure (calls, imports, function or class shapes, argument patterns) with ast-grep. Use grep for plain text, comments, config and file names. On a pattern warning or no match, simplify the pattern before you widen the path. Returns 'line: first line of match' per file, cut at ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)}; the full output then goes to a temp file.`,
     promptSnippet: "Structural code search (calls, imports, function and class shapes) with ast-grep",
     parameters: Params,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

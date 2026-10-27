@@ -29,7 +29,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
   pi.registerTool({
     name: "bash",
     label: "bash",
-    description: `Run a bash command for builds, scripts and tools. Read files with read, search with grep, and look at git history with git. Returns the exit status and the output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB; longer output gives its size and an out:<name> reference for read (offset=-N for the end) and grep. A failure adds every distinct error line. A command over ${INLINE_WAIT_S} s continues as a job and ends your turn; a message reports its result. Put independent commands in one message with the same group: they report once. Chain dependent steps in one command with &&, also a wait for a condition: timeout 30 bash -c 'until CHECK; do sleep 1; done' && NEXT. A command stops after ${DEFAULT_LIMIT_S / 3600} hour; add "${NO_TIME_LIMIT}" for a longer run.`,
+    description: `Run a bash command for builds, scripts and tools. Read files with read, search with grep, and look at git history with git. Returns the exit status and the output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB; longer output gives its size and an out:<name> reference for read (offset=-N for the end) and grep. A failure adds every distinct error line. A command over ${INLINE_WAIT_S} s continues as a job and ends your turn; a message reports its result. Chain dependent steps in one command with &&, also a wait for a condition: timeout 30 bash -c 'until CHECK; do sleep 1; done' && NEXT.`,
     promptSnippet: "Run a bash command; short output back, long commands continue in the background",
     parameters: Type.Object({
       command: Type.String({ description: "Bash command to execute" }),
@@ -37,7 +37,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
         Type.Number({ description: `Timeout in seconds; the job is killed after this time. Default ${DEFAULT_LIMIT_S}, or none with "${NO_TIME_LIMIT}".` }),
       ),
       background: Type.Optional(Type.Boolean({ description: "Return the job id at once, for a server or a watcher." })),
-      group: Type.Optional(Type.String({ description: "Jobs with the same group report together in one message." })),
+      group: Type.Optional(Type.String({ description: "Give independent commands in one message the same group; they report together once." })),
     }),
 
     async execute(toolCallId, params, signal, onUpdate, ctx) {

@@ -23,6 +23,7 @@ export function registerFiles(pi: ExtensionAPI, checker: Checker = fromConfig())
   const edit = createEditToolDefinition(cwd);
   pi.registerTool({
     ...edit,
+    description: "Change an existing file with exact text replacements. Put all changes to one file in one call.",
     async execute(toolCallId: string, params: any, signal: any, onUpdate: any, ctx: ExtensionToolContext) {
       const file = absolutePath(String(params.path), ctx?.cwd ?? cwd);
       const name = String(params.path);

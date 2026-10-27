@@ -75,7 +75,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "opencode",
     label: "opencode",
-    description: `Give one task to an OpenCode agent that works in the same project and returns a short report. Use it for a clear task that does not need this session's context, so its reads stay out of your context. Give the task all the context it needs, and check its changes with git diff and the tests before you continue. It can read, edit, search and run tests. It cannot commit, push, delete files or work outside the project. A model ID that OpenCode does not know gives the list of models. Models under opencode/ are free and their list changes. Pass the returned session ID to continue the same agent.`,
+    description: `Give one task to an OpenCode agent that works in the same project and returns a short report. Use it for a clear task that does not need this session's context, so its reads stay out of your context. Check its changes with git diff and the tests before you continue. It can read, edit, search and run tests. It cannot commit, push, delete files or work outside the project. A model ID that OpenCode does not know gives the list of models. Models under opencode/ are free and their list changes. Pass the returned session ID to continue the same agent.`,
     promptSnippet: "Give one task to an OpenCode subagent on a free or OpenCode Go model",
     parameters: Type.Object({
       task: Type.String({ description: "The complete task, with all the context the agent needs." }),

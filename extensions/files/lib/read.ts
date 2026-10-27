@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createReadToolDefinition, type ExtensionAPI, type ExtensionToolContext, formatSize } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import { resolveOutRef } from "../../../shared/store.ts";
 import { absolutePath } from "../../../shared/util.ts";
 import { fileLines, linesInContext, type Seen, type SeenRange, seenRanges, segments } from "./lines.ts";
@@ -112,7 +113,12 @@ export function registerRead(pi: ExtensionAPI, cwd: string) {
   const base = createReadToolDefinition(cwd);
   pi.registerTool({
     ...base,
-    description: `Read a line range of a file (offset, limit), after grep or the outline found it. Without offset and limit, a file over ${READ_MAX_LINES} lines gives an outline with line numbers. limit is capped at ${READ_MAX_LINES} lines. offset=-N gives the last N lines, also for a log or an out:<name> output. Lines that are unchanged and still in your context are not sent again. Images (jpg, png, gif, webp, bmp) are sent as attachments.`,
+    parameters: Type.Object({
+      path: Type.String({ description: "File path, or out:<name> for a tool output." }),
+      offset: Type.Optional(Type.Number({ description: "First line, 1-based. -N gives the last N lines, for example the end of a log." })),
+      limit: Type.Optional(Type.Number({ description: `Max lines, capped at ${READ_MAX_LINES}.` })),
+    }),
+    description: `Read a line range of a file after grep or the outline found it. Without offset and limit, a file over ${READ_MAX_LINES} lines gives an outline with line numbers. Lines that are unchanged and still in your context are not sent again. Images (jpg, png, gif, webp, bmp) are sent as attachments.`,
     promptSnippet: "Read a line range of a file, or the outline of a big file",
     async execute(toolCallId: string, params: any, signal: any, onUpdate: any, ctx: ExtensionToolContext) {
       if (IMAGE.test(String(params.path))) return base.execute(toolCallId, params, signal, onUpdate, ctx);
