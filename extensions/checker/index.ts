@@ -99,19 +99,22 @@ export const QUESTIONS = {
     instructions: "A coding agent ended its turn with finalAnswer for the user's request. What is the state of the work?",
     criteria: {
       done: "The request is fully handled and the answer states the result.",
-      incomplete: "Parts of the request are not done, or the answer stops halfway.",
+      incomplete:
+        "Parts of the request are not done, or the answer stops halfway. A step left for the user, such as a merge, rebuild, restart or decision, is not an open point.",
       blocked: "The agent cannot continue without something outside its reach: access, a decision of the user, a missing service.",
       question: "The answer ends with a question to the user.",
     },
   },
   open_error: {
     type: "bool",
-    instructions: "Does finalAnswer or toolErrors show an error, bug or failing check that the agent did not fix?",
+    instructions:
+      "Does finalAnswer or toolErrors show an error, bug or failing check that the agent did not fix? A step left for the user, such as a merge, rebuild, restart or decision, is not an open point.",
     criteria: { true: "An error stays unfixed.", false: "No unfixed error." },
   },
   in_scope: {
     type: "bool",
-    instructions: "If an error or open point stays, is fixing it part of the request or of normal project rules (tests, lint, types)?",
+    instructions:
+      "If an error or open point stays, is fixing it part of the request or of normal project rules (tests, lint, types)? A step left for the user, such as a merge, rebuild, restart or decision, is not an open point.",
     criteria: { true: "Fixing it belongs to the task.", false: "It is outside the task, or nothing stays open." },
   },
   question_answerable: {
