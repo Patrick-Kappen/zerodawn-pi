@@ -2,7 +2,7 @@
 
 | Command | What |
 |---|---|
-| `/ide` | moves the paired Neovide to the current worktree; without a pair, starts Neovide on a socket, pairs this tmux client with it and starts the pair |
+| `/ide` | moves the paired Neovide to the current worktree and focuses its window through `hyprctl` (Hyprland); without a pair, starts Neovide on a socket, pairs this tmux client with it and starts the pair |
 
 On every session start, resume, new and fork, the pi session id is set as the tmux pane option `@pair-agent-session` of `$TMUX_PANE`. Nothing happens outside tmux.
 

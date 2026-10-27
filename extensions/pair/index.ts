@@ -15,6 +15,7 @@ export type Deps = {
 const quote = (text: string) => text.replaceAll("'", "''");
 
 export const followExpr = (dir: string) => `luaeval('require("zerodawn.pair").follow(_A)', '${quote(dir)}')`;
+export const parentExpr = "luaeval('vim.uv.os_getppid()')";
 export const startExpr = (dir: string) => `luaeval('(function(d) vim.cmd.cd(d); require("zerodawn.pair").start() end)(_A)', '${quote(dir)}')`;
 
 async function remote(deps: Deps, server: string, expr: string, what: string) {
@@ -22,6 +23,16 @@ async function remote(deps: Deps, server: string, expr: string, what: string) {
   const result = await deps.run(nvim, ["--clean", "--headless", "--server", server, "--remote-expr", expr]);
   if (result.code !== 0)
     throw new Error(`/ide: ${what} failed on the nvim server ${server}: ${result.stderr.trim() || `exit ${result.code}`}. Start Neovide again with /ide.`);
+  return result.stdout.trim();
+}
+
+// Neovide is the parent process of its nvim server; Hyprland focuses the window of that pid.
+async function focus(deps: Deps, server: string) {
+  const pid = await remote(deps, server, parentExpr, "reading the Neovide pid");
+  if (!/^\d+$/.test(pid)) throw new Error(`/ide: the nvim server ${server} gave no parent pid: '${pid}'.`);
+  const result = await deps.run("hyprctl", ["dispatch", "focuswindow", `pid:${pid}`]);
+  if (result.code !== 0 || result.stdout.trim() !== "ok")
+    throw new Error(`/ide: hyprctl focuswindow pid:${pid} failed: ${(result.stderr || result.stdout).trim() || `exit ${result.code}`}`);
 }
 
 // Moves the paired Neovide to dir. Without a pair: starts Neovide on a socket, pairs this tmux client with it, and starts the pair there.
@@ -30,6 +41,7 @@ export async function ide(deps: Deps, pane: string | undefined, dir: string): Pr
   const { client, server } = await pairServer(deps.run, pane);
   if (server) {
     await remote(deps, server, followExpr(dir), "following the worktree");
+    await focus(deps, server);
     return `Neovide follows ${dir}`;
   }
   const socket = `${deps.env.XDG_RUNTIME_DIR || "/tmp"}/pi-ide-${deps.pid}.sock`;

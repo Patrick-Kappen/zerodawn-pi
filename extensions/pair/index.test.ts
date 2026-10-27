@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Run } from "../../shared/pair.ts";
-import register, { type Deps, followExpr, ide, publishSession, startExpr } from "./index.ts";
+import register, { type Deps, followExpr, ide, parentExpr, publishSession, startExpr } from "./index.ts";
 
 function setup(replies: Record<string, { code?: number; stdout?: string; stderr?: string }>, socketAppears = true) {
   const calls: string[][] = [];
@@ -23,11 +23,26 @@ function setup(replies: Record<string, { code?: number; stdout?: string; stderr?
 }
 const client = { "tmux display-message -p -t %1 #{client_name}": { stdout: "c1\n" } };
 
-test("ide moves the paired Neovide to the worktree", async () => {
-  const { calls, spawned, deps } = setup({ ...client, "tmux show-option -gqv @pair-c1": { stdout: "/s.sock\n" } });
+const paired = {
+  ...client,
+  "tmux show-option -gqv @pair-c1": { stdout: "/s.sock\n" },
+  [`nvim --clean --headless --server /s.sock --remote-expr ${parentExpr}`]: { stdout: "42\n" },
+};
+
+test("ide moves the paired Neovide to the worktree and focuses its window", async () => {
+  const { calls, spawned, deps } = setup({ ...paired, "hyprctl dispatch focuswindow pid:42": { stdout: "ok\n" } });
   assert.match(await ide(deps, "%1", "/w"), /follows \/w/);
-  assert.deepEqual(calls.at(-1), ["nvim", "--clean", "--headless", "--server", "/s.sock", "--remote-expr", followExpr("/w")]);
+  assert.deepEqual(calls.slice(-3), [
+    ["nvim", "--clean", "--headless", "--server", "/s.sock", "--remote-expr", followExpr("/w")],
+    ["nvim", "--clean", "--headless", "--server", "/s.sock", "--remote-expr", parentExpr],
+    ["hyprctl", "dispatch", "focuswindow", "pid:42"],
+  ]);
   assert.equal(spawned.length, 0);
+});
+
+test("ide fails loud when Hyprland does not focus the window", async () => {
+  const { deps } = setup({ ...paired, "hyprctl dispatch focuswindow pid:42": { stdout: "No such window found" } });
+  await assert.rejects(ide(deps, "%1", "/w"), /focuswindow pid:42 failed: No such window found/);
 });
 
 test("ide starts Neovide and the pair when none exists", async () => {
