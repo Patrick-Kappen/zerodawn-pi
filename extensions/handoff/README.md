@@ -52,9 +52,11 @@ The tool `recall { question, session? }` answers one question about earlier work
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.0 — 2026-10-27
+## 0.2.0 — 2026-10-27
 
-- First release.
+- cut at the end of a run after the warning
+
+- resume after a cut, check PR status of the card
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

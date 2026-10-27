@@ -91,6 +91,34 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.18.0 — 2026-10-27
+
+### checker 0.2.1
+
+- accept a rebuttal, fixed limit per user message
+
+- a step for the user is not an open point
+
+- handoff: cut at the end of a run after the warning
+
+### handoff 0.2.0
+
+- cut at the end of a run after the warning
+
+- resume after a cut, check PR status of the card
+
+### repository
+
+- docs: record the CI and release plan
+- checker: accept a rebuttal, fixed limit per user message
+- flake: clear the default gitleaks args
+- repo: git hooks from tracked .githooks, not from the dev shell
+- handoff: cut at the end of a run after the warning
+- flake: clear the default gitleaks args
+- flake
+- handoff: gpt-6-luna first in the default card ladder
+- handoff: resume after a cut, check PR status of the card
+
 ## 0.17.0 — 2026-10-27
 
 ### shared 0.9.0
@@ -212,45 +240,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ### repository
 
 - docs: open points of 2026-10-27 in the TODO files
-
-## 0.15.0 — 2026-10-27
-
-### shared 0.8.0
-
-- outputs as out:<name>; read and grep take it as a path
-
-### bash 0.7.0
-
-- the tool description names the out:<name> reference
-
-- jobs list gives the model only running jobs
-
-- shared: outputs as out:<name>; read and grep take it as a path
-
-### checker 0.1.0
-
-- First release.
-
-### files 0.4.0
-
-- shared: outputs as out:<name>; read and grep take it as a path
-
-- the grep and rg block points to the grep tool
-
-- own grep tool on ripgrep with noIgnore, type and counts
-
-### git 0.4.0
-
-- shared: outputs as out:<name>; read and grep take it as a path
-
-### tests 0.5.0
-
-- shared: outputs as out:<name>; read and grep take it as a path
-
-### repository
-
-- checker: classifier check before the agent settles
-- files: own grep tool on ripgrep with noIgnore, type and counts
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

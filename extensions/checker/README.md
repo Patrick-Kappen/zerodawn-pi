@@ -47,17 +47,13 @@ Every check goes to the session as a custom entry `checker` and as one JSON line
 ## Changes
 
 <!-- changelog:start -->
-## 0.2.0 — 2026-10-27
+## 0.2.1 — 2026-10-27
 
-- send back an offered step, no notice per follow-up
+- accept a rebuttal, fixed limit per user message
 
-- also check runs that end on assistant text
+- a step for the user is not an open point
 
-- count follow-ups in a row; a tool call resets the count
-
-- shorter follow-up text, no reason for skipped tests
-
-- shorter follow-up text, no reason for skipped tests
+- handoff: cut at the end of a run after the warning
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

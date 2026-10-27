@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1 — 2026-10-27
+
+- accept a rebuttal, fixed limit per user message
+
+- a step for the user is not an open point
+
+- handoff: cut at the end of a run after the warning
+
 ## 0.2.0 — 2026-10-27
 
 - send back an offered step, no notice per follow-up

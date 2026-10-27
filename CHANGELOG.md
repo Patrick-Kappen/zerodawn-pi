@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.18.0 — 2026-10-27
+
+### checker 0.2.1
+
+- accept a rebuttal, fixed limit per user message
+
+- a step for the user is not an open point
+
+- handoff: cut at the end of a run after the warning
+
+### handoff 0.2.0
+
+- cut at the end of a run after the warning
+
+- resume after a cut, check PR status of the card
+
+### repository
+
+- docs: record the CI and release plan
+- checker: accept a rebuttal, fixed limit per user message
+- flake: clear the default gitleaks args
+- repo: git hooks from tracked .githooks, not from the dev shell
+- handoff: cut at the end of a run after the warning
+- flake: clear the default gitleaks args
+- flake
+- handoff: gpt-6-luna first in the default card ladder
+- handoff: resume after a cut, check PR status of the card
+
 ## 0.17.0 — 2026-10-27
 
 ### shared 0.9.0
