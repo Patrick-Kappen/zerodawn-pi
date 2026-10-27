@@ -24,26 +24,27 @@ const textOf = (content: unknown) =>
     .map((p) => p.text ?? "")
     .join(" ");
 
-export function strip(entries: Entry[]): string[] {
+export function strip(entries: Entry[], { ids = false, textMax = TEXT_MAX } = {}): string[] {
   const lines: string[] = [];
+  const push = (e: Entry, line: string) => lines.push(ids ? `[${e.id}] ${line}` : line);
   const callLine = new Map<string, number>();
   for (const e of entries) {
     if (e.type === "custom_message") {
       const text = textOf(e.content);
-      if (text) lines.push(`event ${e.customType}: ${flat(text, RESULT_MAX)}`);
+      if (text) push(e, `event ${e.customType}: ${flat(text, RESULT_MAX)}`);
       continue;
     }
     const m = e.message;
     if (e.type !== "message" || !m) continue;
     if (m.role === "user") {
       const text = textOf(m.content);
-      if (text) lines.push(`user: ${flat(text, TEXT_MAX)}`);
+      if (text) push(e, `user: ${flat(text, textMax)}`);
     } else if (m.role === "assistant") {
       const text = textOf(m.content);
-      if (text.trim()) lines.push(`assistant: ${flat(text, TEXT_MAX)}`);
+      if (text.trim()) push(e, `assistant: ${flat(text, textMax)}`);
       for (const p of parts(m.content).filter((p) => p.type === "toolCall")) {
         callLine.set(p.id ?? "", lines.length);
-        lines.push(`${p.name}: ${argSummary(p.arguments, 120)}`);
+        push(e, `${p.name}: ${argSummary(p.arguments, 120)}`);
       }
     } else if (m.role === "toolResult") {
       const at = callLine.get(m.toolCallId ?? "");

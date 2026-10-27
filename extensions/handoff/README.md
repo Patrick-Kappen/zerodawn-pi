@@ -37,9 +37,17 @@ The extension keeps the context between about 100k and 150k tokens:
 
 A notification names each cut and the handoff file. A failing card write is an error, and the context stays as it is.
 
+## recall
+
+The tool `recall { question, session? }` answers one question about earlier work, also the part before a cut, which stays in the session file. `session` is a `.jsonl` path, for example the one under "Earlier work" in a handoff; the default is this session.
+
+- The session becomes a stripped transcript with the entry id in front of each line. User and assistant text keep up to 2000 characters per message here, against 500 for the card, because recall is about details.
+- When it is larger than 200000 characters, code keeps the chunks of 40 lines with the most words of the question, in their order, with `[…]` between gaps.
+- A model of `handoffModels` answers in a few lines with entry ids, or "Not in the transcript.". The first model with auth and a non-empty answer wins.
+
 ## Constants
 
-`index.ts`: `RECENT_MAX_CHARS`. `lib/triggers.ts`: `UPDATE_CHARS`. `lib/decider.ts`: `WARN_AT`, `CUT_AT`, `HARD_AT`, `WARM_BELOW`. `lib/card.ts`: `LIMITS`, `HANDOFF_MAX_CHARS`. `lib/summarize.ts`: `TRANSCRIPT_MAX_CHARS`. `lib/transcript.ts`: `TEXT_MAX`.
+`index.ts`: `RECENT_MAX_CHARS`. `lib/triggers.ts`: `UPDATE_CHARS`. `lib/decider.ts`: `WARN_AT`, `CUT_AT`, `HARD_AT`, `WARM_BELOW`. `lib/recall.ts`: `RECALL_MAX_CHARS`, `RECALL_TEXT_MAX`. `lib/card.ts`: `LIMITS`, `HANDOFF_MAX_CHARS`. `lib/summarize.ts`: `TRANSCRIPT_MAX_CHARS`. `lib/transcript.ts`: `TEXT_MAX`.
 
 ## Changes
 
