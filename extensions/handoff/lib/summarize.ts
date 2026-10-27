@@ -8,6 +8,7 @@ const SYSTEM = [
   "You keep the handoff card of a coding session up to date. The next agent reads only this card.",
   "Call write_card once with the full new card. Keep only what the next actions need. Drop finished history, chat and tool output.",
   "Take the goal and the next actions only from what the user asked and what the agent said it does next. Never invent work.",
+  "When the user asked something new after the previous card, the goal is that newest request. A finished request of the previous card is not a next action.",
   "When the agent stopped in the middle of a step, write in inProgress what is half done and where to go on, so the next agent goes on without a question.",
   "The next actions are the most important part. Make them exact: the first action is what the next agent does first.",
   "The facts show all PRs and worktrees of the repository, also of other sessions. Name only those that this session worked on.",

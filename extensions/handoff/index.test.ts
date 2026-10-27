@@ -106,7 +106,7 @@ test("agent_end updates the card in the background after a commit; /quit and /ne
   assert.match(notes[1], /^handoff: card updated \(\/new\) by p\/m: .*handoff\/2\.json$/);
 });
 
-test("turn_end warns, settle cuts with the handoff as a compaction, the hard limit cuts and continues, warming follows jobs", async () => {
+test("turn_end warns and cuts at the next tool turn; settle cuts and keeps the final answer; the hard limit cuts; warming follows jobs", async () => {
   const dir = mkdtempSync(join(tmpdir(), "handoff-decider-"));
   const config = join(dir, "config.json");
   writeFileSync(config, JSON.stringify({ handoffModels: ["p/m"] }));
@@ -122,42 +122,38 @@ test("turn_end warns, settle cuts with the handoff as a compaction, the hard lim
   } as any;
   const handlers = new Map<string, any>();
   register({ registerCommand() {}, registerTool() {}, on: (name: string, fn: any) => handlers.set(name, fn) } as any);
-  const turnEnd = () => handlers.get("turn_end")({}, own);
+  const turnEnd = (tools: boolean) => handlers.get("turn_end")({ toolResults: tools ? [{}] : [] }, own);
   const settle = () => handlers.get("agent_before_settle")({}, own);
 
   tokens = 131_000;
-  assert.match((await turnEnd()).entries[0].content, /^System: context 131k of 150k/);
-  assert.equal(await turnEnd(), undefined);
-  tokens = 135_000;
-  const early = await settle();
-  assert.equal(early.entries[0].type, "compaction", "the warning promises a cut at the end of the run, also below 150k");
-  assert.equal(early.continue, false, "the card waits for the user, so a checker continuation is cancelled");
-  assert.match(notes.at(-1) ?? "", /^handoff: context 135k at the end of the run after the warning/);
-  tokens = 152_000;
-  assert.equal((await turnEnd()).entries[0].customType, "handoff-warning");
-  const cut = await settle();
-  assert.equal(cut.entries.length, 1);
-  assert.equal(cut.entries[0].type, "compaction");
-  assert.equal(cut.entries[0].firstKeptEntryId, null);
-  assert.match(cut.entries[0].summary, /^# Handoff\nGoal: Ship it/);
-  assert.match(notes.at(-1) ?? "", /^handoff: context 152k at the end of the run; the context is now the handoff/);
-  card.waitsForUser = false;
-  card.inProgress = ["half of README.md is done; go on at Updates"];
-  handlers.get("agent_start")();
-  assert.equal((await settle()).continue, false, "a run that ended without the warning waits for the user");
-  assert.equal((await turnEnd()).entries[0].customType, "handoff-warning");
-  const goOn = await settle();
+  assert.match((await turnEnd(true)).entries[0].content, /^System: context 131k of 150k\. After your next tool call/);
+  tokens = 133_000;
+  const work = await turnEnd(true);
   assert.deepEqual(
-    goOn.entries.map((e: any) => e.customType ?? e.type),
+    work.entries.map((e: any) => e.customType ?? e.type),
     ["compaction", "handoff-resume"],
   );
-  assert.equal(goOn.continue, true);
-  assert.match(goOn.entries[0].summary, /\nResume: go on at once with Next 1, without a question to the user\nIn progress:\n- half of README\.md/);
-  assert.match(goOn.entries[1].content, /Do not ask the user to continue/);
-  card.waitsForUser = true;
+  assert.equal(work.entries[0].firstKeptEntryId, null);
+  assert.equal(work.continue, true);
+  assert.match(notes.at(-1) ?? "", /^handoff: context 133k after the warning, in the middle of the work/);
+
+  tokens = 135_000;
+  assert.equal((await turnEnd(true)).entries[0].customType, "handoff-warning");
+  assert.equal(await turnEnd(false), undefined, "a final answer after the warning is no cut in the middle of the work");
+  const answer = await settle();
+  assert.deepEqual(
+    answer.entries.map((e: any) => e.type),
+    ["compaction"],
+  );
+  assert.equal(answer.entries[0].firstKeptEntryId, "e2", "the final answer stays visible after the cut");
+  assert.match(answer.entries[0].summary, /^# Handoff\nGoal: Ship it/);
+  assert.equal(answer.continue, false);
+  assert.match(notes.at(-1) ?? "", /^handoff: context 135k at the end of the run after the warning/);
+  tokens = 152_000;
+  assert.equal((await settle()).continue, false, "a run that ended from 150k waits for the user");
 
   tokens = 175_000;
-  const hard = await turnEnd();
+  const hard = await turnEnd(false);
   assert.deepEqual(
     hard.entries.map((e: any) => e.type),
     ["compaction", "custom_message"],
@@ -167,9 +163,41 @@ test("turn_end warns, settle cuts with the handoff as a compaction, the hard lim
   mkdirSync(join(dir, "s", "jobs"), { recursive: true });
   writeFileSync(join(dir, "s", "jobs", "1.json"), JSON.stringify({ id: "1", command: "just check", bg: true, status: join(dir, "1.status") }));
   tokens = 155_000;
+  assert.match((await turnEnd(true)).entries[0].content, /The cut waits until the running bash jobs end\.$/);
+  assert.equal(await turnEnd(true), undefined);
   assert.equal(await settle(), undefined);
   tokens = 50_000;
   assert.deepEqual(handlers.get("cache_warming_decision")({}, own), { action: "warm" });
+});
+
+test("a cut uses the card of the background update when it covers the same entries", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "handoff-reuse-"));
+  const config = join(dir, "config.json");
+  writeFileSync(config, JSON.stringify({ handoffModels: ["p/m"] }));
+  process.env.ZERODAWN_PI_CONFIG = config;
+  const entries = [
+    { id: "u1", type: "message", message: { role: "user", content: "Commit it" } },
+    {
+      id: "a1",
+      type: "message",
+      message: { role: "assistant", content: [{ type: "toolCall", id: "c1", name: "bash", arguments: { command: "git commit -qm x" } }] },
+    },
+    { id: "r1", type: "message", message: { role: "toolResult", toolCallId: "c1", content: "ok" } },
+  ];
+  const calls: unknown[] = [];
+  const own = {
+    cwd: dir,
+    sessionManager: { getSessionFile: () => join(dir, "s.jsonl"), getBranch: () => entries },
+    modelRegistry: ctx(calls).modelRegistry,
+    ui: { notify() {} },
+    getContextUsage: () => ({ tokens: 155_000 }),
+  } as any;
+  const handlers = new Map<string, any>();
+  register({ registerCommand() {}, registerTool() {}, on: (name: string, fn: any) => handlers.set(name, fn) } as any);
+  handlers.get("agent_end")({}, own);
+  const cut = await handlers.get("agent_before_settle")({}, own);
+  assert.equal(calls.length, 1);
+  assert.equal(cut.entries[0].firstKeptEntryId, "a1");
 });
 
 test("recall answers from the session file with entry ids, and names a missing session file", async () => {
