@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2 — 2026-10-27
+
+- run tests and gates in the dev environment of the project
+
+- print mode waits for background runs before it ends
+
 ## 0.4.1 — 2026-10-26
 
 - bash: a command that moves to the background ends the turn

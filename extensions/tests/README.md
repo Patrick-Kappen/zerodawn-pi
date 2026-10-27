@@ -60,11 +60,11 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 ## Changes
 
 <!-- changelog:start -->
-## 0.4.1 — 2026-10-26
+## 0.4.2 — 2026-10-27
 
-- bash: a command that moves to the background ends the turn
+- run tests and gates in the dev environment of the project
 
-- bash: end the turn when only jobs are left, not jobs wait
+- print mode waits for background runs before it ends
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

@@ -23,13 +23,9 @@ Registers pi's `read`, `grep`, `edit` and `write` tools again with shorter descr
 ## Changes
 
 <!-- changelog:start -->
-## 0.3.0 — 2026-10-27
+## 0.3.1 — 2026-10-27
 
-- edit and write run the formatter of the project
-
-- edit and write undo a change that adds a syntax error
-
-- read sends only new lines; bash blocks file views
+- read resends a known part shorter than its note
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
