@@ -193,13 +193,7 @@
         },
         {
           "always_run": false,
-          "args": [
-            "git",
-            "--pre-commit",
-            "--redact",
-            "--staged",
-            "--verbose"
-          ],
+          "args": [],
           "entry": "/nix/store/sbrzys45a04nfn0k88qab2jzd1vfwr3i-gitleaks-8.30.1/bin/gitleaks git --pre-commit --staged --redact --no-banner",
           "exclude": "^$",
           "exclude_types": [],
