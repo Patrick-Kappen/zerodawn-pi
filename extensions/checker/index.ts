@@ -172,6 +172,15 @@ export const QUESTIONS = {
       "Does finalAnswer propose or offer a next step (for example 'shall I do X?') that belongs to the request, that the agent can do itself with its tools, and that needs no choice that only the user can make?",
     criteria: { true: "The agent offers a step that it can simply do.", false: "No such step, or the step needs a choice of the user." },
   },
+  unchecked: {
+    type: "bool",
+    instructions:
+      "Does finalAnswer say that the agent did not check, test, look up or verify a point of the request, while the agent can do that now itself with its tools (read files, logs or code, run a command)? A step left for the user, such as a merge, push permission, rebuild, restart, a manual test in a GUI or on hardware, or a decision, is not such a point. Work that the answer hands to a next session is not such a point.",
+    criteria: {
+      true: "The agent left a check undone that it can do itself now.",
+      false: "Nothing is left unchecked, or only the user or a next session can do it.",
+    },
+  },
   completeness: {
     type: "score",
     instructions: "How completely does finalAnswer handle the request?",
@@ -193,6 +202,7 @@ export function decide(a: Answers): string[] {
   if (p("open_error") > 0.7 && p("in_scope") > 0.6) reasons.push("Fix the error in scope.");
   if (a.status?.choice === "question" && p("question_answerable") > 0.7) reasons.push("Find the answer yourself.");
   if (p("next_step_offered") > 0.7) reasons.push("Do the step that you offered.");
+  if (p("unchecked") > 0.7) reasons.push("Do the check that you left open.");
   if ((a.status?.choice === "incomplete" && a.status.confidence > 0.7) || (a.completeness?.type === "score" && a.completeness.score <= 1))
     reasons.push("Finish the task.");
   return reasons;
