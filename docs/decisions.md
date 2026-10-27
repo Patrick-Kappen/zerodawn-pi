@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 26. A cheap model writes a hard handoff card; code adds the facts (2026-10-27)
+
+Long sessions cost most: every request reads 100k to 250k tokens, and free-text summaries lose details or keep old ones. A handoff is a card with fixed fields that a cheap model writes through one tool, from a stripped transcript (text and one line per tool call, no tool output). Facts that code can read (branch, dirty files, worktrees, PRs, jobs) come from code, not from the model. Done work drops out of the card. The handoff is a file, so a new session or another agent can take it. Tests in the sandbox showed: `ctx.compact` refuses small sessions and keeps a tail, but a `compaction` draft with `firstKeptEntryId: null` at `agent_before_settle` removes the old context completely; pi waits for an async `session_shutdown` handler, so `/quit` can update the card. The automatic cut between 130k and 150k comes in a later step.
+
 ## 25. A classifier decides at settle time whether the agent is done (2026-10-27)
 
 Agents report an error in scope, ask a question they can answer themselves, or stop halfway, and call that done. The `checker` asks a classifier model on `agent_before_settle`, so it sees the whole run once and can request one more turn through pi, without a user message. The classifier only answers typed questions with probabilities. Fixed thresholds in code make the decision, so a change of behaviour is a code change with a test. A limit of 3 follow-ups per user message stops a loop between agent and classifier. Every check goes to a JSONL log, to tune the thresholds on real runs. Cost: one classify call per finished run.

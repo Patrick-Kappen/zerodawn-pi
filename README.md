@@ -18,6 +18,7 @@ Extensions for [pi](https://pi.dev), the terminal coding agent, packaged as one 
 | [watchdog](extensions/watchdog/README.md) | Detects a run that hangs, asks a classifier model to confirm, aborts, goes back to the last good point and continues. `/unstick` does it by hand. |
 | [checker](extensions/checker/README.md) | Before the agent finishes, asks a classifier whether the work is done. It sends the agent back with a hidden message when it left an error in scope, asked a question it can answer itself, skipped checks or stopped halfway. At most 3 times per message. |
 | [gateway](extensions/gateway/README.md) | Sends the pi session id to agentgateway so its logs group requests by session. |
+| [handoff](extensions/handoff/README.md) | `/handoff`: a cheap model writes a handoff card from a stripped transcript; the code adds git, PR and job facts; a new session starts with it. |
 
 Every extension has its own README with tools, keys, commands and constants, an `AGENTS.md` for coding agents, a `CHANGELOG.md` and tests. [shared/](shared/README.md) holds the few helpers they share.
 
@@ -61,7 +62,7 @@ Clone the repository and add it to `~/.pi/agent/settings.json`:
 { "packages": ["/path/to/zerodawn-pi"] }
 ```
 
-Some extensions read `config.json` next to `package.json`; copy `config.example.json`. All keys are optional: `astGrep` (path of the binary; default from `PATH`), `nvim` (path of the binary for the syntax check of edit and write; default from `PATH`), `treesitterParsers` (directory with a `parser/` directory of tree-sitter grammars for that check), `nixosRepo` (checkout of your NixOS flake), `subagentExtensions` (absolute paths of extensions that every subagent loads, for example a provider login), `subagentModels` (the model ladder of the subagents, `provider/id[:thinking]`, in order; the subagent tool needs it, Home Manager sets a default). `ZERODAWN_PI_CONFIG` points to another `config.json`; `just dev` uses it for the config of the installed package. A key with a wrong type fails at load with the file path.
+Some extensions read `config.json` next to `package.json`; copy `config.example.json`. All keys are optional: `astGrep` (path of the binary; default from `PATH`), `nvim` (path of the binary for the syntax check of edit and write; default from `PATH`), `treesitterParsers` (directory with a `parser/` directory of tree-sitter grammars for that check), `nixosRepo` (checkout of your NixOS flake), `subagentExtensions` (absolute paths of extensions that every subagent loads, for example a provider login), `subagentModels` (the model ladder of the subagents, `provider/id[:thinking]`, in order; the subagent tool needs it, Home Manager sets a default), `handoffModels` (the models that write the handoff card, same format; `/handoff` needs it, Home Manager sets a default). `ZERODAWN_PI_CONFIG` points to another `config.json`; `just dev` uses it for the config of the installed package. A key with a wrong type fails at load with the file path.
 
 ## Docs
 
