@@ -12,7 +12,7 @@ Keep extension behaviour unchanged during this work. This plan does not authoriz
 
 [The baseline](ci-baseline.md) records measurements, rollback points, merge settings, and missing behavior tests.
 The first delivery adds contract tests and fixes mutation during an empty release request.
-The NixOS output warnings still block completion of step 1 across all repositories.
+The owner accepts the known NixOS output warnings for continued pi work, not as successful checks.
 Later stages remain open; this delivery does not authorize refactoring or publication.
 
 ## 1. Record the baseline

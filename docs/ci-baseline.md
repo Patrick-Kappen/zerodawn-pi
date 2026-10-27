@@ -36,8 +36,10 @@ Unloaded entry points and shell scripts do not enter these percentages.
 High coverage does not prove that extensions work together or that a change keeps compatibility.
 
 The NixOS command exits with status zero, but Nix 2.34.9 reports unknown outputs `modules` and `deploy`.
-The warning policy makes this result a failure.
+The warning policy makes this result a failure, not a successful check.
 These outputs serve supported consumers and must remain.
+The owner accepts these known warnings for continued pi test and CI work.
+They do not block this pi delivery. The NixOS baseline still contains warnings.
 Resolve support for these outputs in the Nix checker before claiming a baseline without warnings.
 Do not remove outputs or filter the warnings to report a passing baseline.
 
@@ -85,7 +87,7 @@ It does not separate all existing unit and integration tests yet.
 The existing commit hook still runs the full suite, and CI still repeats some work.
 Do not mark the later plan stages complete from this baseline PR.
 
-The pi baseline passes. The NixOS warning blocker prevents completion of the baseline across all three repositories.
+The pi baseline passes. The owner accepts the known NixOS warnings for continued work, not as successful checks.
 Refactoring and release automation remain outside this delivery.
 
 ## Local evidence
