@@ -2,7 +2,7 @@ import { appendFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { callFileId, callOutFile, shorten } from "../../../shared/store.ts";
-import { CHANGED_RECIPE, changedFiles, execute, inGit, plan, type Run, reader, TIMEOUT_MS } from "../../../shared/testrun.ts";
+import { CHANGED_RECIPE, changedFiles, execute, inGit, inProjectEnv, plan, type Run, reader, TIMEOUT_MS } from "../../../shared/testrun.ts";
 import { absolutePath } from "../../../shared/util.ts";
 import { loadRecipes } from "./recipes.ts";
 import { counts, type Diagnosis, diagnose, failures, warningLines } from "./report.ts";
@@ -144,7 +144,7 @@ export class RunTests {
       if (earlier && !command.includes(RERUN))
         return { text: `${CHECK_HEAD}\n${again(earlier, `add "${RERUN}" to run it again`).content[0].text}`, isError: earlier.isError, background: false };
       const r = await this.inline(key, `check ${callFileId(ctx, toolCallId)}`, ctx.signal, async (signal) => {
-        const run = await execute(["bash", "-c", command], ctx.cwd, signal);
+        const run = await execute(inProjectEnv(["bash", "-c", command], ctx.cwd), ctx.cwd, signal);
         const log = callOutFile(ctx, toolCallId, "check");
         writeFileSync(log, run.output);
         const { text: t, ok } = report(run, "check", command, [], log);
@@ -210,7 +210,7 @@ export class RunTests {
       return result;
     }
     return this.inline(key, `run_tests ${callFileId(ctx, toolCallId)}`, signal, async (stop) => {
-      const run = await execute(p.run, cwd, stop);
+      const run = await execute(inProjectEnv(p.run, cwd), cwd, stop);
       const log = callOutFile(ctx, toolCallId, "tests");
       writeFileSync(log, run.output);
       const { text: t, ok } = report(run, "tests", p.run.join(" "), p.uncovered, log);
