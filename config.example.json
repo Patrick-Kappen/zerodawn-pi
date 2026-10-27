@@ -4,5 +4,6 @@
   "nvim": "/path/to/nvim",
   "treesitterParsers": "/path/to/dir-with-parser-subdir",
   "subagentExtensions": ["/home/me/pi-extensions/anthropic-oauth/index.ts"],
-  "subagentModels": ["provider/model-id:medium", "other/model-id"]
+  "subagentModels": ["provider/model-id:medium", "other/model-id"],
+  "handoffModels": ["local/model-id", "provider/model-id:low"]
 }

@@ -52,6 +52,16 @@ export function config(): Config {
   return loaded;
 }
 
+export function handoffModels(file: string = configFile()): string[] {
+  const list = (readConfig(file) as { handoffModels?: unknown }).handoffModels;
+  if (!Array.isArray(list) || list.length === 0 || !list.every(isString)) {
+    throw new Error(
+      `zerodawn-pi: ${file} needs "handoffModels", a non-empty list of "provider/id[:thinking]" strings. Set programs.zerodawn-pi.handoffModels or see config.example.json.`,
+    );
+  }
+  return list;
+}
+
 export function subagentModels(file: string = configFile()): string[] {
   const list = (readConfig(file) as { subagentModels?: unknown }).subagentModels;
   if (!Array.isArray(list) || list.length === 0 || !list.every(isString)) {

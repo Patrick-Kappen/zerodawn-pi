@@ -30,6 +30,8 @@ The follow-up message lists only the reasons that apply. At most 3 follow-ups in
 
 The checker does not ask whether tests ran. The pre-commit hook and CI run the full test suite.
 
+The checker does not ask whether tests ran. The pre-commit hook and CI run the full test suite.
+
 Every check goes to the session as a custom entry `checker` and as one JSON line to the log file.
 
 ## Environment

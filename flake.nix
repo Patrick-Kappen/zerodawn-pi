@@ -195,6 +195,7 @@
             inherit (cfg) nixosRepo;
             subagentExtensions = if cfg.subagentExtensions == [ ] then null else cfg.subagentExtensions;
             subagentModels = if cfg.subagentModels == [ ] then null else cfg.subagentModels;
+            handoffModels = if cfg.handoffModels == [ ] then null else cfg.handoffModels;
           };
           # The extensions read config.json next to package.json, so it is copied into the package.
           configured = pkgs.runCommand "${cfg.package.name}-configured" { } ''
@@ -270,6 +271,16 @@
               type = lib.types.listOf lib.types.str;
               default = [ ];
               description = "Absolute paths of extensions that every subagent loads, for example a provider login extension.";
+            };
+            handoffModels = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [
+                "local/qwen3.6-35b-a3b"
+                "ibm-next/qwen38-flash-next"
+                "opencode/deepseek-v4.1-flash-free"
+                "openai-codex/gpt-6-luna:low"
+              ];
+              description = "Models that write the handoff card, as provider/id[:thinking], in order. The first one with auth and a valid card is used.";
             };
             subagentModels = lib.mkOption {
               type = lib.types.listOf lib.types.str;

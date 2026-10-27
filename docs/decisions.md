@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 27. A cheap model writes a hard handoff card; code adds the facts (2026-10-27)
+
+Long sessions cost most: every request reads 100k to 250k tokens, and free-text summaries lose details or keep old ones. A handoff is a card with fixed fields that a cheap model writes through one tool, from a stripped transcript (text and one line per tool call, no tool output). Facts that code can read (branch, dirty files, worktrees, PRs, jobs) come from code, not from the model. Done work drops out of the card. The handoff is a file, so a new session or another agent can take it. Tests in the sandbox showed: `ctx.compact` refuses small sessions and keeps a tail, but a `compaction` draft with `firstKeptEntryId: null` at `agent_before_settle` removes the old context completely; pi waits for an async `session_shutdown` handler, so `/quit` can update the card. The automatic cut between 130k and 150k comes in a later step.
+
 ## 26. The full test suite runs before each commit (2026-10-27)
 
 The pre-commit hook `tests` runs `bun test` over the whole repository, with the same tools on PATH as the nix test checks. Reason: a failing test shows at the commit, not after the push in CI. The checker extension therefore does not ask whether tests ran. Cost: every commit waits for the suite, and the nix `pre-commit` check runs the suite again next to the `tests-<name>` checks.
