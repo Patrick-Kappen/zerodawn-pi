@@ -1,5 +1,5 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { Recipes } from "./recipes.ts";
 import { diagnose, failures, warningLines } from "./report.ts";
@@ -93,6 +93,13 @@ export function plan(cwd: string, recipes: Recipes | undefined, scope: "changed"
   if (changed.some((f) => JS_CONFIG.test(f))) return { run: ["bun", "test", "--only-failures"], tests: [], uncovered };
   if (!tests.length) return { uncoveredOnly: uncovered };
   return { run: ["bun", "test", "--only-failures", ...tests.map((t) => `./${t}`)], tests, uncovered };
+}
+
+/** Runs argv in the dev environment of the project: through direnv when the git root of cwd has an .envrc. pi keeps the environment of the shell it started in, so another project needs its own. */
+export function inProjectEnv(argv: string[], cwd: string): string[] {
+  const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8" });
+  const root = r.status === 0 ? r.stdout.trim() : cwd;
+  return existsSync(join(root, ".envrc")) ? ["direnv", "exec", root, ...argv] : argv;
 }
 
 export type Run = { output: string; code: number | null; timedOut: boolean; ms: number };

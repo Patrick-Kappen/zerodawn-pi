@@ -9,6 +9,8 @@ Gives the agent the tool `run_tests`. It runs the tests for the files that chang
 - `rerun: true`: run again when no file changed. Without it, the tool gives the earlier result.
 - `path`: the project directory, such as a git worktree. Default: the current directory.
 
+The run gets the dev environment of the project: when the git root of the directory has an `.envrc`, the command runs through `direnv exec <git root>`. A blocked `.envrc` fails the run with the direnv message: run `direnv allow <git root>`. The check commands in bash run the same way.
+
 How it picks the tests for `changed`:
 
 1. The project has a recipe `test-changed *files`: `just test-changed <files>` (Makefile: `make test-changed FILES="<files>"`). The recipe gets every changed path, also deleted files and files that are not code. It runs the tests for them, fails for a changed code file without a test, and fails on a warning. This works for every language and test tool.
@@ -49,7 +51,7 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 
 ## Needs
 
-`git`. `bun` for a `package.json` project without the recipe. `just` in `PATH` for projects with a justfile. The extension fails loud when one is missing.
+`git`. `direnv` for a project with an `.envrc`. `bun` for a `package.json` project without the recipe. `just` in `PATH` for projects with a justfile. The extension fails loud when one is missing.
 
 ## Constants
 
