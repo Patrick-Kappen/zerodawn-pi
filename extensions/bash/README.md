@@ -51,13 +51,13 @@ Jobs survive a pi restart: `session_start` reads the job files, reports jobs tha
 ## Changes
 
 <!-- changelog:start -->
-## 0.6.1 — 2026-10-27
+## 0.7.0 — 2026-10-27
 
-- inline output also has a 4 KB limit
+- the tool description names the out:<name> reference
 
-- print mode waits for background jobs before it ends
+- jobs list gives the model only running jobs
 
-- short failure output inline; fail on a missing cwd
+- shared: outputs as out:<name>; read and grep take it as a path
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

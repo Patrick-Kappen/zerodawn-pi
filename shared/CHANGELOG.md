@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0 — 2026-10-27
+
+- outputs as out:<name>; read and grep take it as a path
+
 ## 0.7.1 — 2026-10-27
 
 - tests: run tests and gates in the dev environment of the project

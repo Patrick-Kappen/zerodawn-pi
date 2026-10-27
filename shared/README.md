@@ -27,9 +27,9 @@ Tests: `util.test.ts`, `store.test.ts`, `config.test.ts`, `testrun.test.ts`. The
 ## Changes
 
 <!-- changelog:start -->
-## 0.7.1 — 2026-10-27
+## 0.8.0 — 2026-10-27
 
-- tests: run tests and gates in the dev environment of the project
+- outputs as out:<name>; read and grep take it as a path
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

@@ -1,6 +1,6 @@
 {
   "name": "shared",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "helpers shared by the extensions: paths, output store, config",
   "type": "module"
 }

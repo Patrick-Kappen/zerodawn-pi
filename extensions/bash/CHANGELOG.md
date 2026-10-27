@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0 — 2026-10-27
+
+- the tool description names the out:<name> reference
+
+- jobs list gives the model only running jobs
+
+- shared: outputs as out:<name>; read and grep take it as a path
+
 ## 0.6.1 — 2026-10-27
 
 - inline output also has a 4 KB limit

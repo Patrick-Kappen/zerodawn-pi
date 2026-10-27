@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 — 2026-10-27
+
+- shared: outputs as out:<name>; read and grep take it as a path
+
+- the grep and rg block points to the grep tool
+
+- own grep tool on ripgrep with noIgnore, type and counts
+
 ## 0.3.1 — 2026-10-27
 
 - read resends a known part shorter than its note

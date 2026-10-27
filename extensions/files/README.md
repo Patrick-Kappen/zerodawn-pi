@@ -25,9 +25,13 @@ Registers pi's `read`, `edit` and `write` tools again with shorter descriptions 
 ## Changes
 
 <!-- changelog:start -->
-## 0.3.1 — 2026-10-27
+## 0.4.0 — 2026-10-27
 
-- read resends a known part shorter than its note
+- shared: outputs as out:<name>; read and grep take it as a path
+
+- the grep and rg block points to the grep tool
+
+- own grep tool on ripgrep with noIgnore, type and counts
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
