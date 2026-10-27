@@ -325,10 +325,11 @@ export function createAgents(options: AgentsOptions) {
     record.events.push(formatEvent(value));
     if (record.events.length > MAX_EVENTS) record.events.shift();
     if (value.kind === "message") {
-      record.usage = { tokens: record.usage.tokens + value.usage.tokens, cost: record.usage.cost + value.usage.cost };
+      // The tokens of a message hold the whole context of its request, so a sum counts each earlier message again.
+      record.usage = { tokens: value.usage.tokens, cost: record.usage.cost + value.usage.cost };
       if (record.usage.tokens >= MAX_TOKENS && record.entry.status === "running" && !record.handingOff) {
         record.handingOff = true;
-        record.events.push(line(`token limit ${MAX_TOKENS} reached (${record.usage.tokens} tokens): handoff`));
+        record.events.push(line(`token limit ${MAX_TOKENS} reached (context ${record.usage.tokens} tokens): handoff`));
         options.sendToSub(id, { type: "handoff" });
       }
     } else if (value.kind === "error") {
