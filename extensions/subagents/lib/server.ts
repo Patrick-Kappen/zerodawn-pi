@@ -10,7 +10,7 @@ import { formatServerMessage, parseClientLine, type ServerMessage } from "./prot
 import { writeRegister } from "./register.ts";
 import type { Tmux as FullTmux } from "./tmux.ts";
 
-export type Tmux = Pick<FullTmux, "setOption" | "killSession" | "openWindow" | "listWindows">;
+export type Tmux = Pick<FullTmux, "setOption" | "killSession" | "openWindow" | "listWindows" | "killWindow">;
 
 export interface SupervisorOptions {
   session: string;
@@ -24,6 +24,7 @@ export interface SupervisorOptions {
   runtimeDir: string | undefined;
   tmux: Tmux;
   timers: Timers;
+  now?: () => number;
   graceMs?: number;
   helloTimeoutMs?: number;
   pollMs?: number;
@@ -125,6 +126,7 @@ export async function startSupervisor(options: SupervisorOptions) {
     extensions: options.extensions,
     tmux: options.tmux,
     timers: options.timers,
+    now: options.now ?? Date.now,
     newId: options.newId,
     sendToSub: (id, message) => {
       const socket = subs.get(id);
@@ -173,7 +175,7 @@ export async function startSupervisor(options: SupervisorOptions) {
         return;
       case "start":
         if (connection.role !== "main") throw new Error('supervisor: only a connection with hello role "main" can start a subagent.');
-        agents.start(message.task, message.args, message.checks, { repo: message.repo, sha: message.sha }).then(
+        agents.start(message.task, message.args, message.checks, message.models, { repo: message.repo, sha: message.sha }).then(
           async (id) => {
             await writing;
             send(socket, { type: "started", id });
@@ -237,7 +239,8 @@ export async function startSupervisor(options: SupervisorOptions) {
     socket.on("error", () => socket.destroy());
     socket.on("close", () => {
       clients.delete(socket);
-      if (connection.role === "sub" && connection.id !== undefined) subs.delete(connection.id);
+      // A restarted agent says hello again with the same id; the closed socket of the old one must not remove it.
+      if (connection.role === "sub" && connection.id !== undefined && subs.get(connection.id) === socket) subs.delete(connection.id);
       if (connection.role === "main") {
         mains.delete(socket);
         if (stopping === undefined) lifecycle.mainClosed();

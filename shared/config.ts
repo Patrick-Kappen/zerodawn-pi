@@ -51,3 +51,13 @@ export function config(): Config {
   loaded ??= readConfig(configFile());
   return loaded;
 }
+
+export function subagentModels(file: string = configFile()): string[] {
+  const list = (readConfig(file) as { subagentModels?: unknown }).subagentModels;
+  if (!Array.isArray(list) || list.length === 0 || !list.every(isString)) {
+    throw new Error(
+      `zerodawn-pi: ${file} needs "subagentModels", a non-empty list of "provider/id[:thinking]" strings. Set programs.zerodawn-pi.subagentModels or see config.example.json.`,
+    );
+  }
+  return list;
+}

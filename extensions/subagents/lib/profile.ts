@@ -1,6 +1,5 @@
 export interface Profile {
   description: string;
-  models: string[];
   tools: string[];
   extensions: string[];
   skills: string[];
@@ -8,7 +7,7 @@ export interface Profile {
   prompt: string;
 }
 
-const LIST_KEYS = ["models", "tools", "extensions", "skills", "checks"] as const;
+const LIST_KEYS = ["tools", "extensions", "skills", "checks"] as const;
 const KEYS: string[] = ["description", ...LIST_KEYS];
 const KEY_LINE = /^([A-Za-z]+):(.*)$/;
 const ITEM_LINE = /^\s+-(?:\s+(.*))?$/;
@@ -39,6 +38,7 @@ export function parseProfile(text: string, file: string): Profile {
     }
     const key = match[1] as string;
     const rest = (match[2] as string).trim();
+    if (key === "models") fail(number, 'key "models" is not allowed. Remove it: the model ladder is "subagentModels" in config.json.');
     if (!KEYS.includes(key)) fail(number, `unknown key "${key}". Use: ${KEYS.join(", ")}.`);
     if (found.has(key)) fail(number, `key "${key}" is given twice.`);
     if (key === "description") {
@@ -64,8 +64,6 @@ export function parseProfile(text: string, file: string): Profile {
 
   const description = found.get("description");
   if (typeof description !== "string") fail(close + 1, 'key "description" is missing.');
-  const models = (found.get("models") ?? []) as string[];
-  if (models.length === 0) fail(close + 1, 'key "models" is missing or empty.');
   const prompt = lines
     .slice(close + 1)
     .join("\n")
@@ -74,7 +72,6 @@ export function parseProfile(text: string, file: string): Profile {
   const list = (key: string): string[] => (found.get(key) ?? []) as string[];
   return {
     description: description as string,
-    models,
     tools: list("tools"),
     extensions: list("extensions"),
     skills: list("skills"),

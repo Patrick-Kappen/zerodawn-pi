@@ -97,7 +97,11 @@ export function createTmux(exec: Exec, socket?: string) {
     await check(["kill-session", "-t", `=${session}`]);
   }
 
-  return { hasSession, openWindow, listWindows, setOption, unsetOption, getOption, killSession };
+  async function killWindow(window: string): Promise<void> {
+    await check(["kill-window", "-t", window]);
+  }
+
+  return { hasSession, openWindow, listWindows, setOption, unsetOption, getOption, killSession, killWindow };
 }
 
 export type Tmux = ReturnType<typeof createTmux>;

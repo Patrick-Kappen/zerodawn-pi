@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import type { ExecOptions, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { config } from "../../shared/config.ts";
+import { config, subagentModels } from "../../shared/config.ts";
 import { loadRecipes } from "../../shared/recipes.ts";
 import { changedFiles, execute, plan, uncoveredOf } from "../../shared/testrun.ts";
 import { type Client, connectMain } from "./lib/client.ts";
@@ -11,7 +11,9 @@ import { runGate } from "./lib/gate.ts";
 import { commitAll, git, resolveBase } from "./lib/git.ts";
 import type { Timers } from "./lib/lifecycle.ts";
 import { cleanupAt, cleanupMerged, mergeBranches } from "./lib/merge.ts";
+import { checkLadder, createAvailability, probeModel } from "./lib/models.ts";
 import { answers } from "./lib/probe.ts";
+import type { FailedModel } from "./lib/protocol.ts";
 import { nodeFiles, resolveProfile } from "./lib/resolve.ts";
 import { shapeResult } from "./lib/result.ts";
 import { askSchema, blockerSchema, continueSchema, doneSchema, handoffSchema } from "./lib/schemas.ts";
@@ -130,6 +132,17 @@ export default function (pi: ExtensionAPI): void {
   const tmux = createTmux((command, args, options) => pi.exec(command, args, options));
   const execGit = (command: string, args: string[], options?: ExecOptions) => pi.exec(command, args, options);
   let client: Promise<Client> | undefined;
+  const availability = createAvailability(() => Date.now());
+
+  // The ladder entries from the first available model on; the supervisor restarts on the next one after a provider error.
+  async function ladder(ctx: ExtensionContext): Promise<{ models: string[]; skipped: FailedModel[] }> {
+    const entries = subagentModels();
+    const models = checkLadder(ctx.modelRegistry, entries);
+    const { entry, failed } = await availability.pick(entries, (name) =>
+      probeModel(ctx.modelRegistry, models.get(name) as NonNullable<ReturnType<typeof ctx.modelRegistry.find>>),
+    );
+    return { models: entries.slice(entries.indexOf(entry)), skipped: failed.map((item) => ({ model: item.entry, reason: item.reason })) };
+  }
 
   async function connection(sessionId: string): Promise<Client> {
     const current = client === undefined ? undefined : await client.catch(() => undefined);
@@ -219,7 +232,7 @@ export default function (pi: ExtensionAPI): void {
             discard: (id) => connected.discard(id),
             startMerge: async (task, source) => {
               const { args, profile } = await resolveProfile(home, "merge", nodeFiles);
-              return connected.begin(task, args, profile.checks, source);
+              return connected.begin(task, args, profile.checks, (await ladder(ctx)).models, source);
             },
           },
           params.ids,
@@ -244,9 +257,12 @@ export default function (pi: ExtensionAPI): void {
       }
       if (params.action === "start") {
         const { args, profile } = await resolveProfile(homedir(), params.profile as string, nodeFiles);
+        const { models, skipped } = await ladder(ctx);
         const source = await resolveBase((command, commandArgs, options) => pi.exec(command, commandArgs, options), ctx.cwd, params.base);
         const connected = await connection(ctx.sessionManager.getSessionId());
-        const shaped = shapeResult(await connected.start(params.task as string, args, profile.checks, source, signal));
+        const result = await connected.start(params.task as string, args, profile.checks, models, source, signal);
+        const failedModels = [...skipped, ...(result.failedModels ?? [])];
+        const shaped = shapeResult(failedModels.length === 0 ? result : { ...result, failedModels });
         if (source.dirty) shaped.content[0].text += `\nuncommitted changes in ${ctx.cwd} are not in the subagent`;
         return shaped;
       }

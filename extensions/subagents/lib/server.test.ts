@@ -18,6 +18,7 @@ const git = {
   state: async () => ({ dirty: false, moved: false }),
   commitAll: async () => {},
   removeWorktree: async () => {},
+  changed: async () => [],
 };
 const extra = { pi: "pi", home: "/h", git, extensions: [fileURLToPath(import.meta.url)], newId: () => ID };
 
@@ -31,6 +32,7 @@ function setup() {
     listWindows: async () => [{ id: "@7", name: "sub-abcd" }],
     setOption: async (...args: string[]) => void calls.push(["set", ...args]),
     killSession: async (...args: string[]) => void calls.push(["kill", ...args]),
+    killWindow: async () => {},
   };
   return { calls, tmux };
 }
@@ -136,7 +138,7 @@ test("supervisor: start, sub hello, task, events, one result to main, immediate 
     const main = await connect(supervisor.path);
     const mainNext = lines(main);
     main.write(
-      '{"type":"hello","role":"main"}\n{"type":"start","task":"do it","args":["--no-tools"],"checks":[],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}\n',
+      '{"type":"hello","role":"main"}\n{"type":"start","task":"do it","args":["--no-tools"],"checks":[],"models":["m/x"],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}\n',
     );
     assert.deepEqual(await mainNext(), { type: "started", id: ID });
     assert.equal(calls.find((call) => call[0] === "open")?.[1]?.includes('"PI_SUBAGENT_ID"'), true);
@@ -161,6 +163,7 @@ test("supervisor: start, sub hello, task, events, one result to main, immediate 
       text: "s\na.ts:1 x\ntests: none",
       usage: { tokens: 3, cost: 0.1 },
       events: ["tool bash {}", "message m"],
+      model: "m/x",
       handoff: {
         subject: "scope: what",
         summary: "s",
@@ -193,7 +196,7 @@ test("supervisor: main gone while an agent runs; the supervisor ends when the ag
     const main = await connect(supervisor.path);
     const mainNext = lines(main);
     main.write(
-      '{"type":"hello","role":"main"}\n{"type":"start","task":"t","args":[],"checks":[],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}\n',
+      '{"type":"hello","role":"main"}\n{"type":"start","task":"t","args":[],"checks":[],"models":["m/x"],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}\n',
     );
     await mainNext();
     const sub = await connect(supervisor.path);
@@ -225,7 +228,7 @@ test("supervisor: wrong roles and unknown ids get an error message", async () =>
     const next = lines(client);
     for (const [line, pattern] of [
       [
-        '{"type":"start","task":"t","args":[],"checks":[],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',
+        '{"type":"start","task":"t","args":[],"checks":[],"models":["m/x"],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',
         /only a connection with hello role "main"/,
       ],
       ['{"type":"event","event":{"kind":"settled","text":""}}', /only a connection with hello role "sub"/],

@@ -2,7 +2,8 @@ import { basename, join } from "node:path";
 import { type Blocker, type GateInfo, type Handoff, handoffText } from "./format.ts";
 import type { Git, Source } from "./git.ts";
 import type { Timers } from "./lifecycle.ts";
-import type { AgentResult, AgentStatus, ServerMessage, SubEvent, Usage } from "./protocol.ts";
+import { createMarks } from "./models.ts";
+import type { AgentResult, AgentStatus, FailedModel, ServerMessage, SubEvent, Usage } from "./protocol.ts";
 import type { AgentEntry } from "./register.ts";
 import type { Tmux } from "./tmux.ts";
 
@@ -20,8 +21,9 @@ export interface AgentsOptions {
   home: string;
   git: Git;
   extensions: string[];
-  tmux: Pick<Tmux, "openWindow" | "listWindows">;
+  tmux: Pick<Tmux, "openWindow" | "listWindows" | "killWindow">;
   timers: Timers;
+  now: () => number;
   newId: () => string;
   sendToSub: (id: string, message: ServerMessage) => void;
   sendToMains: (message: ServerMessage) => void;
@@ -35,6 +37,14 @@ interface AgentRecord {
   entry: AgentEntry;
   repo: string;
   task: string;
+  baseTask: string;
+  args: string[];
+  checks: string[];
+  models: string[];
+  current: number;
+  failed: FailedModel[];
+  sessionId: string;
+  restarting?: boolean;
   events: string[];
   text: string;
   usage: Usage;
@@ -67,6 +77,8 @@ export function formatEvent(event: SubEvent): string {
       return line(`gate ${event.ok ? "green" : "red"}${event.text ? `: ${event.text}` : ""}`);
     case "error":
       return line(`error ${event.text}`);
+    case "provider_error":
+      return line(`provider error ${event.text}`);
   }
 }
 
@@ -78,6 +90,7 @@ export function createAgents(options: AgentsOptions) {
   let pollTimer: unknown;
   let polling = false;
   let disposed = false;
+  const marks = createMarks(options.now);
 
   // "question" and "blocked" are not active: the agent waits for the main agent.
   function active(record: AgentRecord): boolean {
@@ -95,6 +108,8 @@ export function createAgents(options: AgentsOptions) {
       text: record.text,
       usage: record.usage,
       events: record.events,
+      model: record.models[record.current] as string,
+      ...(record.failed.length === 0 ? {} : { failedModels: record.failed }),
       ...record.extra,
       ...(record.entry.worktree === undefined ? {} : { worktree: record.entry.worktree, branch: record.entry.branch }),
     };
@@ -162,29 +177,14 @@ export function createAgents(options: AgentsOptions) {
   async function poll(): Promise<void> {
     const windows = new Set((await options.tmux.listWindows(options.session)).map((window) => window.id));
     for (const record of records.values()) {
-      if (active(record) && !windows.has(record.entry.window)) {
+      if (active(record) && !record.restarting && !windows.has(record.entry.window)) {
         fail(record, `subagent ${record.entry.id} ended without a result: its window ${record.entry.window} is gone. Run: tmux attach -t ${options.session}`);
       }
     }
   }
 
-  async function start(task: string, args: string[], checks: string[], source: Source): Promise<string> {
-    const id = options.newId();
-    const worktree = join(options.home, ".worktrees", basename(source.repo), `sub-${id.slice(0, 8)}`);
-    const branch = `sub/${id.slice(0, 8)}`;
-    await options.git.addWorktree({ ...source, path: worktree, branch });
-    const record: AgentRecord = {
-      entry: { id, role: "sub", window: "", status: "starting", base: source.sha, worktree, branch },
-      repo: source.repo,
-      task,
-      events: [],
-      text: "",
-      usage: { tokens: 0, cost: 0 },
-      helloTimer: undefined,
-      extra: {},
-    };
-    records.set(id, record);
-    entries.push(record.entry);
+  function openWindow(record: AgentRecord): Promise<string> {
+    const { id } = record.entry;
     const command = [
       options.piCommand,
       "-ne",
@@ -193,24 +193,50 @@ export function createAgents(options: AgentsOptions) {
       "-nc",
       "--no-themes",
       ...options.extensions.flatMap((path) => ["-e", path]),
-      ...args,
+      ...record.args,
+      "--model",
+      record.models[record.current] as string,
       "--session-id",
-      id,
+      record.sessionId,
       "--session-dir",
       `${options.dir}/sessions`,
     ];
+    return options.tmux.openWindow(
+      options.session,
+      `sub-${id.slice(0, 4)}`,
+      command,
+      { PI_SUBAGENT_SOCKET: options.socket, PI_SUBAGENT_ID: id, PI_SUBAGENT_CHECKS: JSON.stringify(record.checks) },
+      record.entry.worktree,
+    );
+  }
+
+  async function start(task: string, args: string[], checks: string[], models: string[], source: Source): Promise<string> {
+    if (models.length === 0) throw new Error("supervisor: a start needs at least one model.");
+    const id = options.newId();
+    const worktree = join(options.home, ".worktrees", basename(source.repo), `sub-${id.slice(0, 8)}`);
+    const branch = `sub/${id.slice(0, 8)}`;
+    await options.git.addWorktree({ ...source, path: worktree, branch });
+    const record: AgentRecord = {
+      entry: { id, role: "sub", window: "", status: "starting", base: source.sha, worktree, branch },
+      repo: source.repo,
+      task,
+      baseTask: task,
+      args,
+      checks,
+      models,
+      current: 0,
+      failed: [],
+      sessionId: id,
+      events: [],
+      text: "",
+      usage: { tokens: 0, cost: 0 },
+      helloTimer: undefined,
+      extra: {},
+    };
+    records.set(id, record);
+    entries.push(record.entry);
     try {
-      record.entry.window = await options.tmux.openWindow(
-        options.session,
-        `sub-${id.slice(0, 4)}`,
-        command,
-        {
-          PI_SUBAGENT_SOCKET: options.socket,
-          PI_SUBAGENT_ID: id,
-          PI_SUBAGENT_CHECKS: JSON.stringify(checks),
-        },
-        worktree,
-      );
+      record.entry.window = await openWindow(record);
     } catch (cause) {
       records.delete(id);
       entries.splice(entries.indexOf(record.entry), 1);
@@ -220,7 +246,7 @@ export function createAgents(options: AgentsOptions) {
       );
       throw new Error(`supervisor: could not start subagent ${id}. Make sure tmux runs and "${options.piCommand}" is in PATH.${cleanup}`, { cause });
     }
-    record.helloTimer = options.timers.setTimeout(() => fail(record, `subagent ${id} did not connect; run tmux attach -t ${options.session}`), helloTimeoutMs);
+    armHello(record);
     options.onChange();
     schedulePoll();
     return id;
@@ -243,10 +269,59 @@ export function createAgents(options: AgentsOptions) {
     options.sendToSub(id, { type: "task", task: record.task });
   }
 
+  function failedList(record: AgentRecord): string {
+    return record.failed.map((item) => `${item.model}: ${item.reason}`).join("; ");
+  }
+
+  function armHello(record: AgentRecord): void {
+    const { id } = record.entry;
+    record.helloTimer = options.timers.setTimeout(() => fail(record, `subagent ${id} did not connect; run tmux attach -t ${options.session}`), helloTimeoutMs);
+  }
+
+  // Max one restart per model: the index only moves forward.
+  function providerError(record: AgentRecord, reason: string): void {
+    if (record.entry.status !== "running" || record.concluding) return;
+    const { id } = record.entry;
+    record.failed.push({ model: record.models[record.current] as string, reason });
+    marks.mark(record.models[record.current] as string);
+    const next = record.models.findIndex((model, index) => index > record.current && !marks.marked(model));
+    if (next === -1) {
+      fail(
+        record,
+        `subagent ${id} stopped on a provider error and no other model is available. Failed: ${failedList(record)}. Check the providers, or "subagentModels" in config.json.`,
+      );
+      return;
+    }
+    record.restarting = true;
+    record.entry.status = "starting";
+    options.onChange();
+    restart(record, next).catch((cause: Error) => {
+      record.restarting = false;
+      fail(record, `subagent ${id} could not restart on ${record.models[next]} after a provider error: ${cause.message}`);
+    });
+  }
+
+  async function restart(record: AgentRecord, next: number): Promise<void> {
+    const { worktree, window } = record.entry;
+    if (worktree === undefined) throw new Error("the agent has no worktree");
+    const changed = await options.git.changed(worktree);
+    await options.tmux.killWindow(window);
+    record.current = next;
+    record.sessionId = options.newId();
+    record.task = `${record.baseTask}\nThe previous agent stopped on a provider error. Continue the task. Changed files: ${changed.join(", ") || "none"}.`;
+    record.events.push(line(`restart on ${record.models[next]} after: ${failedList(record)}`));
+    if (record.events.length > MAX_EVENTS) record.events.shift();
+    record.entry.window = await openWindow(record);
+    record.restarting = false;
+    armHello(record);
+    options.onChange();
+    schedulePoll();
+  }
+
   function event(id: string, value: SubEvent): void {
     const record = find(id);
-    // A late event of an agent that already failed must not change its result.
-    if (record.entry.status === "failed") return;
+    // A late event of an agent that already failed, or of the child that a restart replaces, must not change its result.
+    if (record.entry.status === "failed" || record.restarting) return;
     record.events.push(formatEvent(value));
     if (record.events.length > MAX_EVENTS) record.events.shift();
     if (value.kind === "message") {
@@ -258,6 +333,8 @@ export function createAgents(options: AgentsOptions) {
       }
     } else if (value.kind === "error") {
       fail(record, value.text);
+    } else if (value.kind === "provider_error") {
+      providerError(record, value.text);
     } else if (value.kind === "settled" && record.entry.status === "running" && !record.concluding) {
       const pending = record.pending;
       record.pending = undefined;
@@ -311,6 +388,7 @@ export function createAgents(options: AgentsOptions) {
       throw new Error(`supervisor: subagent ${id} has no worktree. It ended without changes, or it was discarded. Start a new agent.`);
     }
     record.concluding = false;
+    record.baseTask = text;
     options.sendToSub(id, { type: "task", task: text });
     record.entry.status = "running";
     options.onChange();

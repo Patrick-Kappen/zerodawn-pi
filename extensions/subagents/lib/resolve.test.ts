@@ -11,7 +11,7 @@ after(() => rm(home, { recursive: true, force: true }));
 async function profile(name: string, frontmatter: string, prompt = "Prompt  with 'quotes' and $VAR"): Promise<void> {
   const dir = join(home, ".pi", "agent", "agents");
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, `${name}.md`), `---\ndescription: d\nmodels: [m/one:off, m/two]\n${frontmatter}\n---\n${prompt}\n`);
+  await writeFile(join(dir, `${name}.md`), `---\ndescription: d\n${frontmatter}\n---\n${prompt}\n`);
 }
 
 test("profilePath accepts only plain names", () => {
@@ -23,7 +23,7 @@ test("missing profile names the path", async () => {
   await assert.rejects(resolveProfile(home, "nope", nodeFiles), (error: Error) => error.message.includes(join(home, ".pi/agent/agents/nope.md")));
 });
 
-test("builtin, package extension, skill, tools, first model and prompt as one argument", async () => {
+test("builtin, package extension, skill, tools, and prompt as one argument", async () => {
   const ext = join(home, ".pi/agent/packages/pkg-b/extensions/files");
   await mkdir(ext, { recursive: true });
   await writeFile(join(ext, "index.ts"), "");
@@ -40,12 +40,18 @@ test("builtin, package extension, skill, tools, first model and prompt as one ar
     join(home, ".pi/agent/skills/lint"),
     "--tools",
     "read,mcp__gh__*,ask,blocker,handoff,continue,done",
-    "--model",
-    "m/one:off",
     "--system-prompt",
     "Prompt  with 'quotes' and $VAR",
   ]);
-  assert.deepEqual(loaded.models, ["m/one:off", "m/two"]);
+  assert.equal("models" in loaded, false);
+});
+
+test("a profile with models is an error that names the path and the config key", async () => {
+  await profile("old", "models: [m/one]");
+  await assert.rejects(
+    resolveProfile(home, "old", nodeFiles),
+    (error: Error) => error.message.includes(join(home, ".pi/agent/agents/old.md")) && /Remove it.*subagentModels/.test(error.message),
+  );
 });
 
 test("--tools always has ask, blocker, handoff, continue and done; a tool list without mcp__ gives --no-mcp", async () => {
@@ -65,7 +71,7 @@ test("missing extension and missing skill are errors with names and paths", asyn
   const empty = await mkdtemp(join(tmpdir(), "pi-subagents-resolve-empty-"));
   try {
     await mkdir(join(empty, ".pi/agent/agents"), { recursive: true });
-    await writeFile(join(empty, ".pi/agent/agents/e.md"), "---\ndescription: d\nmodels: [m]\nextensions: [x]\n---\nP\n");
+    await writeFile(join(empty, ".pi/agent/agents/e.md"), "---\ndescription: d\nextensions: [x]\n---\nP\n");
     await assert.rejects(resolveProfile(empty, "e", nodeFiles), /packages directory .*does not exist/);
   } finally {
     await rm(empty, { recursive: true, force: true });

@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { shapeResult } from "./result.ts";
 
-const base = { id: "abc", status: "idle" as const, text: "done", usage: { tokens: 1234, cost: 0.5 }, events: [] };
+const base = { id: "abc", status: "idle" as const, text: "done", usage: { tokens: 1234, cost: 0.5 }, events: [], model: "m/x" };
 
 test("the content has only id, status, text and one usage line", () => {
   const shaped = shapeResult({ ...base, events: ["tool bash {}"] });
   assert.equal(shaped.content.length, 1);
-  assert.equal(shaped.content[0]?.text, "agent abc\nstatus: idle\ndone\n1234 tokens, $0.5000");
+  assert.equal(shaped.content[0]?.text, "agent abc\nstatus: idle\nmodel: m/x\ndone\n1234 tokens, $0.5000");
   assert.doesNotMatch(shaped.content[0]?.text ?? "", /tool bash/);
 });
 
@@ -57,10 +57,20 @@ test("details keep at most 20 events of at most 200 characters", () => {
 
 test("question and blocked results have only id, status and text", () => {
   for (const status of ["question", "blocked"] as const) {
-    assert.equal(shapeResult({ ...base, status, text: "which db?" }).content[0]?.text, `agent abc\nstatus: ${status}\nwhich db?`);
+    assert.equal(shapeResult({ ...base, status, text: "which db?" }).content[0]?.text, `agent abc\nstatus: ${status}\nmodel: m/x\nwhich db?`);
   }
 });
 
+test("the model line names the failed models with their reasons", () => {
+  const failedModels = [
+    { model: "a/b:low", reason: "429 rate limit" },
+    { model: "c/d", reason: "503" },
+  ];
+  const shaped = shapeResult({ ...base, model: "e/f", failedModels });
+  assert.equal(shaped.content[0]?.text.split("\n")[2], "model: e/f; failed: a/b:low (429 rate limit), c/d (503)");
+  assert.deepEqual(shaped.details.failedModels, failedModels);
+});
+
 test("a failed result shows its status", () => {
-  assert.match(shapeResult({ ...base, status: "failed", text: "boom" }).content[0]?.text ?? "", /status: failed\nboom/);
+  assert.match(shapeResult({ ...base, status: "failed", text: "boom" }).content[0]?.text ?? "", /status: failed\nmodel: m\/x\nboom/);
 });

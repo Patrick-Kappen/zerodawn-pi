@@ -6,6 +6,7 @@ import { createConnection } from "node:net";
 const path = process.env.PI_SUBAGENT_SOCKET;
 const id = process.env.PI_SUBAGENT_ID;
 if (path === undefined || id === undefined) throw new Error("fake-pi: PI_SUBAGENT_SOCKET and PI_SUBAGENT_ID must be set.");
+const model = process.argv[process.argv.indexOf("--model") + 1] ?? "";
 const empty = { subject: "scope: what", summary: "", change: "fix", changes: [], tests: [], findings: [], decisions: [], open: [], next: "", risks: [] };
 const socket = createConnection(path);
 const send = (message: object) => socket.write(`${JSON.stringify(message)}\n`);
@@ -22,6 +23,10 @@ socket.on("data", (chunk) => {
       continue;
     }
     if (message.type !== "task") continue;
+    if (model.startsWith("bad/")) {
+      send({ type: "event", event: { kind: "provider_error", text: `429 rate limit on ${model}` } });
+      continue;
+    }
     if (message.task === "BLOCK") {
       send({ type: "blocker", data: { issue: "no access", files: ["x.ts", "y.ts"], tried: ["a", "b"] } });
       send({ type: "event", event: { kind: "settled", text: "blocked" } });
