@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.1 — 2026-10-27
+
+- tests: run tests and gates in the dev environment of the project
+
+- request id in each client request and its answer
+
+- token limit checks the context size, not a sum
+
 ## 0.8.0 — 2026-10-27
 
 - model ladder by availability from subagentModels (breaking)

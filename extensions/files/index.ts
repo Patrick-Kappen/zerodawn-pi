@@ -1,8 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { DEFAULT_MAX_LINES, type ExtensionAPI, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
-import { outFile, shorten } from "../../shared/store.ts";
+import { outFile, outRef } from "../../shared/store.ts";
 import { absolutePath, textOf } from "../../shared/util.ts";
-import { GREP_LINE_MAX, registerFiles, WRITE_MAX_LINES } from "./lib/files.ts";
+import { registerFiles, WRITE_MAX_LINES } from "./lib/files.ts";
+import { GREP_LINE_MAX } from "./lib/grep.ts";
 import { registerViewGuard } from "./lib/guard.ts";
 
 const MAX_BYTES = 16 * 1024;
@@ -51,7 +52,7 @@ export default function (pi: ExtensionAPI) {
     if (!cut.truncated) return;
     const log = outFile(ctx, event.toolCallId, "codemode");
     writeFileSync(log, text);
-    const note = `[codemode result cut: ${cut.outputLines} of ${cut.totalLines} lines, ${formatSize(cut.outputBytes)} of ${formatSize(cut.totalBytes)}. Full text: ${shorten(log)}]`;
+    const note = `[codemode result cut: ${cut.outputLines} of ${cut.totalLines} lines, ${formatSize(cut.outputBytes)} of ${formatSize(cut.totalBytes)}. Full text: ${outRef(log)}]`;
     return { content: [{ type: "text", text: `${cut.content}\n\n${note}` }] };
   });
 }

@@ -27,9 +27,9 @@ Tests: `util.test.ts`, `store.test.ts`, `config.test.ts`, `testrun.test.ts`. The
 ## Changes
 
 <!-- changelog:start -->
-## 0.7.0 — 2026-10-27
+## 0.7.1 — 2026-10-27
 
-- subagents: model ladder by availability from subagentModels (breaking)
+- tests: run tests and gates in the dev environment of the project
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

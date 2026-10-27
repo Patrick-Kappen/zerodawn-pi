@@ -89,6 +89,45 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.14.1 — 2026-10-27
+
+### shared 0.7.1
+
+- tests: run tests and gates in the dev environment of the project
+
+### bash 0.6.1
+
+- inline output also has a 4 KB limit
+
+- print mode waits for background jobs before it ends
+
+- short failure output inline; fail on a missing cwd
+
+### files 0.3.1
+
+- read resends a known part shorter than its note
+
+### subagents 0.8.1
+
+- tests: run tests and gates in the dev environment of the project
+
+- request id in each client request and its answer
+
+- token limit checks the context size, not a sum
+
+### tests 0.4.2
+
+- run tests and gates in the dev environment of the project
+
+- print mode waits for background runs before it ends
+
+### repository
+
+- tests: run tests and gates in the dev environment of the project
+- subagents: ladder for now is deepseek on opencode-go, then sonnet low
+- docs: subagents design with the decisions of the user
+- docs: subagents design with and without nullspace
+
 ## 0.14.0 — 2026-10-27
 
 ### shared 0.7.0
@@ -129,41 +168,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 - files: edit and write run the formatter of the project
 - files: edit and write undo a change that adds a syntax error
 - files: read sends only new lines; bash blocks file views
-
-## 0.12.0 — 2026-10-26
-
-### bash 0.5.1
-
-- a command that moves to the background ends the turn
-
-- end the turn when only jobs are left, not jobs wait
-
-### subagents 0.7.0
-
-- merge action with a merge agent on a conflict
-
-- the subagent commits with its own subject
-
-- a git worktree and branch per subagent
-
-- agent calls done, gate runs, green forces a handoff
-
-- enforced done tool with a git check of the changes
-
-### tests 0.4.1
-
-- bash: a command that moves to the background ends the turn
-
-- bash: end the turn when only jobs are left, not jobs wait
-
-### repository
-
-- subagents: the subagent commits with its own subject
-- subagents: a git worktree and branch per subagent
-- subagents: agent calls done, gate runs, green forces a handoff
-- subagents: enforced done tool with a git check of the changes
-- docs: rules for found bugs and for releases
-- repo: release notes list repository commits; empty notes fail
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

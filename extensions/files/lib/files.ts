@@ -1,21 +1,15 @@
 import { readFileSync } from "node:fs";
-import {
-  createEditToolDefinition,
-  createGrepToolDefinition,
-  createWriteToolDefinition,
-  type ExtensionAPI,
-  type ExtensionToolContext,
-} from "@earendil-works/pi-coding-agent";
+import { createEditToolDefinition, createWriteToolDefinition, type ExtensionAPI, type ExtensionToolContext } from "@earendil-works/pi-coding-agent";
 import { config } from "../../../shared/config.ts";
 import { absolutePath } from "../../../shared/util.ts";
 import { explain, fixIndent, freshLines, freshRanges } from "./editfix.ts";
 import { formatterFor, runFormatter } from "./format.ts";
+import { registerGrep } from "./grep.ts";
 import { fileLines } from "./lines.ts";
 import { registerRead, seenDetails } from "./read.ts";
 import { type Checker, checked } from "./syntax.ts";
 
 export const WRITE_MAX_LINES = 100;
-export const GREP_LINE_MAX = 200;
 
 const fromConfig = (): Checker => ({ nvim: config().nvim ?? "nvim", parsers: config().treesitterParsers });
 
@@ -24,12 +18,7 @@ export function registerFiles(pi: ExtensionAPI, checker: Checker = fromConfig())
 
   registerRead(pi, cwd);
 
-  pi.registerTool({
-    ...createGrepToolDefinition(cwd),
-    description: `Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Lines are cut at ${GREP_LINE_MAX} chars.`,
-    promptSnippet: "Search file contents for patterns (respects .gitignore)",
-    promptGuidelines: ["Find code with grep or ast_grep first. Then read the found range with offset and limit."],
-  });
+  registerGrep(pi, cwd);
 
   const edit = createEditToolDefinition(cwd);
   pi.registerTool({

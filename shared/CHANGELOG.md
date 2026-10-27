@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1 — 2026-10-27
+
+- tests: run tests and gates in the dev environment of the project
+
 ## 0.7.0 — 2026-10-27
 
 - subagents: model ladder by availability from subagentModels (breaking)

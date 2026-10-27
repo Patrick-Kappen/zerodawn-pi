@@ -112,3 +112,38 @@ test("commitAll: a refused commit throws the git output and leaves a clean index
   await rm(hook);
   await git.removeWorktree(repo, path, "sub/2");
 });
+
+test("createGit: a worktree gets direnv allow only when the repo allowed the same .envrc", async () => {
+  const calls: string[] = [];
+  let allowed = 0;
+  const fake: Exec = (command, args, options) => {
+    if (command === "git") return exec(command, args, options);
+    calls.push([command, ...args].join(" "));
+    const stdout = command === "bash" ? JSON.stringify({ state: { foundRC: { allowed, path: join(repo, ".envrc") } } }) : "";
+    return Promise.resolve({ stdout, stderr: "", code: 0, killed: false });
+  };
+  await writeFile(join(repo, ".envrc"), "use flake\n");
+  await sh(repo, "add", ".envrc");
+  await sh(repo, "commit", "-q", "-m", "envrc");
+  const sha = await sh(repo, "rev-parse", "HEAD");
+  const git = createGit(fake);
+  const add = async (n: string) => {
+    const path = join(root, "wt", `env-${n}`);
+    await git.addWorktree({ repo, sha, path, branch: `env/${n}` });
+    return path;
+  };
+  const allowedPath = await add("1");
+  assert.deepEqual(calls, [`bash -c cd -- "$1" && exec direnv status --json bash ${repo}`, `direnv allow ${allowedPath}`]);
+  calls.length = 0;
+  allowed = 1;
+  await add("2");
+  assert.deepEqual(calls, [`bash -c cd -- "$1" && exec direnv status --json bash ${repo}`], "a blocked repo .envrc gives no allow");
+  calls.length = 0;
+  await writeFile(join(repo, ".envrc"), "use flake .#other\n");
+  await add("3");
+  assert.deepEqual(calls, [], "other content in the repo gives no allow");
+  await sh(repo, "checkout", "-q", ".envrc");
+  const plain = join(root, "wt", "env-4");
+  await git.addWorktree({ repo, sha: first, path: plain, branch: "env/4" });
+  assert.deepEqual(calls, [], "a worktree without .envrc calls no direnv");
+});

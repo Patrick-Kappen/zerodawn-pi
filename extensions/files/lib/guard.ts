@@ -67,6 +67,11 @@ export function registerViewGuard(pi: ExtensionAPI) {
     if (event.toolName !== "bash" || typeof command !== "string") return;
     const cmd = fileView(command);
     if (!cmd) return;
+    if (/grep$|^rg$/.test(cmd))
+      return {
+        block: true,
+        reason: `"${cmd}" on a file or directory in bash: use the grep tool. It has glob, type, context, filesOnly, count, multiline, and noIgnore for node_modules and other ignored paths.`,
+      };
     return {
       block: true,
       reason: `"${cmd}" on a file in bash: use grep to find the lines, then read with offset and limit (offset=-N for the last N lines). Pipe the file into a program that is not a viewer to process it.`,

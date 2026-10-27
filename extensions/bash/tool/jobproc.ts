@@ -1,8 +1,8 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync, readSync, renameSync, statSync, writeFileSync } from "node:fs";
-import { shorten } from "../../../shared/store.ts";
+import { outRef } from "../../../shared/store.ts";
 import { age, commandLine } from "../../../shared/util.ts";
-import { DEFAULT_COLUMNS, DEFAULT_LIMIT_S, DEFAULT_ROWS, INLINE_LINES, NO_TIME_LIMIT, RESULT_TAIL_BYTES, TAIL_LINES } from "../config.ts";
+import { DEFAULT_COLUMNS, DEFAULT_LIMIT_S, DEFAULT_ROWS, INLINE_BYTES, INLINE_LINES, NO_TIME_LIMIT, RESULT_TAIL_BYTES, TAIL_LINES } from "../config.ts";
 import { Screen, stripScript } from "../screen/screen.ts";
 
 export type Job = {
@@ -189,17 +189,18 @@ export function errorLines(lines: string[]): { n: number[]; text: string }[] {
   return [...out].map(([text, n]) => ({ n, text }));
 }
 
-// The context gets the status and the path of the output. A success adds short output. A failure adds every distinct error line.
+// The context gets the status and short output. Long output goes to a file; a failure then adds every distinct error line.
 export function resultText(log: string, status: string): string {
   const ok = /^exit 0\b/.test(status);
   const { plain, cut } = render(log, ok ? RESULT_TAIL_BYTES : Number.POSITIVE_INFINITY);
   if (plain.length === 0) return status;
-  if (ok && plain.length <= INLINE_LINES) return `${status}\n${plain.join("\n")}`;
+  const text = plain.join("\n");
+  if (plain.length <= INLINE_LINES && Buffer.byteLength(text) <= INLINE_BYTES) return `${status}\n${text}`;
   const txt = log.replace(/\.log$/, ".txt");
   writeFileSync(txt, `${plain.join("\n")}\n`);
   const { bytes } = statsOf(log);
   const total = cut ? `last ${plain.length} lines of ${bytes} bytes` : `${plain.length} lines, ${bytes} bytes`;
-  const head = `${status} · ${total} · output: ${shorten(txt)}`;
+  const head = `${status} · ${total} · output: ${outRef(txt)}`;
   if (ok) return head;
   const errors = errorLines(plain);
   if (errors.length === 0) return `${head}\nlast ${Math.min(TAIL_LINES, plain.length)} lines:\n${plain.slice(-TAIL_LINES).join("\n")}`;
@@ -221,5 +222,5 @@ export const ending = (job: Job) => (job.result ? job.result.split("\n")[0].spli
 export function describe(job: Job): string {
   const { lines, bytes } = job.stats();
   const state = ending(job) ?? `running ${age(Date.now() - job.start)}`;
-  return `job ${job.id} · ${state} · ${lines < 0 ? "" : `${lines} lines, `}${bytes} bytes · ${commandLine(job.command, 60)} · log: ${shorten(job.log)}`;
+  return `job ${job.id} · ${state} · ${lines < 0 ? "" : `${lines} lines, `}${bytes} bytes · ${commandLine(job.command, 60)} · log: ${outRef(job.log)}`;
 }

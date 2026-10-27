@@ -1,4 +1,5 @@
-import { basename, dirname, isAbsolute } from "node:path";
+import { readFile } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import type { Exec } from "./tmux.ts";
 
 export const MAX_SUBJECT = 72;
@@ -82,6 +83,32 @@ export async function resolveBase(exec: Exec, cwd: string, base?: string): Promi
 export function createGit(exec: Exec) {
   async function addWorktree(spec: WorktreeSpec): Promise<void> {
     await git(exec, ["-C", spec.repo, "worktree", "add", "-b", spec.branch, spec.path, spec.sha], `could not create the worktree "${spec.path}"`);
+    await allowEnvrc(spec.repo, spec.path);
+  }
+
+  /** direnv allows an .envrc per path, so a new worktree is blocked. The user allowed the same content in the repo already. */
+  async function allowEnvrc(repo: string, path: string): Promise<void> {
+    const content = await readFile(join(path, ".envrc"), "utf8").catch(() => undefined);
+    if (content === undefined || content !== (await readFile(join(repo, ".envrc"), "utf8").catch(() => undefined))) return;
+    const status = await direnv(["bash", "-c", 'cd -- "$1" && exec direnv status --json', "bash", repo], `could not read the direnv status of "${repo}"`);
+    let allowed: unknown;
+    try {
+      allowed = JSON.parse(status).state?.foundRC?.allowed;
+    } catch (cause) {
+      throw new Error(`subagents: "direnv status --json" in "${repo}" gave no JSON. Update direnv.`, { cause });
+    }
+    if (allowed === 0) await direnv(["direnv", "allow", path], `could not allow the .envrc of the worktree "${path}"`);
+  }
+
+  async function direnv([command, ...args]: string[], what: string): Promise<string> {
+    let result: Awaited<ReturnType<Exec>>;
+    try {
+      result = await exec(command, args);
+    } catch (cause) {
+      throw new Error(`subagents: ${what}: could not run "${command}". Make sure direnv is in PATH.`, { cause });
+    }
+    if (result.code !== 0) throw new Error(`subagents: ${what}: exit code ${result.code}: ${`${result.stderr}${result.stdout}`.trim()}`);
+    return result.stdout;
   }
 
   async function state(path: string, base: string): Promise<{ dirty: boolean; moved: boolean }> {

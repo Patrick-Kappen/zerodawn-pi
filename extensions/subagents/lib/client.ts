@@ -26,14 +26,20 @@ interface Waiter<T> {
   reject: (error: Error) => void;
 }
 
+type Kind = "start" | "status" | "discard" | "answer";
+
+interface Request extends Waiter<ServerMessage> {
+  kind: Kind;
+}
+
 export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIMEOUT_MS): Promise<Client> {
   return new Promise((resolveConnect, rejectConnect) => {
     const socket = createConnection(path);
     let open = false;
     let closed = false;
     let buffer = "";
-    let pending: Waiter<ServerMessage> | undefined;
-    const starts: Waiter<string>[] = [];
+    let counter = 0;
+    const requests = new Map<string, Request>();
     const results = new Map<string, Waiter<AgentResult>>();
 
     const connectTimer = timers.setTimeout(() => {
@@ -44,10 +50,10 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
     }, timeoutMs);
 
     function fail(error: Error): void {
-      const waiting = pending;
-      pending = undefined;
-      waiting?.reject(error);
-      for (const start of starts.splice(0)) start.reject(error);
+      for (const [requestId, request] of [...requests]) {
+        requests.delete(requestId);
+        request.reject(new Error(`subagents: the ${request.kind} request failed: ${error.message}`, { cause: error }));
+      }
       for (const [id, result] of [...results]) {
         results.delete(id);
         result.reject(error);
@@ -59,130 +65,115 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
     }
 
     function status(): Promise<Status> {
-      return exchange({ type: "status" }, "status", (message) => (message.type === "status" ? { agents: message.agents, main: message.main } : undefined));
+      return exchange(
+        "status",
+        "gave no status",
+        (requestId) => ({ type: "status", requestId }),
+        (message) => (message.type === "status" ? { agents: message.agents, main: message.main } : undefined),
+      );
     }
 
     function discard(id: string): Promise<string> {
-      return exchange({ type: "discard", id }, "answer to the discard", (message) => (message.type === "discarded" ? message.text : undefined));
+      return exchange(
+        "discard",
+        "gave no answer to the discard",
+        (requestId) => ({ type: "discard", requestId, id }),
+        (message) => (message.type === "discarded" ? message.text : undefined),
+      );
     }
 
-    // A request with one answer; accept gives undefined for a message of another type.
-    function exchange<T>(request: ClientMessage, what: string, accept: (message: ServerMessage) => T | undefined): Promise<T> {
+    // A request with one answer, matched by requestId; accept gives undefined for a message of another type.
+    // onValue runs in the same tick as the answer: a result in the same chunk must find its waiter.
+    function exchange<T>(
+      kind: Kind,
+      what: string,
+      build: (requestId: string) => ClientMessage,
+      accept: (message: ServerMessage) => T | undefined,
+      onValue?: (value: T) => void,
+    ): Promise<T> {
       return new Promise<T>((resolve, reject) => {
         if (!open) {
           reject(new Error(`subagents: the connection to "${path}" is closed. Call the tool again to reconnect.`));
           return;
         }
-        if (pending !== undefined) {
-          reject(new Error("subagents: a status request is already waiting. Wait for it to end."));
-          return;
-        }
+        counter += 1;
+        const requestId = String(counter);
         const timer = timers.setTimeout(() => {
-          pending = undefined;
+          requests.delete(requestId);
           reject(
             new Error(
-              `subagents: the supervisor at "${path}" gave no ${what} within ${timeoutMs} ms. Run "tmux attach" to the pi-sub session and read window 0.`,
+              `subagents: the supervisor at "${path}" ${what} within ${timeoutMs} ms (${kind} request). Run "tmux attach" to the pi-sub session and read window 0.`,
             ),
           );
         }, timeoutMs);
-        pending = {
+        requests.set(requestId, {
+          kind,
           resolve: (message) => {
             timers.clearTimeout(timer);
             const value = accept(message);
-            if (value !== undefined) resolve(value);
-            else reject(new Error(`subagents: the supervisor sent "${message.type}" instead of the ${what}.`));
-          },
-          reject: (error) => {
-            timers.clearTimeout(timer);
-            reject(error);
-          },
-        };
-        write(request);
-      });
-    }
-
-    function start(task: string, args: string[], checks: string[], models: string[], source: Source, signal?: AbortSignal): Promise<AgentResult> {
-      return run({ type: "start", task, args, checks, models, repo: source.repo, sha: source.sha }, signal);
-    }
-
-    // Starts an agent and returns its id at once; the result message is not awaited.
-    function begin(task: string, args: string[], checks: string[], models: string[], source: Source): Promise<string> {
-      return new Promise<string>((resolve, reject) => {
-        if (!open) {
-          reject(new Error(`subagents: the connection to "${path}" is closed. Call the tool again to reconnect.`));
-          return;
-        }
-        const timer = timers.setTimeout(
-          () =>
-            reject(new Error(`subagents: the supervisor at "${path}" did not start the subagent within ${timeoutMs} ms. Read window 0 of the pi-sub session.`)),
-          timeoutMs,
-        );
-        starts.push({
-          resolve: (id) => {
-            timers.clearTimeout(timer);
-            resolve(id);
+            if (value !== undefined) {
+              onValue?.(value);
+              resolve(value);
+            } else reject(new Error(`subagents: the supervisor sent "${message.type}" to the ${kind} request. Stop the supervisor and start it again.`));
           },
           reject: (error) => {
             timers.clearTimeout(timer);
             reject(error);
           },
         });
-        write({ type: "start", task, args, checks, models, repo: source.repo, sha: source.sha });
+        write(build(requestId));
       });
     }
 
+    function start(task: string, args: string[], checks: string[], models: string[], source: Source, signal?: AbortSignal): Promise<AgentResult> {
+      return run("start", (requestId) => ({ type: "start", requestId, task, args, checks, models, repo: source.repo, sha: source.sha }), signal);
+    }
+
+    // Starts an agent and returns its id at once; the result message is not awaited.
+    function begin(task: string, args: string[], checks: string[], models: string[], source: Source): Promise<string> {
+      return accepted("start", (requestId) => ({ type: "start", requestId, task, args, checks, models, repo: source.repo, sha: source.sha }));
+    }
+
+    function accepted(kind: "start" | "answer", build: (requestId: string) => ClientMessage, onStarted?: (id: string) => void): Promise<string> {
+      return exchange(kind, "did not start the subagent", build, (message) => (message.type === "started" ? message.id : undefined), onStarted);
+    }
+
     function answer(id: string, text: string, signal?: AbortSignal): Promise<AgentResult> {
-      return run({ type: "answer", id, text }, signal);
+      return run("answer", (requestId) => ({ type: "answer", requestId, id, text }), signal);
     }
 
     // The supervisor accepts a start or an answer with "started"; the result follows.
-    function run(message: ClientMessage, signal?: AbortSignal): Promise<AgentResult> {
+    function run(kind: "start" | "answer", build: (requestId: string) => ClientMessage, signal?: AbortSignal): Promise<AgentResult> {
       return new Promise<AgentResult>((resolve, reject) => {
-        if (!open) {
-          reject(new Error(`subagents: the connection to "${path}" is closed. Call the tool again to reconnect.`));
-          return;
-        }
         let id: string | undefined;
         let aborted = false;
         const onAbort = () => {
           aborted = true;
-          timers.clearTimeout(timer);
           if (id !== undefined) results.delete(id);
           reject(new Error(`subagents: the wait for subagent ${id ?? "(not started)"} was aborted. The agent keeps running: tmux attach to see it.`));
         };
-        const waiter: Waiter<string> = {
-          resolve: (started) => {
-            timers.clearTimeout(timer);
-            if (aborted) return;
-            id = started;
-            results.set(started, { resolve: end(resolve), reject: end(reject) });
-          },
-          reject: (error) => {
-            timers.clearTimeout(timer);
-            if (!aborted) end(reject)(error);
-          },
-        };
-        const timer = timers.setTimeout(() => {
-          aborted = true;
-          reject(new Error(`subagents: the supervisor at "${path}" did not start the subagent within ${timeoutMs} ms. Read window 0 of the pi-sub session.`));
-        }, timeoutMs);
-        signal?.addEventListener("abort", onAbort, { once: true });
         function end<T>(settle: (value: T) => void): (value: T) => void {
           return (value) => {
             signal?.removeEventListener("abort", onAbort);
             settle(value);
           };
         }
-        starts.push(waiter);
-        write(message);
+        signal?.addEventListener("abort", onAbort, { once: true });
+        accepted(kind, build, (started) => {
+          if (aborted) return;
+          id = started;
+          results.set(started, { resolve: end(resolve), reject: end(reject) });
+        }).then(
+          () => {},
+          (error: Error) => {
+            if (!aborted) end(reject)(error);
+          },
+        );
       });
     }
 
     function onMessage(message: ServerMessage): void {
       switch (message.type) {
-        case "started":
-          starts.shift()?.resolve(message.id);
-          return;
         case "result": {
           const waiting = results.get(message.id);
           results.delete(message.id);
@@ -190,22 +181,30 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
           return;
         }
         case "error": {
-          const error = new Error(`subagents: the supervisor refused the request: ${message.message}`);
-          const waiting = pending ?? starts.shift();
-          pending = undefined;
-          waiting?.reject(error);
+          if (message.requestId === undefined) {
+            throw new Error(`subagents: the supervisor refused a message: ${message.message}. Stop the supervisor and start it again.`);
+          }
+          const request = take(message.requestId, message.type);
+          request.reject(new Error(`subagents: the supervisor refused the ${request.kind} request: ${message.message}`));
           return;
         }
+        case "started":
         case "status":
-        case "discarded": {
-          const waiting = pending;
-          pending = undefined;
-          waiting?.resolve(message);
+        case "discarded":
+          take(message.requestId, message.type).resolve(message);
           return;
-        }
         case "task":
           throw new Error('subagents: the supervisor sent a "task" to a main connection. Stop the supervisor and start it again.');
       }
+    }
+
+    function take(requestId: string, type: string): Request {
+      const request = requests.get(requestId);
+      if (request === undefined) {
+        throw new Error(`protocol: the supervisor sent "${type}" with the unknown requestId "${requestId}". Stop the supervisor and start it again.`);
+      }
+      requests.delete(requestId);
+      return request;
     }
 
     socket.setEncoding("utf8");

@@ -119,6 +119,18 @@ test("a run longer than the inline time continues in the background; a message g
   assert.match((await slow.check("call-8", command, ctx)).text, /same result/);
 });
 
+test("nextResult ends after the notify of the next background run, and is undefined when none runs", async () => {
+  const slow = new RunTests(notify, 50);
+  notes.length = 0;
+  assert.equal(slow.nextResult(), undefined);
+  await slow.check("call-n1", `cd ${dir} && sleep 0.3; echo next`, ctx);
+  const next = slow.nextResult();
+  assert.ok(next);
+  await next;
+  assert.equal(notes.length, 1, "the notify ran before nextResult ended");
+  assert.equal(slow.nextResult(), undefined);
+});
+
 test("reset stops a background run without a message", async () => {
   const slow = new RunTests(notify, 50);
   notes.length = 0;

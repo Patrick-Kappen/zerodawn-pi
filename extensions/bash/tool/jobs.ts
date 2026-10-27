@@ -130,8 +130,11 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
       if (job.result) return resolve();
       waiters.set(job.id, [...(waiters.get(job.id) ?? []), resolve]);
     });
+  const reported: (() => void)[] = [];
+  const nextReport = () => new Promise<void>((resolve) => reported.push(resolve));
   const report = (job: Job, m: Meta, text: string, triggerTurn: boolean) => {
     changes++;
+    for (const resolve of reported.splice(0)) resolve();
     job.result = text;
     job.ok ??= /^exit 0\b/.test(text);
     job.endedAt = Date.now();
@@ -151,6 +154,14 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
   };
   pi.on("agent_start", () => {
     agentRunning = true;
+  });
+  // Print and json mode end when the agent settles, so a background report has nobody to read it: keep the run open for it.
+  pi.on("agent_before_settle", async (_event, ctx) => {
+    if (ctx.mode !== "print" && ctx.mode !== "json") return;
+    while (!held.length && [...jobs.values()].some((j) => j.bg && !j.result)) await nextReport();
+    if (!held.length) return;
+    send(held.splice(0), true);
+    return { continue: true };
   });
   pi.on("agent_end", () => {
     agentRunning = false;

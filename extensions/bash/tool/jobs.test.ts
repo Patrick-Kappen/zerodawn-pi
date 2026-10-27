@@ -56,3 +56,28 @@ test("jobs list gives the model only running jobs; an ended job is reported once
   own.jobs.set("4", job("4", { command: "sleep 8" }));
   assert.match(await list(), /^job 4 · [^\n]*sleep 8[^\n]*\njob 3 · /);
 });
+
+test("print mode: before settle waits for a running background job and sends its report", async () => {
+  const own = new Map<string, (event: any, ctx?: any) => unknown>();
+  const sent: string[] = [];
+  const api = {
+    on: (name: string, fn: (event: any, ctx?: any) => unknown) => own.set(name, fn),
+    registerTool() {},
+    registerShortcut() {},
+    registerCommand() {},
+    sendMessage: (message: { content: string }) => sent.push(message.content),
+  } as any;
+  const state = createState();
+  const reports = registerJobs(api, state, { refresh() {}, stop() {} });
+  const settle = own.get("agent_before_settle") as (event: unknown, ctx: unknown) => Promise<unknown>;
+  assert.equal(await settle({}, { mode: "tui" }), undefined);
+  assert.equal(await settle({}, { mode: "print" }), undefined, "no running job: nothing to wait for");
+  own.get("agent_start")?.({});
+  const running = job("7", {});
+  state.jobs.set("7", running);
+  const waiting = settle({}, { mode: "print" });
+  reports.report(running, {} as any, "exit 0 (20s)", true);
+  assert.deepEqual(await waiting, { continue: true });
+  assert.deepEqual(sent, ["job 7: exit 0 (20s)"]);
+  own.get("session_shutdown")?.({ reason: "quit" });
+});
