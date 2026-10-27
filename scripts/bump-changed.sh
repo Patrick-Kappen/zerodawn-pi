@@ -38,6 +38,7 @@ next() {
   esac
 }
 bumped=()
+bumped_any=false
 for manifest in shared/package.json extensions/*/package.json; do
   name="$(jq -r .name "$manifest")"; version="$(jq -r .version "$manifest")"
   tag="$(git tag --list "$name-v*" --sort=-v:refname | head -n1)"
@@ -50,12 +51,18 @@ for manifest in shared/package.json extensions/*/package.json; do
     new="$(next "$version" "$change")"
   else new="$version"; fi
   bumped+=("$name $version -> $new $(dirname "$manifest")")
+  bumped_any=true
 done
 version="$(jq -r .version package.json)"
 last="$(git tag --list 'v*' --sort=-v:refname | head -n1)"
 [ -n "$last" ] || { echo "bump-changed: no package tag v* exists; tag the first release by hand" >&2; exit 1; }
 change="$(change_of "$last..HEAD")"
 new="$(next "$version" "$change")"
+# Reject an empty request before any file changes, so a failed run leaves no half release.
+if [ "$bumped_any" = false ] && [ -z "$(git log --no-merges --format=%h "$last..HEAD" -- . ':(exclude)shared' ':(exclude)extensions')" ]; then
+  echo "bump-changed: no commit since $last; nothing to release" >&2
+  exit 1
+fi
 # Write only after every level is known, so a failure leaves no half release.
 for entry in "${bumped[@]}"; do
   read -r _ _ _ to dir <<< "$entry"
@@ -80,7 +87,6 @@ done
 # Commits outside the components (repo, flake, ci, docs) go into the package section, so that it is never empty.
 repo="$(git log --no-merges --format='- %s' "$last..HEAD" -- . ':(exclude)shared' ':(exclude)extensions')"
 [ -z "$repo" ] || root="$(printf '%s\n\n### repository\n\n%s' "$root" "$repo")"
-[ "$root" != "## $new — $today" ] || { echo "bump-changed: no commit since $last; nothing to release" >&2; exit 1; }
 [ -f CHANGELOG.md ] || printf '# Changelog\n' > CHANGELOG.md
 prepend CHANGELOG.md "$root"
 scripts/notes.sh
