@@ -32,6 +32,15 @@ export default function (pi: ExtensionAPI) {
     runTests.reset();
   });
 
+  // Print and json mode end when the agent settles, so a background result has nobody to read it: keep the run open for it.
+  pi.on("agent_before_settle", async (_event, ctx) => {
+    if (ctx.mode !== "print" && ctx.mode !== "json") return;
+    const next = runTests.nextResult();
+    if (!next) return;
+    await next;
+    return { continue: true };
+  });
+
   pi.on("session_shutdown", () => {
     runTests.reset();
   });

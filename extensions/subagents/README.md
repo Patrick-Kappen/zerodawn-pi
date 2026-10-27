@@ -35,6 +35,7 @@ pi filters extension tools with `--tools` and `--no-tools`, so the main pi alway
 
 - Every subagent works in its own git worktree `~/.worktrees/<repo>/sub-<first 8 characters of its id>` on the branch `sub/<first 8 characters of its id>`. `<repo>` is the name of the main repository root (from `git rev-parse --git-common-dir`).
 - `base` is a branch, a commit, or the absolute path of a worktree (then its HEAD). Without `base` the worktree starts at the HEAD of the cwd of the main pi. The main pi resolves `base` to a commit hash; a bad `base` fails the start and names it. When the cwd has uncommitted changes and no `base` is given, the result says "uncommitted changes in <cwd> are not in the subagent".
+- direnv: a new worktree has a new path, so direnv blocks its `.envrc`. After `git worktree add`, the supervisor runs `direnv allow` on the worktree only when the repo `.envrc` has the same content and is allowed (`direnv status --json`). The done gate runs the tests through `direnv exec`, see the `tests` extension.
 - The supervisor runs `git worktree add -b` before it opens the window. A git error fails the start with the git message. All git calls use an exec function with an argument list (`lib/git.ts`).
 - `handoff` has the required fields `subject` (1 to 72 characters: the commit subject, in the form the repository wants) and `change` (`fix`, `feature` or `breaking`). The subagent extension commits, in the `handoff` tool of the subagent: when git shows changed files, it runs `git add -A` and `git commit` with the subject, the `changes` lines as body, and the trailer `Change: <change>`. A handoff at the token limit or after 3 red gates has the body line `Unfinished: <reason>` first. No changed files: no commit. The commit runs the repository hooks; `--no-verify` is never used. When git refuses the commit, the tool fails with the git output, the index is reset, and the model calls `handoff` again with a better subject. This counts as an invalid call: 2 invalid calls fail the agent. The result to the main agent has the line `commit: <short sha> <subject>` after the worktree and branch.
 - Cleanup: when an agent ends (result `idle`, `handoff` or `failed`) and its worktree has no changes and no new commit, the supervisor removes the worktree and the branch. Then `answer` for that agent fails: start a new agent. Every other end keeps the worktree and the branch; the result shows their paths. `discard` removes them (with `--force`).
@@ -79,6 +80,7 @@ Resolve only the merge conflicts that the task names. Keep both changes where po
   - It sends their events to the main pi, so the tool calls show in the UI.
   - It shows an overview of all agents in window 0.
 - The main pi and the subagents are clients. They connect to one Unix socket of the supervisor. The tmux option `@pi-sub-socket` on the session holds its path.
+- Each request of the main pi (start, answer, status, discard) carries a `requestId`; the supervisor puts it in its answer (`started`, `status`, `discarded`, `error`). So more requests can wait at the same time, and an error rejects only its own request. An agent result comes later and carries the agent id.
 - Each subagent has a real pi session (`--session-id`, `--session-dir`), so the tool can resume it later. The id is a UUID.
 - The subagent loads this extension too. `PI_SUBAGENT_SOCKET` and `PI_SUBAGENT_ID` make it a client of the supervisor: it runs the task it gets and sends tool, message and settle events.
 - Agent status: `starting`, `running`, `idle`, `question`, `blocked`, `failed`. `question` and `blocked` count as not running. An agent that does not connect within 30 s, or whose window is gone without a result, is `failed`. The supervisor checks the windows every 2 s.
@@ -104,7 +106,7 @@ The code for the test run (`changedFiles`, `plan`, `execute`, `verdict`) is in `
 The limits are constants in code. A later step moves them to the profile.
 
 - **Gate tries:** max 3 red gate results per task. On the third, the subagent does not get the failures. It does the forced handoff (see "Handoff") and the result has status `handoff`, `details.reason` with the gate reason, and the line `gate red: <reason>` in the text. An `answer` or a new `task` message resets the count, and so does a green gate.
-- **Tokens:** max 100 000 tokens per agent (sum of the usage of its messages). When the sum reaches the limit while the agent runs, the supervisor sends `{type:"handoff"}`. See "Handoff".
+- **Tokens:** max 100 000 tokens of context per agent: the tokens of its last message, which hold the whole context of that request. The cost is the sum of all messages. When the context reaches the limit while the agent runs, the supervisor sends `{type:"handoff"}`. See "Handoff".
 - A failed agent is final: a later `settled`, `gate` or `message` event changes nothing.
 
 ## Handoff
@@ -208,17 +210,13 @@ The main pi connects to the supervisor when the first subagent starts. At `sessi
 ## Changes
 
 <!-- changelog:start -->
-## 0.7.0 — 2026-10-26
+## 0.8.1 — 2026-10-27
 
-- merge action with a merge agent on a conflict
+- tests: run tests and gates in the dev environment of the project
 
-- the subagent commits with its own subject
+- request id in each client request and its answer
 
-- a git worktree and branch per subagent
-
-- agent calls done, gate runs, green forces a handoff
-
-- enforced done tool with a git check of the changes
+- token limit checks the context size, not a sum
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

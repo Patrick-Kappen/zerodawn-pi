@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.1 — 2026-10-27
+
+- inline output also has a 4 KB limit
+
+- print mode waits for background jobs before it ends
+
+- short failure output inline; fail on a missing cwd
+
 ## 0.6.0 — 2026-10-27
 
 - files: read sends only new lines; bash blocks file views

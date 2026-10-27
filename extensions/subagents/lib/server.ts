@@ -148,6 +148,17 @@ export async function startSupervisor(options: SupervisorOptions) {
     pollMs: options.pollMs,
   });
 
+  // A refused line keeps its requestId, so the client rejects the right request.
+  function requestIdOf(line: string): { requestId?: string } {
+    let requestId: unknown;
+    try {
+      requestId = (JSON.parse(line) as { requestId?: unknown }).requestId;
+    } catch {
+      return {};
+    }
+    return typeof requestId === "string" ? { requestId } : {};
+  }
+
   function handle(socket: Socket, connection: Connection, line: string): void {
     const message = parseClientLine(line);
     switch (message.type) {
@@ -171,29 +182,29 @@ export async function startSupervisor(options: SupervisorOptions) {
         return;
       }
       case "status":
-        send(socket, { type: "status", agents: agents.entries(), main: lifecycle.isMainConnected() ? "connected" : "gone" });
+        send(socket, { type: "status", requestId: message.requestId, agents: agents.entries(), main: lifecycle.isMainConnected() ? "connected" : "gone" });
         return;
       case "start":
         if (connection.role !== "main") throw new Error('supervisor: only a connection with hello role "main" can start a subagent.');
         agents.start(message.task, message.args, message.checks, message.models, { repo: message.repo, sha: message.sha }).then(
           async (id) => {
             await writing;
-            send(socket, { type: "started", id });
+            send(socket, { type: "started", requestId: message.requestId, id });
           },
-          (error: Error) => send(socket, { type: "error", message: error.message }),
+          (error: Error) => send(socket, { type: "error", requestId: message.requestId, message: error.message }),
         );
         return;
       case "discard":
         if (connection.role !== "main") throw new Error('supervisor: only a connection with hello role "main" can discard a subagent.');
         agents.discard(message.id).then(
-          (text) => send(socket, { type: "discarded", id: message.id, text }),
-          (error: Error) => send(socket, { type: "error", message: error.message }),
+          (text) => send(socket, { type: "discarded", requestId: message.requestId, id: message.id, text }),
+          (error: Error) => send(socket, { type: "error", requestId: message.requestId, message: error.message }),
         );
         return;
       case "answer":
         if (connection.role !== "main") throw new Error('supervisor: only a connection with hello role "main" can answer a subagent.');
         agents.answer(message.id, message.text);
-        send(socket, { type: "started", id: message.id });
+        send(socket, { type: "started", requestId: message.requestId, id: message.id });
         return;
       case "ask":
       case "blocker":
@@ -232,7 +243,7 @@ export async function startSupervisor(options: SupervisorOptions) {
         try {
           handle(socket, connection, line);
         } catch (error) {
-          send(socket, { type: "error", message: (error as Error).message });
+          send(socket, { type: "error", ...requestIdOf(line), message: (error as Error).message });
         }
       }
     });

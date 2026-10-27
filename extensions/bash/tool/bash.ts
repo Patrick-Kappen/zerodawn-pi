@@ -1,11 +1,11 @@
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Key } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { callFileId, freeId, shorten, storeDir } from "../../../shared/store.ts";
 import { age } from "../../../shared/util.ts";
-import { DEFAULT_LIMIT_S, INLINE_LINES, INLINE_WAIT_S, NO_TIME_LIMIT, STREAM_LINES, STREAM_MS, STREAM_TAIL_BYTES } from "../config.ts";
+import { DEFAULT_LIMIT_S, INLINE_BYTES, INLINE_LINES, INLINE_WAIT_S, NO_TIME_LIMIT, STREAM_LINES, STREAM_MS, STREAM_TAIL_BYTES } from "../config.ts";
 import type { State } from "../state.ts";
 import type { Widget } from "../ui/dashboard.ts";
 import { type Job, kill, limitText, type Meta, render, resultText, saveMeta, spawnJob, statsOf } from "./jobproc.ts";
@@ -29,7 +29,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
   pi.registerTool({
     name: "bash",
     label: "bash",
-    description: `Run a bash command. Returns the exit status; output up to ${INLINE_LINES} lines, else its size and path. A failure adds every distinct error line. Over ${INLINE_WAIT_S} s it continues as a job and a message reports it. Use it for builds, scripts and tools; not to read or search files.`,
+    description: `Run a bash command. Returns the exit status; output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB, else its size and path. A failure adds every distinct error line. Over ${INLINE_WAIT_S} s it continues as a job and a message reports it. Use it for builds, scripts and tools; not to read or search files.`,
     promptSnippet: "Run a bash command; short output back, long commands continue in the background",
     promptGuidelines: [
       "Use bash to run things, not to read: read for a range of a file, grep for a search, git for a diff or log.",
@@ -49,6 +49,8 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
     }),
 
     async execute(toolCallId, params, signal, onUpdate, ctx) {
+      if (!statSync(ctx.cwd, { throwIfNoEntry: false })?.isDirectory())
+        throw new Error(`bash: the working directory ${ctx.cwd} does not exist. Restart pi in an existing directory.`);
       const outDir = storeDir(ctx, "out");
       const jobsDir = storeDir(ctx, "jobs");
       const id = freeId(callFileId(ctx, toolCallId), (i) => existsSync(join(outDir, `${i}.bash.log`)) || existsSync(join(jobsDir, `${i}.json`)));

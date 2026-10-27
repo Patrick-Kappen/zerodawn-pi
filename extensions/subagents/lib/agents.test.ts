@@ -111,10 +111,11 @@ test("usage at the token limit asks for a handoff once; the handoff data gives s
   agents.hello(ID);
   toMains.length = 0;
   agents.event(ID, { kind: "message", text: "a", usage: { tokens: MAX_TOKENS - 1, cost: 1 } });
-  assert.deepEqual(toSub, [[ID, { type: "task", task: "do it" }]]);
+  agents.event(ID, { kind: "message", text: "b", usage: { tokens: MAX_TOKENS - 1, cost: 1 } });
+  assert.deepEqual(toSub, [[ID, { type: "task", task: "do it" }]], "two messages below the limit do not add up");
   assert.equal(toMains.length, 0);
-  agents.event(ID, { kind: "message", text: "b", usage: { tokens: 1, cost: 1 } });
-  agents.event(ID, { kind: "message", text: "c", usage: { tokens: 5, cost: 1 } });
+  agents.event(ID, { kind: "message", text: "c", usage: { tokens: MAX_TOKENS, cost: 1 } });
+  agents.event(ID, { kind: "message", text: "d", usage: { tokens: MAX_TOKENS + 5, cost: 1 } });
   assert.deepEqual(toSub.slice(1), [[ID, { type: "handoff" }]]);
   assert.equal(toMains.length, 0);
   await agents.handoff(ID, HANDOFF, undefined, undefined, undefined);
@@ -203,7 +204,7 @@ test("hello sends the task and sets running; settle sets idle and sends one resu
       id: ID,
       status: "idle",
       text: "s\na.ts:1 x\ntests: not run: no changed files",
-      usage: { tokens: 20, cost: 1 },
+      usage: { tokens: 10, cost: 1 },
       events: ["tool bash {}", "message m", "message n"],
       model: "m/x:off",
       handoff: SCOUT,

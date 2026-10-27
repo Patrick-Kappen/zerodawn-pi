@@ -4,6 +4,7 @@ export const STREAM_TAIL_BYTES = 64 * 1024;
 export const RESULT_TAIL_BYTES = 1024 * 1024;
 export const TAIL_LINES = 3;
 export const INLINE_LINES = 50;
+export const INLINE_BYTES = 4 * 1024;
 export const DEFAULT_LIMIT_S = 3600;
 export const INLINE_WAIT_S = 15;
 export const NO_TIME_LIMIT = "# no-time-limit";

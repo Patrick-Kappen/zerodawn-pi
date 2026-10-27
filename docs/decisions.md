@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 24. Tests and gates run in the dev environment of the project (2026-10-27)
+
+pi keeps the environment of the shell it started in. A test run in another project, or in a subagent worktree, got that environment and missed the tools of its own dev shell (for example `bun`). `run_tests`, the check commands and the done gate now run the command through `direnv exec <git root>` when the git root has an `.envrc`. direnv allows an `.envrc` per path, so a new subagent worktree is blocked; the supervisor runs `direnv allow` on it only when the repo has the same `.envrc` content and the user allowed it there. This adds no new trust. A blocked `.envrc` fails the run with the direnv message; there is no fallback to the pi environment.
+
 ## 23. The tooling picks the subagent model, by availability only (2026-10-27)
 
 One ladder `subagentModels` in the config serves all agents; profiles have no `models`. The agent does not choose or know its model: a model that picks its own model picks the strongest, and a list per profile repeats the same order in every file. The tooling takes the first entry that exists, has auth and answers a probe, and restarts on the next entry after a provider error, in the same worktree. Reason for availability only: it works without data. Quota (use left, reset time) and escalation on failure need numbers and a failure rule that do not exist yet; they come later and obey this order. Cost: a restart loses the context of the old agent; the task line and the changed files carry the work over.

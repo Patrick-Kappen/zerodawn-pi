@@ -78,11 +78,11 @@ test("supervisor: hello, status, bad line, close, shutdown", async () => {
 
     const client = await connect(supervisor.path);
     const next = lines(client);
-    client.write('{"type":"status"}\n');
-    assert.deepEqual(await next(), { type: "status", agents: [], main: "gone" });
-    client.write('{"type":"hello","role":"main"}\nnot json\n{"type":"status"}\n');
+    client.write('{"type":"status","requestId":"1"}\n');
+    assert.deepEqual(await next(), { type: "status", requestId: "1", agents: [], main: "gone" });
+    client.write('{"type":"hello","role":"main"}\nnot json\n{"type":"status","requestId":"1"}\n');
     assert.equal(((await next()) as { type: string }).type, "error");
-    assert.deepEqual(await next(), { type: "status", agents: [], main: "connected" });
+    assert.deepEqual(await next(), { type: "status", requestId: "1", agents: [], main: "connected" });
 
     client.end();
     await supervisor.done;
@@ -138,9 +138,9 @@ test("supervisor: start, sub hello, task, events, one result to main, immediate 
     const main = await connect(supervisor.path);
     const mainNext = lines(main);
     main.write(
-      '{"type":"hello","role":"main"}\n{"type":"start","task":"do it","args":["--no-tools"],"checks":[],"models":["m/x"],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}\n',
+      '{"type":"hello","role":"main"}\n{"type":"start","requestId":"1","task":"do it","args":["--no-tools"],"checks":[],"models":["m/x"],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}\n',
     );
-    assert.deepEqual(await mainNext(), { type: "started", id: ID });
+    assert.deepEqual(await mainNext(), { type: "started", requestId: "1", id: ID });
     assert.equal(calls.find((call) => call[0] === "open")?.[1]?.includes('"PI_SUBAGENT_ID"'), true);
     assert.equal(JSON.parse(await readFile(join(dir, "register.json"), "utf8")).agents[0].status, "starting");
 
@@ -150,7 +150,7 @@ test("supervisor: start, sub hello, task, events, one result to main, immediate 
     assert.deepEqual(await subNext(), { type: "task", task: "do it" });
     sub.write('{"type":"event","event":{"kind":"tool_start","name":"bash","args":"{}"}}\n');
     sub.write('{"type":"event","event":{"kind":"message","text":"m","usage":{"tokens":3,"cost":0.1}}}\n');
-    main.write('{"type":"status"}\n');
+    main.write('{"type":"status","requestId":"1"}\n');
     const status = (await mainNext()) as { agents: { status: string }[] };
     assert.equal(status.agents[0]?.status, "running");
     sub.write(
@@ -196,7 +196,7 @@ test("supervisor: main gone while an agent runs; the supervisor ends when the ag
     const main = await connect(supervisor.path);
     const mainNext = lines(main);
     main.write(
-      '{"type":"hello","role":"main"}\n{"type":"start","task":"t","args":[],"checks":[],"models":["m/x"],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}\n',
+      '{"type":"hello","role":"main"}\n{"type":"start","requestId":"1","task":"t","args":[],"checks":[],"models":["m/x"],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}\n',
     );
     await mainNext();
     const sub = await connect(supervisor.path);
@@ -228,7 +228,7 @@ test("supervisor: wrong roles and unknown ids get an error message", async () =>
     const next = lines(client);
     for (const [line, pattern] of [
       [
-        '{"type":"start","task":"t","args":[],"checks":[],"models":["m/x"],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',
+        '{"type":"start","requestId":"1","task":"t","args":[],"checks":[],"models":["m/x"],"repo":"/r/p","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',
         /only a connection with hello role "main"/,
       ],
       ['{"type":"event","event":{"kind":"settled","text":""}}', /only a connection with hello role "sub"/],

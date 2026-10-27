@@ -1,5 +1,61 @@
 # Changelog
 
+## 0.14.1 — 2026-10-27
+
+### shared 0.7.1
+
+- tests: run tests and gates in the dev environment of the project
+
+### bash 0.6.1
+
+- inline output also has a 4 KB limit
+
+- print mode waits for background jobs before it ends
+
+- short failure output inline; fail on a missing cwd
+
+### files 0.3.1
+
+- read resends a known part shorter than its note
+
+### subagents 0.8.1
+
+- tests: run tests and gates in the dev environment of the project
+
+- request id in each client request and its answer
+
+- token limit checks the context size, not a sum
+
+### tests 0.4.2
+
+- run tests and gates in the dev environment of the project
+
+- print mode waits for background runs before it ends
+
+### repository
+
+- tests: run tests and gates in the dev environment of the project
+- subagents: ladder for now is deepseek on opencode-go, then sonnet low
+- docs: subagents design with the decisions of the user
+- docs: subagents design with and without nullspace
+
+## 0.14.0 — 2026-10-27
+
+### shared 0.7.0
+
+- subagents: model ladder by availability from subagentModels (breaking)
+
+### subagents 0.8.0
+
+- model ladder by availability from subagentModels (breaking)
+
+### repository
+
+- subagents: opencode-go deepseek after the free one in the ladder
+- subagents: model ladder by availability from subagentModels
+- ci: nvim in the dev shell for the files compat tests
+- docs: TODO note for a done check after every agent
+
 ## 0.13.0 — 2026-10-27
 
 ### shared 0.6.0
