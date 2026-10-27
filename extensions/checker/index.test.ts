@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildState, decide, FOLLOWUP_TYPE, followupText, type State } from "./index.ts";
+import { createEventBus } from "@earendil-works/pi-coding-agent";
+import { BACKGROUND_JOBS_QUERY, backgroundJobRunning, buildState, decide, FOLLOWUP_TYPE, followupText, type State } from "./index.ts";
+
+test("backgroundJobRunning asks the bash extension and is false without an answer", () => {
+  const events = createEventBus();
+  assert.equal(backgroundJobRunning({ events }), false);
+  events.on(BACKGROUND_JOBS_QUERY, (q) => {
+    (q as { running: boolean }).running = true;
+  });
+  assert.equal(backgroundJobRunning({ events }), true);
+});
 
 const msg = (message: any) => ({ type: "message", message });
 const call = (id: string, name: string, args: any) => ({ type: "toolCall", id, name, arguments: args });

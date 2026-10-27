@@ -3,13 +3,15 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { createState } from "../state.ts";
+import { createEventBus } from "@earendil-works/pi-coding-agent";
+import { BACKGROUND_JOBS_QUERY, createState } from "../state.ts";
 import type { Job } from "./jobproc.ts";
 import { registerJobs } from "./jobs.ts";
 
 const handlers = new Map<string, (event: any, ctx?: any) => unknown>();
 const pi = {
   on: (name: string, fn: (event: any, ctx?: any) => unknown) => handlers.set(name, fn),
+  events: createEventBus(),
   registerTool() {},
   registerShortcut() {},
   registerCommand() {},
@@ -18,6 +20,14 @@ const pi = {
 const s = createState();
 registerJobs(pi, s, { refresh() {}, stop() {} });
 handlers.get("session_shutdown")?.({ reason: "quit" });
+
+test("registerJobs answers the background jobs query of other extensions", () => {
+  const query = { running: false };
+  s.jobs.set("q1", { bg: true } as Job);
+  pi.events.emit(BACKGROUND_JOBS_QUERY, query);
+  s.jobs.delete("q1");
+  assert.equal(query.running, true);
+});
 const job = (id: string, extra: Partial<Job>): Job => ({
   id,
   command: "x",
@@ -65,6 +75,7 @@ test("print mode: before settle waits for a running background job and sends its
   const sent: string[] = [];
   const api = {
     on: (name: string, fn: (event: any, ctx?: any) => unknown) => own.set(name, fn),
+    events: createEventBus(),
     registerTool() {},
     registerShortcut() {},
     registerCommand() {},
