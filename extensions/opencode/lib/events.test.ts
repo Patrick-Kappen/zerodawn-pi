@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { applyEvent, emptyRun, parseModels, report } from "./events.ts";
+import { applyEvent, emptyRun, parseModels, report, runError } from "./events.ts";
 
 const line = (event: object) => JSON.stringify({ sessionID: "ses_1", timestamp: 1, ...event });
 
@@ -52,6 +52,13 @@ describe("OpenCode events", () => {
     assert.equal(run.tools.length, 1);
     assert.equal(run.tools[0].input.length, 120);
     assert.ok(run.tools[0].input.endsWith("…"));
+  });
+
+  test("an error event comes before the exit code", () => {
+    const run = emptyRun();
+    applyEvent(run, line({ type: "error", error: { type: "provider.free-limit", message: "Free usage limit reached." } }));
+    assert.equal(runError(run, 1, ""), "Free usage limit reached.\nSession: ses_1");
+    assert.equal(runError(emptyRun(), 1, "boom"), "exit 1: boom");
   });
 
   test("rejects a line that is not JSON", () => {

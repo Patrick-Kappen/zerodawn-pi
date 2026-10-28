@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { applyEvent, emptyRun, parseModels, type Run, report } from "./lib/events.ts";
+import { applyEvent, emptyRun, parseModels, type Run, report, runError } from "./lib/events.ts";
 
 const BIN = "opencode2";
 const AGENT = "pi-worker";
@@ -78,10 +78,8 @@ async function work(task: string, model: string, session: string | undefined, cw
   const exit = await run(args, cwd, task, (line) => applyEvent(result, line), signal);
   if (signal.aborted) throw new Error(`opencode: stopped at the end of the session. Session: ${result.session}`);
   if (exit.timedOut) throw new Error(`opencode: stopped after ${TIMEOUT_MS / 60_000} minutes. Session: ${result.session}`);
-  if (exit.code !== 0) throw new Error(`opencode: ${BIN} exit ${exit.code}: ${tail(exit.stderr)}`);
-  if (result.errors.length) throw new Error(`opencode: ${result.errors.join("\n")}\nSession: ${result.session}`);
-  if (!result.session) throw new Error("opencode: the output has no session ID. Check the OpenCode version.");
-  if (!result.text.length) throw new Error(`opencode: the agent gave no answer. Session: ${result.session}`);
+  const error = runError(result, exit.code, tail(exit.stderr));
+  if (error) throw new Error(`opencode: ${error}`);
   return { text: report(result), details: { model, session: result.session, tools: result.tools, tokens: result.tokens, cost: result.cost } };
 }
 

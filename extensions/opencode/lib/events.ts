@@ -62,6 +62,14 @@ export function applyEvent(run: Run, line: string): void {
   }
 }
 
+/** The error of a finished run, or undefined. An error event names the cause better than the exit code, so it comes first. */
+export function runError(run: Run, code: number | null, stderr: string): string | undefined {
+  if (run.errors.length) return `${run.errors.join("\n")}\nSession: ${run.session}`;
+  if (code !== 0) return `exit ${code}: ${stderr}`;
+  if (!run.session) return "the output has no session ID. Check the OpenCode version.";
+  if (!run.text.length) return `the agent gave no answer. Session: ${run.session}`;
+}
+
 export function report(run: Run): string {
   const lines = [run.text.join("\n\n")];
   if (run.tools.length) {
