@@ -87,7 +87,9 @@ test("real Bun discovery partitions every fixture once and keeps affected units 
     const result = spawnSync("bash", args, { cwd: root, encoding: "utf8", timeout: 10_000 });
     if (result.error) throw result.error;
     assert.equal(result.status, 0, `${args.join(" ")}: ${result.stderr}`);
-    return [...`${result.stdout}\n${result.stderr}`.matchAll(/\(pass\) (\w+)/g)].map((match) => match[1]).sort();
+    // FORCE_COLOR of the caller gives colour codes, and bun prints a check mark or (pass) after the environment.
+    const output = `${result.stdout}\n${result.stderr}`.replace(/\x1b\[[0-9;]*m/g, "");
+    return [...output.matchAll(/(?:\(pass\)|\u2713) (\w+)/g)].map((match) => match[1]).sort();
   };
   const justfile = readFileSync(join(sourceRoot, "justfile"), "utf8");
   const recipe = (name: string) => {
