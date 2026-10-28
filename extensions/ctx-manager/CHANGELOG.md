@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 — 2026-10-28
+
+- docs: split open work in TODO.md and BACKLOG.md
+
 ## 0.2.1 — 2026-10-27
 
 - docs: open points of 2026-10-27 in the TODO files

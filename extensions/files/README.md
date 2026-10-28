@@ -25,13 +25,9 @@ Registers pi's `read`, `edit` and `write` tools again with shorter descriptions 
 ## Changes
 
 <!-- changelog:start -->
-## 0.5.0 — 2026-10-27
+## 0.5.1 — 2026-10-28
 
-- docs: open points of 2026-10-27 in the TODO files
-
-- core: each tool rule in one place, description or parameter
-
-- core: workflow prompt replaces pi rules; tool descriptions complete
+- docs: split open work in TODO.md and BACKLOG.md
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

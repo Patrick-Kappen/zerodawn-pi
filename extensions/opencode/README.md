@@ -11,11 +11,9 @@ Needs `opencode` in `PATH`. No config. Tests: `events.test.ts`.
 ## Changes
 
 <!-- changelog:start -->
-## 0.3.0 — 2026-10-27
+## 0.3.1 — 2026-10-28
 
-- core: each tool rule in one place, description or parameter
-
-- core: workflow prompt replaces pi rules; tool descriptions complete
+- docs: split open work in TODO.md and BACKLOG.md
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

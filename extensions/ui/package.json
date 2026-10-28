@@ -1,6 +1,6 @@
 {
   "name": "ui",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "transcript views, message style, footer, code blocks, working indicator",
   "type": "module"
 }

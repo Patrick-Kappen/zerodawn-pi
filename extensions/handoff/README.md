@@ -55,11 +55,13 @@ The tool `recall { question, session? }` answers one question about earlier work
 ## Changes
 
 <!-- changelog:start -->
-## 0.2.0 — 2026-10-27
+## 0.3.0 — 2026-10-28
 
-- cut at the end of a run after the warning
+- short warning, tool handoff for an early cut
 
-- resume after a cut, check PR status of the card
+- keep the boundary entries of other extensions
+
+- cut in the middle of the work, keep the final answer
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

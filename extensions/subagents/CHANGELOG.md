@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.4 — 2026-10-28
+
+- docs: split open work in TODO.md and BACKLOG.md
+
 ## 0.8.3 — 2026-10-27
 
 - no provider tool choice for the end tools

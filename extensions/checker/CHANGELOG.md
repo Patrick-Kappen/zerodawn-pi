@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 — 2026-10-28
+
+- handoff: short warning, tool handoff for an early cut
+
+- check a final answer after a handoff warning
+
+- send back a check that the agent left open
+
 ## 0.2.1 — 2026-10-27
 
 - accept a rebuttal, fixed limit per user message

@@ -15,3 +15,13 @@ Needs the zerodawn-tmux addon `pair` and the zerodawn-nvim addon `pair` (`requir
 | `PI_PAIR_COMMAND`, `PI_PAIR_TMUX` | pair script and tmux wrapper, as in `projects` |
 | `PI_IDE_NEOVIDE` | Neovide command (default `neovide`) |
 | `PI_IDE_NVIM` | nvim command to reach the server (default `nvim`) |
+
+## Changes
+
+<!-- changelog:start -->
+## 0.1.0 — 2026-10-28
+
+- First release.
+
+[All changes](CHANGELOG.md)
+<!-- changelog:end -->

@@ -12,9 +12,9 @@ Adds two sections to the system prompt and keeps them current during the session
 ## Changes
 
 <!-- changelog:start -->
-## 0.2.0 — 2026-10-26
+## 0.2.1 — 2026-10-28
 
-- docs: AGENTS.md of each extension as rules, facts to README
+- docs: split open work in TODO.md and BACKLOG.md
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

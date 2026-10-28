@@ -1,6 +1,6 @@
 {
   "name": "subagents",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "`subagent` tool: delegate tasks to pi agents in a tmux session",
   "type": "module"
 }

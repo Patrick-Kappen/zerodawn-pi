@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0 — 2026-10-28
+
+- projects: /switch picker, /ide pair, pi-tui-kit dependency
+
 ## 0.9.0 — 2026-10-27
 
 - a red check shows biome errors without a position

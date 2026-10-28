@@ -21,3 +21,13 @@ Projects are the open worktree windows of `pair list`; when none is open, the re
 | `PI_PAIR_TMUX` | tmux wrapper, passed as `--tmux` |
 
 Needs pi inside tmux (`$TMUX_PANE`), a paired client (`/ide` starts it), and `zoxide`, `git`.
+
+## Changes
+
+<!-- changelog:start -->
+## 0.1.0 — 2026-10-28
+
+- First release.
+
+[All changes](CHANGELOG.md)
+<!-- changelog:end -->

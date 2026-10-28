@@ -11,9 +11,9 @@ The edits are written only when they free at least 16 KB together, so the prompt
 ## Changes
 
 <!-- changelog:start -->
-## 0.2.1 — 2026-10-27
+## 0.2.2 — 2026-10-28
 
-- docs: open points of 2026-10-27 in the TODO files
+- docs: split open work in TODO.md and BACKLOG.md
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

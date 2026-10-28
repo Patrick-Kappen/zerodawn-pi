@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2 — 2026-10-28
+
+- docs: split open work in TODO.md and BACKLOG.md
+
+- a check with a pipe reports the failure of any part
+
 ## 0.6.1 — 2026-10-27
 
 - a check with cd runs in the environment of that directory
