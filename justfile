@@ -1,12 +1,15 @@
 sibling := "zerodawn-pi-private"
 
-# Run all tests with the installed pi version
-test: pi-version
-    bun test
+# Run both test groups with the installed pi version
+test: test-unit test-integration
 
-# Test contracts between extensions and release scripts
+# Run isolated logic tests without processes, sockets or mutable files
+test-unit: pi-version
+    bun test --path-ignore-patterns '**/*.integration.test.ts' --path-ignore-patterns '**/integration/**'
+
+# Run filesystem, process and extension contract tests
 test-integration: pi-version
-    bun test ./integration
+    bun test .integration.test.ts integration/
 
 # Run the tests for these changed files; run_tests calls it: just test-changed FILE...
 test-changed *files: pi-version

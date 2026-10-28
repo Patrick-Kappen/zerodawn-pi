@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { errorLines, exitStatus, render, resultText, spawnJob, summarizeFromDisk } from "./jobproc.ts";
 
 function run(command: string, limit = 10): Promise<{ code: number | null; sig: string | null; dir: string; log: string; status: string }> {
   const dir = mkdtempSync(join(tmpdir(), "bash-"));
+  after(() => rmSync(dir, { recursive: true, force: true }));
   const commandFile = join(dir, "job.sh");
   writeFileSync(commandFile, `${command}\n`);
   const log = join(dir, "job.log");
@@ -50,6 +51,7 @@ test("the time limit kills the whole job", async () => {
 
 test("summarizeFromDisk reads the exit code from the script footer of an old log when the status file is gone", () => {
   const dir = mkdtempSync(join(tmpdir(), "bash-"));
+  after(() => rmSync(dir, { recursive: true, force: true }));
   const log = join(dir, "job.log");
   writeFileSync(log, 'Script started on x\nhi\r\n\nScript done on y [COMMAND_EXIT_CODE="5"]\n');
   const meta = { id: "x", command: "echo hi", log, status: join(dir, "missing"), start: Date.now(), limit: 0, bg: true, reported: false };

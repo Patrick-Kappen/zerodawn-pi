@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { fileLines, linesInContext, seenRanges, segments } from "./lines.ts";
 import { outline } from "./outline.ts";
 import { READ_MAX_BYTES, READ_MAX_LINES, registerRead, renderRead } from "./read.ts";
@@ -126,6 +126,7 @@ test("read tool: a second read of the same range is not sent again; after a chan
   let tool: any;
   registerRead({ registerTool: (t: any) => (tool = t) } as any, "/");
   const dir = mkdtempSync(join(tmpdir(), "read-"));
+  after(() => rmSync(dir, { recursive: true, force: true }));
   const file = join(dir, "a.ts");
   writeFileSync(file, `${wide(10).join("\n")}\n`);
   const entries: any[] = [];

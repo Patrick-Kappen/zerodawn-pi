@@ -326,14 +326,14 @@
         {
           "always_run": true,
           "args": [],
-          "entry": "/nix/store/x2ly7q1c9x066pv7zq0iv9j2vf9z1486-tests",
+          "entry": "/nix/store/qyj41kv0d866cv44s25zi0l435gbbclm-tests-unit",
           "exclude": "^$",
           "exclude_types": [],
           "fail_fast": false,
           "files": "",
-          "id": "tests",
+          "id": "tests-unit",
           "language": "unsupported",
-          "name": "tests: the full test suite",
+          "name": "tests: unit tests",
           "pass_filenames": false,
           "require_serial": false,
           "stages": [

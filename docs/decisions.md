@@ -2,6 +2,19 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 38. Unit tests and integration tests run as separate groups (2026-10-28)
+
+The commit hook ran processes, Git, and tmux on every commit. Source edits also selected integration tests for unrelated extensions.
+Integration tests now use an explicit filename suffix beside their source, or the existing `integration/` directory.
+This keeps relative imports and fixtures intact. Mixed files stay in the integration group unless their tests are split.
+Bun selects the groups; no new runner or dependency is needed. Real discovery tests make sure both groups cover each fixture once.
+Affected source edits select unit tests. Full local checks and CI retain integration tests, including failures and cleanup.
+Commit hooks automatically run unit tests and static checks. A unit failure blocks the commit without a separate agent request.
+Removing automatic tests in favor of agent instructions was wrong. Agents do not need a manual test checklist.
+CI runs integration tests and complete checks. Local commands remain available to investigate failures.
+Nix unit checks need Bun, but no integration tools.
+This replaces decision 26 and the affected-test selection rule in decision 33. It keeps the suite selection of decision 37 and adds the group split. It does not change extension behavior or release policy.
+
 ## 37. CI selects affected suites and does not repeat the local test hook (2026-10-28)
 
 Changes decision 26 for Nix checks, not local commits.

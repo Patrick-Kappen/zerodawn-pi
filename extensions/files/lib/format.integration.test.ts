@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { registerFiles } from "./files.ts";
 import { formatterFor, runFormatter } from "./format.ts";
 
@@ -10,6 +10,7 @@ const SPACES = '#!/bin/sh\nfor f; do :; done\nsed -i "s/ *: */: /" "$f"\n';
 
 function project(files: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), "format-"));
+  after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, ".git"));
   for (const [name, text] of Object.entries(files)) {
     mkdirSync(join(dir, name, ".."), { recursive: true });

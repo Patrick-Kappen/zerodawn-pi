@@ -80,16 +80,26 @@ Some extensions read `config.json` next to `package.json`; copy `config.example.
 
 | Command | What |
 |---|---|
-| `just test` | all tests (`bun test`) |
-| `just test-integration` | contracts between extensions and release scripts |
+| `just test` | both test groups |
+| `just test-unit` | isolated logic, with mocks and static fixtures |
+| `just test-integration` | real files, processes, sockets, Git, tmux, and extension contracts |
 | `just types` | type check (`tsc`) |
 | `just lint` | biome and shellcheck |
 | `just fmt` | format and apply safe fixes |
 | `just check` | lint, types, tests, `nix flake check` |
 | `just dev` | pi in a tmux sandbox with all extensions; `just dev-screen`, `just dev-send "…"`, `just dev-key C-c`, `just dev-stop`. `PI_DEV=<name>` on each of them gives a separate session and sandbox |
 
-The tests in `integration/` use real local processes and fixed model responses. They do not call paid providers.
-Affected extension tests also run this group. Nix runs it as `tests-integration`.
+Integration tests use `*.integration.test.ts` beside their source, or `*.test.ts` under `integration/`.
+Other `*.test.ts` files contain unit tests. Static fixture reads are allowed; real file changes and external processes belong in integration tests.
+Mixed files stay in the integration group unless their tests are split. No test calls paid providers.
+
+`run_tests` runs affected unit tests during source edits. Changes to integration tests also run the integration group.
+Changes to shared code or the root manifest run all unit tests. Changes to repository tooling run all Nix checks.
+`just test` and `just check` run both groups. Nix runs units per extension and shared module, and integrations as `tests-integration`.
+Commit hooks automatically run unit tests and static checks. A unit failure blocks the commit.
+CI runs integration tests, type checks, Nix checks, and compatibility checks when required.
+Agents do not need a manual test checklist. The commands above remain available to investigate failures.
+See [docs/test-separation.md](docs/test-separation.md) for measurements and scope.
 
 CI selects checks from changed files on PRs and pushes to main.
 Documentation changes run formatting and safety checks, without tests.
