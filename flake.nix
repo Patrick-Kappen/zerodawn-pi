@@ -310,6 +310,11 @@
               default = null;
               description = "Checkout of the NixOS flake that built this system. systemstate reports the deployed revision against it.";
             };
+            lspServer = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Socket of the user's nvim LSP server, exported as PI_LSP_SERVER. Null turns the lsp extension off.";
+            };
             subagentExtensions = lib.mkOption {
               type = lib.types.listOf lib.types.str;
               default = [ ];
@@ -348,17 +353,22 @@
           };
 
           config = lib.mkIf cfg.enable {
-            home.file.${cfg.path}.source = configured;
+            home = {
+              file.${cfg.path}.source = configured;
+              sessionVariables = lib.optionalAttrs (cfg.lspServer != null) {
+                PI_LSP_SERVER = cfg.lspServer;
+              };
 
-            # settings.json is also written by pi and by /ext, so it is merged, not replaced.
-            home.activation.zerodawn-pi = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-              f="$HOME/.pi/agent/settings.json"
-              mkdir -p "$(dirname "$f")"
-              [ -s "$f" ] || echo '{}' > "$f"
-              ${lib.getExe pkgs.jq} --arg p "~/${cfg.path}" \
-                '.packages = ((.packages // []) | if index($p) then . else . + [$p] end)' \
-                "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-            '';
+              # settings.json is also written by pi and by /ext, so it is merged, not replaced.
+              activation.zerodawn-pi = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+                f="$HOME/.pi/agent/settings.json"
+                mkdir -p "$(dirname "$f")"
+                [ -s "$f" ] || echo '{}' > "$f"
+                ${lib.getExe pkgs.jq} --arg p "~/${cfg.path}" \
+                  '.packages = ((.packages // []) | if index($p) then . else . + [$p] end)' \
+                  "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+              '';
+            };
 
             systemd.user.services.pi-tool-log-cleanup = lib.mkIf cfg.logCleanup.enable {
               Unit.Description = "Remove the tool output of old pi sessions";
