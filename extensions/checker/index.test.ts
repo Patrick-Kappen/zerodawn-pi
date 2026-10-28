@@ -8,7 +8,6 @@ import {
   decide,
   FOLLOWUP_TYPE,
   followupText,
-  HANDOFF_WARNING_TYPE,
   newReasons,
   QUESTIONS,
   shouldCheck,
@@ -35,7 +34,7 @@ const call = (id: string, name: string, args: any) => ({ type: "toolCall", id, n
 const result = (id: string, toolName: string, t: string, isError = false) =>
   msg({ role: "toolResult", toolCallId: id, toolName, isError, content: [{ type: "text", text: t }] });
 const followup = (reasons: string[]) => ({ type: "custom_message", customType: FOLLOWUP_TYPE, content: followupText(reasons), display: false });
-const handoffWarning = { type: "custom_message", customType: HANDOFF_WARNING_TYPE, content: "end the run", display: false };
+const handoffWarning = { type: "custom_message", customType: "handoff-warning", content: "the cut comes after the next tool call", display: true };
 
 test("buildState takes only the run since the last user message", () => {
   const entries = [
@@ -107,13 +106,11 @@ test("buildState counts all follow-ups since the last user message; a tool call 
   assert.equal(buildState(entries)?.followupsUsed, 3);
 });
 
-test("a handoff warning in the run skips the check", () => {
+test("a final answer after a handoff warning is checked", () => {
   const answer = msg({ role: "assistant", content: [{ type: "text", text: "later" }] });
   const s = buildState([msg({ role: "user", content: "go" }), answer, handoffWarning]);
   assert.ok(s);
-  assert.equal(s.stopRequested, true);
-  assert.equal(shouldSkip(s), true);
-  assert.equal(shouldSkip(buildState([msg({ role: "user", content: "go" }), answer])!), false);
+  assert.equal(shouldSkip(s), false);
 });
 
 test("a live branch with three rounds of follow-up and text-only rebuttal gives at most one follow-up", () => {
@@ -130,12 +127,6 @@ test("a live branch with three rounds of follow-up and text-only rebuttal gives 
     entries.push(msg({ role: "assistant", content: [{ type: "text", text: "the checker is wrong: it is done" }] }));
   }
   assert.equal(given, 1);
-});
-
-test("buildState marks a run with a handoff warning as stop requested", () => {
-  const user = { type: "message", message: { role: "user", content: "go" } };
-  assert.equal(buildState([user])?.stopRequested, false);
-  assert.equal(buildState([user, { type: "custom_message", customType: HANDOFF_WARNING_TYPE, content: "end the run" }])?.stopRequested, true);
 });
 
 test("buildState returns undefined without a user message", () => {

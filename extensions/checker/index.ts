@@ -22,7 +22,6 @@ export const MAX_FOLLOWUPS = 3;
 export const FOLLOWUP_TYPE = "checker-followup";
 const EDIT_TOOLS = new Set(["edit", "write"]);
 export const BACKGROUND_JOBS_QUERY = "bash:background-jobs";
-export const HANDOFF_WARNING_TYPE = "handoff-warning";
 
 /** The bash extension answers synchronously; without it nothing answers and the result is false. */
 export function backgroundJobRunning(pi: Pick<ExtensionAPI, "events">) {
@@ -60,9 +59,9 @@ export function newReasons(reasons: string[], sentReasons: string[]) {
   return reasons.filter((reason) => !sentReasons.includes(reason));
 }
 
-/** Handoff warning in the run, or a text-only answer after a follow-up, ends the check. */
-export function shouldSkip(state: { stopRequested: boolean; rebutted: boolean }) {
-  return state.stopRequested || state.rebutted;
+/** A text-only answer after a follow-up ends the check. */
+export function shouldSkip(state: { rebutted: boolean }) {
+  return state.rebutted;
 }
 
 /** State of the run since the last user message, from session branch entries. */
@@ -83,7 +82,6 @@ export function buildState(entries: any[]) {
   let firstFollowup = -1;
   let lastFollowup = -1;
   let followups = 0;
-  let stopRequested = false;
   const sentReasons: string[] = [];
   for (let i = 0; i < run.length; i++) {
     const e = run[i];
@@ -92,7 +90,7 @@ export function buildState(entries: any[]) {
       lastFollowup = i;
       followups++;
       for (const reason of followupReasons(e.content)) if (!sentReasons.includes(reason)) sentReasons.push(reason);
-    } else if (e.type === "custom_message" && e.customType === HANDOFF_WARNING_TYPE) stopRequested = true;
+    }
   }
   let finalAnswer = "";
   let rebuttal = "";
@@ -133,7 +131,6 @@ export function buildState(entries: any[]) {
     followupsUsed: followups,
     sentReasons,
     rebutted: lastFollowup >= 0 && toolCallsAfterFollowup === 0 && rebuttal.trim().length > 0,
-    stopRequested,
   };
 }
 

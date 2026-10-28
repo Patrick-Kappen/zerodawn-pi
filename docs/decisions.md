@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 34. A handoff cuts in the middle of the work; a final answer stays (2026-10-27)
+
+Replaces 30. The warning told the agent to end the run, so it wrote a full report for the user. Then the cut cleared the chat, and the resume started a second answer. The user lost the first answer, and one answer was split in two. Twice the resume also started the task of an old card after the user asked something new. Now the warning says that the cut comes after the next tool call. A turn with tool calls after the warning gets the cut and the resume. A run that ends with a final answer gets the cut without resume, and the compaction keeps that answer. The card status no longer decides the resume, because the card model judged it wrong in both cases. The checker now also checks a final answer after the warning: the handoff no longer resumes that run, so the skip of 31 has no reason. A checker follow-up continues the run after the cut. The handoff kept only its own boundary entries, so it dropped the entries of the checker and ctx-manager at the same boundary. Now it adds its entries after them.
+
 ## 33. Integration tests protect contracts between extensions and release scripts (2026-10-27)
 
 Separate mocks accepted different event names in the checker and bash tests. No test called the release scripts.

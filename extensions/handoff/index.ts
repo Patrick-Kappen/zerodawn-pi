@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, SessionBoundaryDraft } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { handoffModels } from "../../shared/config.ts";
 import { sessionDir } from "../../shared/store.ts";
@@ -37,11 +37,21 @@ export async function buildHandoff(ctx: ExtensionContext, ladder: string[]): Pro
   return { handoff, path: saveHandoff(dir, handoff) };
 }
 
+type BoundaryEvent = { entries: SessionBoundaryDraft[]; continue: boolean };
+
+export function lastAnswerId(branch: Entry[]): string | undefined {
+  return branch.findLast((e) => e.type === "message" && e.message?.role === "assistant")?.id;
+}
+
 export default function (pi: ExtensionAPI) {
   let running: Promise<unknown> | undefined;
+  let latest: { handoff: Handoff; path: string } | undefined;
   const update = (ctx: ExtensionContext, why: string) => {
     running = buildHandoff(ctx, handoffModels())
-      .then(({ handoff, path }) => ctx.ui.notify(`handoff: card updated (${why}) by ${handoff.model}: ${path}`, "info"))
+      .then((built) => {
+        latest = built;
+        ctx.ui.notify(`handoff: card updated (${why}) by ${built.handoff.model}: ${built.path}`, "info");
+      })
       .catch((err) => ctx.ui.notify(`handoff: the card update (${why}) failed: ${(err as Error).message}`, "error"))
       .finally(() => {
         running = undefined;
@@ -50,37 +60,36 @@ export default function (pi: ExtensionAPI) {
   };
 
   let warned = 0;
-  let askedToStop = false;
-  const boundary = async (ctx: ExtensionContext, at: Boundary) => {
+  const boundary = async (ctx: ExtensionContext, at: Boundary, event: BoundaryEvent, toolCalls: boolean) => {
     const tokens = ctx.getContextUsage()?.tokens;
     if (tokens === undefined || tokens === null) return undefined;
     const jobs = jobsRunning(sessionDir(ctx));
-    const decision = decide(tokens, at, warned, jobs);
+    const decision = decide(tokens, at, warned, jobs, toolCalls);
     if (decision.action === "warn") {
       warned = decision.level;
-      askedToStop = true;
-      return { entries: [{ type: "custom_message" as const, customType: "handoff-warning", content: warning(tokens, jobs), display: true }] };
+      return { entries: [...event.entries, { type: "custom_message" as const, customType: "handoff-warning", content: warning(tokens, jobs), display: true }] };
     }
     if (decision.action !== "cut") return undefined;
     if (running) await running;
-    const { handoff, path } = await buildHandoff(ctx, handoffModels());
+    const branch = ctx.sessionManager.getBranch() as Entry[];
+    const { handoff, path } = latest && latest.handoff.untilEntry === branch.at(-1)?.id ? latest : await buildHandoff(ctx, handoffModels());
     warned = 0;
-    const stoppedForUs = askedToStop;
-    askedToStop = false;
     ctx.ui.notify(`handoff: ${decision.why}; the context is now the handoff (${path}).`, "warning");
+    if (at === "settle") {
+      const keep = lastAnswerId(branch) ?? null;
+      const cut = { type: "compaction" as const, summary: handoff.text, firstKeptEntryId: keep, details: { path } };
+      return { entries: [...event.entries, cut], continue: event.continue };
+    }
     const cut = { type: "compaction" as const, summary: handoff.text, firstKeptEntryId: null, details: { path } };
-    if (at === "settle" && (!stoppedForUs || handoff.card.waitsForUser || handoff.card.status === "done")) return { entries: [cut], continue: false };
-    return { entries: [cut, { type: "custom_message" as const, customType: "handoff-resume", content: RESUME, display: true }], continue: true };
+    const resume = { type: "custom_message" as const, customType: "handoff-resume", content: RESUME, display: true };
+    return { entries: [...event.entries, cut, resume], continue: true };
   };
 
-  pi.on("turn_end", (_event, ctx) => boundary(ctx, "turn_end"));
-  pi.on("agent_before_settle", (_event, ctx) => boundary(ctx, "settle"));
-  pi.on("agent_start", () => {
-    askedToStop = false;
-  });
+  pi.on("turn_end", (event, ctx) => boundary(ctx, "turn_end", event, event.toolResults.length > 0));
+  pi.on("agent_before_settle", (event, ctx) => boundary(ctx, "settle", event, false));
   pi.on("session_start", () => {
     warned = 0;
-    askedToStop = false;
+    latest = undefined;
   });
   pi.on("cache_warming_decision", (_event, ctx) => {
     const tokens = ctx.getContextUsage()?.tokens;
