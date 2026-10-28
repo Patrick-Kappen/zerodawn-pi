@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 39. Tests run after each edit, at commit for the staged files, at push in full (2026-10-28)
+
+The tests extension runs the tests of a file after each `edit` or `write`, in the background, and reports only a failure. The pre-commit hook `tests-changed` runs `scripts/test-changed.sh` with the staged files. The pre-push hook `tests-all` runs the unit and integration tests. `run_tests` and the test and check commands in bash run only when a file changed since the last run; the `rerun` option is gone. Reason: the agent tested too often, and a full suite at each commit was slow. A failure shows directly after the edit that causes it. Cost: a flaky test cannot run again without a change. It changes the commit hook of decision 38.
+
 ## 38. Unit tests and integration tests run as separate groups (2026-10-28)
 
 The commit hook ran processes, Git, and tmux on every commit. Source edits also selected integration tests for unrelated extensions.
@@ -80,11 +84,6 @@ Long sessions cost most: every request reads 100k to 250k tokens, and free-text 
 
 The pre-commit hook `tests` runs `bun test` over the whole repository, with the same tools on PATH as the nix test checks. Reason: a failing test shows at the commit, not after the push in CI. The checker extension therefore does not ask whether tests ran. Cost: every commit waits for the suite, and the nix `pre-commit` check runs the suite again next to the `tests-<name>` checks.
 
-Replaced by 27.
-
-## 27. Tests run after each edit, at commit for the staged files, at push in full (2026-10-28)
-
-The tests extension runs the tests of a file after each `edit` or `write`, in the background, and reports only a failure. The pre-commit hook `tests-changed` runs `scripts/test-changed.sh` with the staged files. The pre-push hook `tests-all` runs the unit and integration tests. `run_tests` and the test and check commands in bash run only when a file changed since the last run; the `rerun` option is gone. Reason: the agent tested too often, and a full suite at each commit was slow. A failure shows directly after the edit that causes it. Cost: a flaky test cannot run again without a change.
 
 ## 25. A classifier decides at settle time whether the agent is done (2026-10-27)
 
