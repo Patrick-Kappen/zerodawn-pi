@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -30,14 +31,14 @@ const ctx = {
 };
 const bash = (params: Record<string, unknown>, id: string) => tools[0].execute(id, params, undefined, undefined, ctx);
 
-test("a short command returns its result inline", async () => {
+test("a quick command returns its result inline", async () => {
   const r = await bash({ command: "echo hi" }, "a");
   assert.match(r.content[0].text, /^exit 0 \(\d+s\)\nhi$/);
   assert.equal(s.jobs.get(r.details.job)?.bg, false);
 });
 
 test("a failing command throws its result", async () => {
-  await assert.rejects(bash({ command: "echo bad >&2; exit 2" }, "b"), /^Error: exit 2 \(\d+s\)\nbad$/);
+  await assert.rejects(bash({ command: "echo bad >&2; false" }, "b"), /^Error: exit 1 \(\d+s\)\nbad$/);
 });
 
 test("a missing working directory fails with its path before the command starts", async () => {
@@ -48,22 +49,26 @@ test("a missing working directory fails with its path before the command starts"
   );
 });
 
-test("background: true returns the job id at once and a report follows", async () => {
-  const r = await bash({ command: "echo late", background: true }, "c");
+test("a command that is not quick returns the job id at once, keeps the turn, and a report follows", async () => {
+  const start = Date.now();
+  const r = await bash({ command: "sleep 0.3; echo late" }, "c");
+  assert.ok(Date.now() - start < 250, "the tool does not wait for the command");
   assert.match(r.content[0].text, /^job .*: running · log: /);
   assert.equal(r.details.background, true);
-  assert.equal(r.terminate, undefined, "a server keeps the turn: the agent works with it");
+  assert.equal(r.terminate, undefined, "the agent goes on with other work");
   while (reported.length === 0) await new Promise((done) => setTimeout(done, 50));
   assert.equal(reported[0].id, r.details.job);
 });
 
-test(`a command that runs longer than ${INLINE_WAIT_S} s moves to the background on its own and ends the turn`, {
+test(`a quick command that runs longer than ${INLINE_WAIT_S} s moves to the background and keeps the turn`, {
   timeout: (INLINE_WAIT_S + 10) * 1000,
 }, async () => {
+  const fifo = join(dir, "fifo");
+  execFileSync("mkfifo", [fifo]);
   const start = Date.now();
-  const r = await bash({ command: "sleep 60", timeout: INLINE_WAIT_S + 5 }, "d");
+  const r = await bash({ command: `cat ${fifo}`, timeout: INLINE_WAIT_S + 5 }, "d");
   assert.match(r.content[0].text, /^job .*: running · log: /);
-  assert.equal(r.terminate, true);
+  assert.equal(r.terminate, undefined);
   const waited = (Date.now() - start) / 1000;
   assert.ok(waited >= INLINE_WAIT_S && waited < INLINE_WAIT_S + 3, `waited ${waited}s`);
   kill(s.jobs.get(r.details.job)?.pid);

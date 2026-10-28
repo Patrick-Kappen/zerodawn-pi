@@ -136,10 +136,10 @@ async function createHarness() {
       { type: "message", message: { role: "user", content: prompt } },
       {
         type: "message",
-        message: { role: "assistant", content: [{ type: "toolCall", id: toolCallId, name: "bash", arguments: { command, background: true } }] },
+        message: { role: "assistant", content: [{ type: "toolCall", id: toolCallId, name: "bash", arguments: { command } }] },
       },
     );
-    return bash.execute(toolCallId, { command, background: true }, undefined, undefined, ctx).then((result: any) => {
+    return bash.execute(toolCallId, { command }, undefined, undefined, ctx).then((result: any) => {
       branch.push(
         { type: "message", message: { role: "toolResult", toolCallId, toolName: "bash", isError: false, content: result.content } },
         { type: "message", message: { role: "assistant", content: [{ type: "text", text: "Waiting for the background job." }] } },

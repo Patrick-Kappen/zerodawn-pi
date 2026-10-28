@@ -7,10 +7,9 @@ import { absolutePath } from "../../../shared/util.ts";
 import { loadRecipes } from "./recipes.ts";
 import { counts, type Diagnosis, diagnose, failures, warningLines } from "./report.ts";
 
-const INLINE_MS = 15 * 1000;
 const RERUN = "# rerun";
 
-type Result = { content: { type: "text"; text: string }[]; details: Record<string, unknown>; isError: boolean; terminate?: boolean };
+type Result = { content: { type: "text"; text: string }[]; details: Record<string, unknown>; isError: boolean };
 
 const noTest = (uncovered: string[]) =>
   `No test for: ${uncovered.join(", ")}. Add a test file that imports each of them, at the place and in the form that the AGENTS.md or README of the project gives, then run run_tests again.`;
@@ -61,7 +60,7 @@ export const TOOL = {
     "A changed code file that no test file imports is an error. A warning is an error.",
     "The result is one line when the tests pass. When they fail, it shows only the failures. The full output goes to a log file.",
     "A test command in bash runs run_tests in its place, and a check command in bash (lint, types, just check) gives a short result.",
-    `A run over ${INLINE_MS / 1000} s ends your turn; a message gives the result.`,
+    "A run returns at once and continues in the background; a message gives the result. Continue with other work, or end your turn when the next step needs the result.",
     "With no changed file it gives the earlier result.",
   ].join(" "),
   promptSnippet: "Run the tests for the changed files; green in one line, or only the failures",
@@ -81,8 +80,7 @@ const TEST_HEAD = "run_tests result (use run_tests next time):";
 const CHECK_HEAD = "Check result (do not run it again in another form):";
 
 /** The text and the state of a bash call that a test or check run replaced. */
-/** background: the run went to the background; the bash call then ends the turn. */
-export type Replacement = { text: string; isError: boolean; background: boolean };
+export type Replacement = { text: string; isError: boolean; background?: boolean };
 
 /** Gives the result of a run that went to the background, as a message to the agent. */
 export type Notify = (text: string, ok: boolean) => void;
@@ -91,7 +89,7 @@ const text = (t: string, isError: boolean, details: Record<string, unknown> = {}
 
 /**
  * The run_tests tool without its schema, and the check commands. Keeps the last results to give them again when no file changed.
- * A run waits up to inlineMs for its result; after that it continues in the background, and notify gives its result.
+ * A run continues in the background, and notify gives its result. Only the tests pass an inlineMs, to read a result in the call.
  */
 export class RunTests {
   private last = new Map<string, Result>();
@@ -100,7 +98,7 @@ export class RunTests {
 
   constructor(
     private readonly notify: Notify,
-    private readonly inlineMs = INLINE_MS,
+    private readonly inlineMs = 0,
   ) {}
 
   /** Forgets the results and stops the background runs, for a new session. */
@@ -126,7 +124,7 @@ export class RunTests {
       const r = await this.execute(toolCallId, { path: cdOf(command), rerun: command.includes(RERUN) }, ctx.signal, ctx);
       return { text: `${TEST_HEAD}\n${r.content[0].text}`, isError: r.isError, background: r.details.background === true };
     } catch (err) {
-      return { text: `${TEST_HEAD}\n${(err as Error).message}`, isError: true, background: false };
+      return { text: `${TEST_HEAD}\n${(err as Error).message}`, isError: true };
     }
   }
 
@@ -138,7 +136,7 @@ export class RunTests {
       const key = inGit(dir) ? fingerprint(dir, `check ${clean}`, changedFiles(dir)) : `check ${dir} ${clean}`;
       const earlier = this.last.get(key);
       if (earlier && !command.includes(RERUN))
-        return { text: `${CHECK_HEAD}\n${again(earlier, `add "${RERUN}" to run it again`).content[0].text}`, isError: earlier.isError, background: false };
+        return { text: `${CHECK_HEAD}\n${again(earlier, `add "${RERUN}" to run it again`).content[0].text}`, isError: earlier.isError };
       const r = await this.inline(key, `check ${callFileId(ctx, toolCallId)}`, ctx.signal, async (signal) => {
         const run = await execute(inProjectEnv(["bash", "-o", "pipefail", "-c", command], dir), ctx.cwd, signal);
         const log = callOutFile(ctx, toolCallId, "check");
@@ -148,13 +146,13 @@ export class RunTests {
       });
       return { text: `${CHECK_HEAD}\n${r.content[0].text}`, isError: r.isError, background: r.details.background === true };
     } catch (err) {
-      return { text: `${CHECK_HEAD}\n${(err as Error).message}`, isError: true, background: false };
+      return { text: `${CHECK_HEAD}\n${(err as Error).message}`, isError: true };
     }
   }
 
-  /** Starts a run and waits up to inlineMs for it. A later result goes to notify. A second call for the same key does not start a second run. */
+  /** Starts a run in the background; its result goes to notify. A second call for the same key does not start a second run. */
   private async inline(key: string, label: string, signal: AbortSignal | undefined, start: (signal: AbortSignal) => Promise<Result>): Promise<Result> {
-    if (this.running.has(key)) return { ...text(`${label} still runs for this change. ${LATER}`, false, { background: true }), terminate: true };
+    if (this.running.has(key)) return text(`${label} still runs for this change. ${LATER}`, false, { background: true });
     const stop = new AbortController();
     const session = this.session.signal;
     const stopRun = () => stop.abort();
@@ -185,7 +183,7 @@ export class RunTests {
         if (!session.aborted) this.notify(`${label} failed: ${err.message}`, false);
       },
     );
-    return { ...text(`${label}: background (more than ${this.inlineMs / 1000} s). ${LATER}`, false, { background: true }), terminate: true };
+    return text(`${label}: runs in the background. ${LATER}`, false, { background: true });
   }
 
   async execute(toolCallId: string, params: Params, signal: AbortSignal | undefined, ctx: ExtensionContext): Promise<Result> {
