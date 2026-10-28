@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.19.1 — 2026-10-28
+
+### pair 0.1.1
+
+- /ide finds the Neovide window by its nvim socket
+
+### repository
+
+- docs: add astra latency task and guard block measurement
+- docs: task to record mistakes and turn frequent ones into fixes
+
 ## 0.19.0 — 2026-10-28
 
 ### shared 0.10.0
