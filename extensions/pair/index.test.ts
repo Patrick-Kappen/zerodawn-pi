@@ -16,7 +16,7 @@ function setup(replies: Record<string, { code?: number; stdout?: string; stderr?
     spawnDetached: (c, a) => spawned.push([c, ...a]),
     exists: () => socketAppears,
     sleep: async () => {},
-    env: { XDG_RUNTIME_DIR: "/run/u" },
+    env: { XDG_RUNTIME_DIR: "/run/u", PI_PAIR_COMMAND: "pair" },
     pid: 7,
     cmdline: (pid) => ({ 41: ["neovide", "--server", "/other.sock"], 42: ["neovide", "--server", "/s.sock"] })[pid] ?? [],
   };
@@ -58,6 +58,16 @@ test("ide starts Neovide and the pair when none exists", async () => {
   assert.deepEqual(spawned, [["neovide", "--", "--listen", "/run/u/pi-ide-7.sock"]]);
   assert.deepEqual(calls.at(-2), ["pair", "register", "c1", "/run/u/pi-ide-7.sock"]);
   assert.deepEqual(calls.at(-1)?.slice(-1), [startExpr("/w")]);
+});
+
+test("ide without PI_PAIR_COMMAND fails before it registers the pair", async () => {
+  const { calls, deps } = setup(client);
+  deps.env = { XDG_RUNTIME_DIR: "/run/u" };
+  await assert.rejects(ide(deps, "%1", "/w"), /\/ide: PI_PAIR_COMMAND is not set/);
+  assert.equal(
+    calls.some((c) => c[0] === "pair"),
+    false,
+  );
 });
 
 test("ide fails loud: no tmux, no socket, nvim error", async () => {

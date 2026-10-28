@@ -52,6 +52,9 @@ export async function ide(deps: Deps, pane: string | undefined, dir: string): Pr
   for (let i = 0; i < 50 && !deps.exists(socket); i++) await deps.sleep(100);
   if (!deps.exists(socket))
     throw new Error(`/ide: Neovide did not open ${socket} within 5 s. Check that ${deps.env.PI_IDE_NEOVIDE || "neovide"} starts, or set PI_IDE_NEOVIDE.`);
+  if (!deps.env.PI_PAIR_COMMAND) {
+    throw new Error("/ide: PI_PAIR_COMMAND is not set. Start pi again in a new tmux pane, or set it to the pair script of zerodawn-tmux.");
+  }
   const { command, prefix } = pairCommand(deps.env);
   const registered = await deps.run(command, [...prefix, "register", client, socket]);
   if (registered.code !== 0) throw new Error(`/ide: pair register failed (exit ${registered.code}): ${registered.stderr.trim()}`);

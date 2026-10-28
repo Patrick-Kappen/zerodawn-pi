@@ -12,7 +12,8 @@ Needs the zerodawn-tmux addon `pair` and the zerodawn-nvim addon `pair` (`requir
 
 | Variable | What |
 |---|---|
-| `PI_PAIR_COMMAND`, `PI_PAIR_TMUX` | pair script and tmux wrapper, as in `projects` |
+| `PI_PAIR_COMMAND` | the pair script (required) |
+| `PI_PAIR_TMUX` | the tmux wrapper, as in `projects` |
 | `PI_IDE_NEOVIDE` | Neovide command (default `neovide`) |
 | `PI_IDE_NVIM` | nvim command to reach the server (default `nvim`) |
 
