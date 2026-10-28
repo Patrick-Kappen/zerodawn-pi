@@ -35,6 +35,14 @@ jobs:
         with:
           fetch-depth: 0
       - name: Tag new versions and release the package
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
         run: scripts/ci-release.sh
+      - name: Update the input in Nixos with a PR
+        if: steps.release.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.NIXOS_UPDATE_TOKEN }}
+          INPUT: ${{ github.event.repository.name }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: scripts/ci-nixos-update.sh "$INPUT" "$TAG"

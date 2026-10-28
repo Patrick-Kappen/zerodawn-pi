@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # After a merge to main: tag every new version and create the GitHub release. Needs GH_TOKEN and push rights.
+# Writes tag=<package tag> to GITHUB_OUTPUT when it released the package.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 fail() { printf 'ci-release: %s\n' "$1" >&2; [ $# -gt 1 ] && printf 'Next: %s\n' "$2" >&2; exit 1; }
 [ -n "${GH_TOKEN:-}" ] || fail "GH_TOKEN is not set" "the release job needs the GitHub token with contents: write"
+[ -n "${GITHUB_OUTPUT:-}" ] || fail "GITHUB_OUTPUT is not set" "run this script only in the GitHub Actions release job"
 git config user.name "github-actions[bot]"
 git config user.email "github-actions[bot]@users.noreply.github.com"
 git fetch -q --tags origin || fail "cannot fetch tags from origin" "check the token and the remote"
@@ -47,4 +49,5 @@ done
 tag_it "$tag" "$notes"
 gh release create "$tag" --title "$tag" --notes "$notes" ||
   fail "tag $tag is pushed but the GitHub release was not created" "create it by hand with the section of CHANGELOG.md: gh release create $tag --title $tag --notes-file FILE"
+echo "tag=$tag" >>"$GITHUB_OUTPUT"
 echo "released $tag with $tagged component tags"
