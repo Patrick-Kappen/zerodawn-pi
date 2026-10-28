@@ -41,7 +41,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
   pi.registerTool({
     name: "bash",
     label: "bash",
-    description: `Run a bash command for builds, scripts and tools. Read files with read, search with grep, and look at git history with git. Returns the exit status and the output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB; longer output gives its size and an out:<name> reference for read (offset=-N for the end) and grep. A failure adds every distinct error line. A quick command (ls, cd, pwd, echo, file operations, git status) returns its result. A bash call that is the only tool call of its message returns its result when it ends within ${ALONE_WAIT_S} s. Every other command returns a job id and runs in the background; a message reports its result. Continue with other work, or end your turn when the next step needs the result. Chain dependent steps in one command with &&, also a wait for a condition: timeout 30 bash -c 'until CHECK; do sleep 1; done' && NEXT.`,
+    description: `Run a bash command for builds, scripts and tools. Read files with read, search with grep, and look at git history with git. Returns the exit status and the output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB; longer output gives its size and an out:<name> reference for read (offset=-N for the end) and grep. A failure adds every distinct error line. A quick command (ls, cd, pwd, echo, file operations, git status) returns its result. A bash call that is the only tool call of its message returns its result when it ends within ${ALONE_WAIT_S} s. Every other command returns a job id and runs in the background; a message reports its result. Set background to start the command as a job at once, when you have other work during the run. Continue with other work, or end your turn without text when the next step needs the result. Chain dependent steps in one command with &&, also a wait for a condition: timeout 30 bash -c 'until CHECK; do sleep 1; done' && NEXT.`,
     promptSnippet: "Run a bash command; quick commands give the result, others run in the background",
     parameters: Type.Object({
       command: Type.String({ description: "Bash command to execute" }),
@@ -49,6 +49,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
         Type.Number({ description: `Timeout in seconds; the job is killed after this time. Default ${DEFAULT_LIMIT_S}, or none with "${NO_TIME_LIMIT}".` }),
       ),
       group: Type.Optional(Type.String({ description: "Give independent commands in one message the same group; they report together once." })),
+      background: Type.Optional(Type.Boolean({ description: "Start the command as a job at once and continue with other work." })),
     }),
 
     async execute(toolCallId, params, signal, onUpdate, ctx) {
@@ -124,7 +125,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       // The agent waits for a call that is alone in its message anyway, so a short command saves it a stop.
       // A command that still runs after the wait (a build, a big directory, a slow disk) moves to the background.
       const alone = aloneInMessage(ctx.sessionManager.getBranch(), toolCallId);
-      const wait = alone ? ALONE_WAIT_S : isQuick(params.command) ? INLINE_WAIT_S : 0;
+      const wait = params.background ? 0 : alone ? ALONE_WAIT_S : isQuick(params.command) ? INLINE_WAIT_S : 0;
       const autoMove = setTimeout(toBackground, wait * 1000);
       ctx.ui.setStatus("bash-wait", ctx.ui.theme.fg("dim", "bash running · ctrl+shift+b: background"));
       const inline = wait > 0 ? await Promise.race([done, moved]) : undefined;

@@ -2,6 +2,12 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 44. The agent can start a bash job at once (2026-10-28)
+
+Adds to decision 40. A call alone in its message waits up to 10 s, also when the agent has other work for that time.
+The `background` parameter starts the command as a job at once, so the agent chooses to continue.
+The tool description tells the agent to end its turn without text when it waits for a job. A "Waiting for …" line gave the user no information.
+
 ## 43. A clean file ends on quiet LSP progress (2026-10-28)
 
 vtsls sends no diagnostics for a clean file that it did not check before, so DiagnosticChanged never comes.
