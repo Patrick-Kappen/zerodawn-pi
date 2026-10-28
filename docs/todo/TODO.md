@@ -73,6 +73,7 @@
 - [ ] Set the thinking level per step, never to or from off ([task](../tasks/cost-thinking-level-per-step.md))
 - [ ] Decrease codemode output ([task](../tasks/cost-codemode-output.md))
 - [ ] Put repeated mistakes as ast-grep or semgrep rules in the repo ([task](../tasks/cost-rules-repeated-mistakes.md))
+- [ ] Record mistakes when they occur and turn frequent ones into fixes ([task](../tasks/learn-from-incidents.md))
 - [ ] Find out if nullspace allows a tmux server with a PTY ([task](../tasks/design-nullspace-tmux.md))
 - [ ] Decide where subagent worktrees live: state dir or repo ([task](../tasks/design-worktree-location.md))
 - [ ] Decide if subagents get layer skills or only profile skills ([task](../tasks/design-subagent-skills.md))
