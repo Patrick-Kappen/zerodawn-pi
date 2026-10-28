@@ -1,7 +1,7 @@
 // The Lua side runs in the user's Neovim server through luaeval. The script uses only single quotes, so it fits in a
 // Vim double-quoted string without escapes; see expression().
 
-const SOURCE = String.raw`
+const SOURCE = `
 local p = vim.json.decode(_A)
 local d = _G.__pi_debug
 if not d then
