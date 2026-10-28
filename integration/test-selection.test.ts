@@ -116,12 +116,38 @@ test("real Bun discovery partitions every fixture once and keeps affected units 
   assert.match(failed.stderr, /unit failure/);
 });
 
-test("commit hooks omit test suites while Nix keeps both groups", () => {
+test("commit hooks run unit tests automatically and reject failures without integration tests", (t) => {
   const hooks = JSON.parse(readFileSync(join(sourceRoot, ".pre-commit-config.yaml"), "utf8").replace(/^#.*\n/gm, ""));
-  const entries = hooks.repos.flatMap((repo: { hooks: { id: string; entry: string }[] }) => repo.hooks);
-  assert.ok(entries.some((hook: { id: string }) => hook.id === "biome"));
-  assert.ok(entries.some((hook: { id: string }) => hook.id === "gitleaks"));
-  assert.ok(entries.every((hook: { id: string; entry: string }) => !/^tests?\b/.test(hook.id) && !/\bbun test\b/.test(hook.entry)));
+  type Hook = { id: string; entry: string; always_run: boolean; pass_filenames: boolean; stages: string[] };
+  const entries: Hook[] = hooks.repos.flatMap((repo: { hooks: Hook[] }) => repo.hooks);
+  assert.ok(entries.some((hook) => hook.id === "biome"));
+  assert.ok(entries.some((hook) => hook.id === "gitleaks"));
+  const unit = entries.find((hook) => hook.id === "tests-unit");
+  assert.ok(unit, "commit hooks must run unit tests without an agent request");
+  assert.equal(unit.always_run, true);
+  assert.equal(unit.pass_filenames, false);
+  assert.deepEqual(unit.stages, ["pre-commit"]);
+
+  const root = mkdtempSync(join(tmpdir(), "pi-unit-hook-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, "integration"));
+  writeFileSync(join(root, "unit.test.ts"), 'import { test } from "bun:test"; test("UNIT_HOOK", () => {});\n');
+  const integration = 'throw new Error("integration tests must not run in the commit hook");\n';
+  writeFileSync(join(root, "files.integration.test.ts"), integration);
+  writeFileSync(join(root, "integration", "contract.test.ts"), integration);
+  const run = () => {
+    const result = spawnSync(unit.entry, [], { cwd: root, encoding: "utf8", timeout: 10_000 });
+    if (result.error) throw result.error;
+    return result;
+  };
+  const passed = run();
+  assert.equal(passed.status, 0, passed.stderr);
+  assert.match(passed.stderr, /UNIT_HOOK/);
+  assert.doesNotMatch(passed.stderr, /integration tests must not run/);
+  writeFileSync(join(root, "unit.test.ts"), 'import { test } from "bun:test"; test("UNIT_HOOK", () => { throw new Error("unit hook failure"); });\n');
+  const failed = run();
+  assert.notEqual(failed.status, 0);
+  assert.match(failed.stderr, /unit hook failure/);
   const flake = readFileSync(join(sourceRoot, "flake.nix"), "utf8");
   assert.match(flake, /nativeBuildInputs = \[ pkgs\.bun \];/);
   assert.match(flake, /HOME="\$TMPDIR" bun test .*\n\s+--path-ignore-patterns '\*\*\/\*\.integration\.test\.ts'/);

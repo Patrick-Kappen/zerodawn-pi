@@ -96,7 +96,9 @@ Mixed files stay in the integration group unless their tests are split. No test 
 `run_tests` runs affected unit tests during source edits. Changes to integration tests also run the integration group.
 Changes to shared code or the root manifest run all unit tests. Changes to repository tooling run all Nix checks.
 `just test` and `just check` run both groups. Nix runs units per extension and shared module, and integrations as `tests-integration`.
-Commit hooks run static checks, not test suites. CI retains both test groups.
+Commit hooks automatically run unit tests and static checks. A unit failure blocks the commit.
+CI runs integration tests, type checks, Nix checks, and compatibility checks when required.
+Agents do not need a manual test checklist. The commands above remain available to investigate failures.
 See [docs/test-separation.md](docs/test-separation.md) for measurements and scope.
 
 CI selects checks from changed files on PRs and pushes to main.

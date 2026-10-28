@@ -324,6 +324,28 @@
           "verbose": false
         },
         {
+          "always_run": true,
+          "args": [],
+          "entry": "/nix/store/g1hm879zk0bv7v0j7q869x7734n3p3v3-tests-unit",
+          "exclude": "^$",
+          "exclude_types": [],
+          "fail_fast": false,
+          "files": "",
+          "id": "tests-unit",
+          "language": "unsupported",
+          "name": "tests: unit tests",
+          "pass_filenames": false,
+          "require_serial": false,
+          "stages": [
+            "pre-commit"
+          ],
+          "types": [
+            "file"
+          ],
+          "types_or": [],
+          "verbose": false
+        },
+        {
           "always_run": false,
           "args": [],
           "entry": "/nix/store/fk6b6vknx0dy7bsqg6ba9qwgfsw21fyh-python3.14-pre-commit-hooks-6.0.0/bin/trailing-whitespace-fixer",

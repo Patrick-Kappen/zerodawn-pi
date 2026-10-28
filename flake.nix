@@ -443,6 +443,24 @@
                 pass_filenames = false;
                 always_run = true;
               };
+              tests-unit = {
+                enable = true;
+                name = "tests: unit tests";
+                entry = "${pkgs.writeShellScript "tests-unit" ''
+                  set -eu
+                  export PATH=${
+                    pkgs.lib.makeBinPath [
+                      pkgs.bun
+                      pkgs.coreutils
+                    ]
+                  }:$PATH
+                  [ -e node_modules ] || ln -s ${piModules pkgs}/node_modules node_modules
+                  exec bun test --path-ignore-patterns '**/*.integration.test.ts' --path-ignore-patterns '**/integration/**'
+                ''}";
+                stages = [ "pre-commit" ];
+                pass_filenames = false;
+                always_run = true;
+              };
               gitleaks = {
                 enable = true;
                 name = "gitleaks";
@@ -506,6 +524,7 @@
                   ];
                 };
                 nativeBuildInputs = testInputs pkgs;
+                ZD_HOOKS_CONFIG = self.checks.${system}.pre-commit.config.configFile;
               }
               ''
                 cp -r "$src" src

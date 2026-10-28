@@ -15,7 +15,10 @@ Most moves change only filenames. Mixed files remain integration tests; handoff 
 Shared code and root manifest changes select all unit tests. Repository tooling changes select all Nix checks.
 `just check` retains lint, types, both test groups, and all Nix checks.
 
-Commit hooks retain static checks only. Nix runs unit tests per extension and for shared code, with Bun as their only test tool.
+Commit hooks automatically run unit tests and static checks. A unit failure blocks the commit.
+CI runs integration tests and complete checks. Agents do not need a manual test checklist.
+Local commands remain available to investigate failures.
+Nix runs unit tests per extension and for shared code, with Bun as their only test tool.
 The integration check keeps the existing process tools. CI still runs both groups through the existing checks.
 
 ## Tests for the separation
@@ -24,7 +27,8 @@ The integration check keeps the existing process tools. CI still runs both group
 - Nested directories, integration filenames, and filenames that contain `integration` without the suffix have explicit expectations.
 - Affected source edits select only their unit tests. Shared changes select all unit tests.
 - Explicit integration changes select integration tests. A unit failure stops the combined selection with a nonzero exit code.
-- Generated commit hooks retain static checks and omit test suites. Nix retains both groups.
+- Generated commit hooks run unit tests without an agent request and reject unit failures.
+- Real hook execution excludes integration files and directories. Nix and CI retain both groups.
 
 The cleanup regression failed before the fix: file, job, and handoff fixtures left temporary directories behind.
 Cleanup hooks now remove those directories. The regression checks the fixture directory after a child test process exits.
@@ -45,9 +49,9 @@ Hook measurements use `.githooks/pre-commit` with no staged files, before and af
 Before the change, public tests took 29.1 seconds and private tests took 5.6 seconds.
 Full checks took 58.3 seconds and 10.3 seconds. Commit hooks took 24.127 seconds and 0.831 seconds.
 
-## Final measurements
+## Initial measurements
 
-The final public check includes the rebase onto `8b62f7d` and the cleanup fix for the new handoff reuse test.
+The initial public check includes the rebase onto `8b62f7d` and the cleanup fix for the new handoff reuse test.
 The private base remains `4360cef`. Both complete checks pass without warnings.
 
 | Measurement | Public before | Public after | Private before | Private after |
@@ -60,7 +64,8 @@ The private base remains `4360cef`. Both complete checks pass without warnings.
 The public groups contain 289 unit tests and 230 integration tests. The private groups contain 25 unit tests and 10 integration tests.
 The separate public `run_tests` run took 28.7 seconds for both groups, including setup.
 The full checks include cached Nix results where available. These times do not measure cold builds.
-The hook measurements contain no staged files. They measure the removed test cost, not static checks on changed files.
+The hook measurements contain no staged files. They do not measure static checks on changed files.
+The static-only hook was an intermediate mistake. The commit hook now runs unit tests automatically.
 
 ## Boundary
 
