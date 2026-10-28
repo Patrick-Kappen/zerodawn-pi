@@ -5,6 +5,8 @@
 - [ ] Give subagents and opencode the tests extension, not the full test output ([task](../tasks/subagent-tests-full-output.md))
 - [ ] Add a done check after every agent ([task](../tasks/done-check-after-agent.md))
 - [ ] Build the handoff extension (card writer, system facts, decider) ([task](../tasks/handoff-extension.md))
+- [ ] Make the handoff card accurate and keep it on the task ([task](../tasks/handoff-card-accuracy.md))
+- [ ] Stop the checker note from starting work that the user did not ask for ([task](../tasks/checker-continue-note.md))
 - [ ] Refactor recall into a memory system ([task](../tasks/recall-tool.md))
 - [ ] Find why many random things go wrong ([task](../tasks/random-failures.md))
 - [ ] Make bash a real background call ([task](../tasks/bash-not-background.md))
