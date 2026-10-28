@@ -69,6 +69,7 @@
 - [ ] Add a debug tool ([task](../tasks/cost-debug-tool.md))
 - [ ] Give line numbers in read and write, and force read before edit ([task](../tasks/cost-files-line-numbers.md))
 - [ ] Find why gpt-6-astra misses the cache ([task](../tasks/cost-astra-cache-miss.md))
+- [ ] Find why gpt-6-astra became slower ([task](../tasks/cost-astra-latency.md))
 - [ ] Increase first time right ([task](../tasks/cost-first-time-right.md))
 - [ ] Set the thinking level per step, never to or from off ([task](../tasks/cost-thinking-level-per-step.md))
 - [ ] Decrease codemode output ([task](../tasks/cost-codemode-output.md))
