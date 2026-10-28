@@ -16,9 +16,9 @@
 ## Changes
 
 <!-- changelog:start -->
-## 0.5.1 — 2026-10-28
+## 0.6.0 — 2026-10-28
 
-- docs: split open work in TODO.md and BACKLOG.md
+- tests: separate unit and integration suites
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

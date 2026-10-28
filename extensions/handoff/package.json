@@ -1,6 +1,6 @@
 {
   "name": "handoff",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "a handoff card from a stripped transcript, written by a cheap model, for a new session or another agent",
   "type": "module"
 }

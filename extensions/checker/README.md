@@ -48,13 +48,9 @@ Every check goes to the session as a custom entry `checker` and as one JSON line
 ## Changes
 
 <!-- changelog:start -->
-## 0.3.0 — 2026-10-28
+## 0.4.0 — 2026-10-28
 
-- handoff: short warning, tool handoff for an early cut
-
-- check a final answer after a handoff warning
-
-- send back a check that the agent left open
+- tests: separate unit and integration suites
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

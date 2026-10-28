@@ -113,6 +113,82 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.20.0 — 2026-10-28
+
+### shared 0.11.0
+
+- tests: separate unit and integration suites
+
+### bash 0.9.0
+
+- tests: separate unit and integration suites
+
+- tests: clean fixtures and isolate the supervisor environment
+
+### checker 0.4.0
+
+- tests: separate unit and integration suites
+
+### core 0.4.0
+
+- tests: separate unit and integration suites
+
+### files 0.6.0
+
+- tests: separate unit and integration suites
+
+- tests: clean fixtures and isolate the supervisor environment
+
+### git 0.6.0
+
+- tests: separate unit and integration suites
+
+### handoff 0.4.0
+
+- remove the reused card fixture after tests
+
+- tests: separate unit and integration suites
+
+- tests: clean fixtures and isolate the supervisor environment
+
+### pair 0.1.2
+
+- /ide requires PI_PAIR_COMMAND
+
+### projects 0.2.0
+
+- /switch requires PI_PAIR_COMMAND
+
+- mark pi when any window of a folder runs it
+
+- popup picker with open, worktrees and projects scopes
+
+### subagents 0.9.0
+
+- tests: separate unit and integration suites
+
+- tests: clean fixtures and isolate the supervisor environment
+
+### tests 0.7.0
+
+- separate unit and integration suites
+
+### repository
+
+- tests: regenerate the pre-commit config after the rebase
+- docs: record automatic unit hook timings
+- tests: restore automatic unit tests in commit hooks
+- docs: record final test separation measurements
+- tests: separate unit and integration suites
+- tests: clean fixtures and isolate the supervisor environment
+- docs: tmux update-environment is the cause of the lost SSH agent
+- docs: name the missing SSH_AUTH_SOCK as cause in random failures
+- docs: tasks for recall memory, failures, bash, docs flow, test VM
+- docs: record status and next steps of the Nixos update PRs
+- ci: ask Nixos for an update PR after a package release
+- ci: keep renamed test hooks disabled in Nix checks
+- ci: select affected checks without repeated test suites
+
 ## 0.19.1 — 2026-10-28
 
 ### pair 0.1.1
@@ -215,34 +291,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 - ci: record baseline and run behavior contracts
 - tests: cover release preparation behavior
 - tests: cover checker and background job behavior
-
-## 0.18.0 — 2026-10-27
-
-### checker 0.2.1
-
-- accept a rebuttal, fixed limit per user message
-
-- a step for the user is not an open point
-
-- handoff: cut at the end of a run after the warning
-
-### handoff 0.2.0
-
-- cut at the end of a run after the warning
-
-- resume after a cut, check PR status of the card
-
-### repository
-
-- docs: record the CI and release plan
-- checker: accept a rebuttal, fixed limit per user message
-- flake: clear the default gitleaks args
-- repo: git hooks from tracked .githooks, not from the dev shell
-- handoff: cut at the end of a run after the warning
-- flake: clear the default gitleaks args
-- flake
-- handoff: gpt-6-luna first in the default card ladder
-- handoff: resume after a cut, check PR status of the card
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

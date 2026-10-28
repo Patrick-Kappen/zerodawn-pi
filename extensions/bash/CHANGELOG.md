@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.0 — 2026-10-28
+
+- tests: separate unit and integration suites
+
+- tests: clean fixtures and isolate the supervisor environment
+
 ## 0.8.1 — 2026-10-28
 
 - docs: split open work in TODO.md and BACKLOG.md

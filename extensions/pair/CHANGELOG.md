@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 — 2026-10-28
+
+- /ide requires PI_PAIR_COMMAND
+
 ## 0.1.1 — 2026-10-28
 
 - /ide finds the Neovide window by its nvim socket

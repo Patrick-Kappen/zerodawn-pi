@@ -27,9 +27,9 @@ Unit tests: `util.test.ts` and `report.test.ts`. Integration tests: `store.integ
 ## Changes
 
 <!-- changelog:start -->
-## 0.10.0 — 2026-10-28
+## 0.11.0 — 2026-10-28
 
-- projects: /switch picker, /ide pair, pi-tui-kit dependency
+- tests: separate unit and integration suites
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

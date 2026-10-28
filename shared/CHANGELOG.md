@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0 — 2026-10-28
+
+- tests: separate unit and integration suites
+
 ## 0.10.0 — 2026-10-28
 
 - projects: /switch picker, /ide pair, pi-tui-kit dependency

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 — 2026-10-28
+
+- remove the reused card fixture after tests
+
+- tests: separate unit and integration suites
+
+- tests: clean fixtures and isolate the supervisor environment
+
 ## 0.3.0 — 2026-10-28
 
 - short warning, tool handoff for an early cut

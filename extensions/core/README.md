@@ -22,9 +22,9 @@ Core sets pi's custom prompt (`lib/prompt.ts`): a short preamble, `<workflow>` w
 ## Changes
 
 <!-- changelog:start -->
-## 0.3.0 — 2026-10-27
+## 0.4.0 — 2026-10-28
 
-- workflow prompt replaces pi rules; tool descriptions complete
+- tests: separate unit and integration suites
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

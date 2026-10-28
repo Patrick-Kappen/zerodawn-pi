@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0 — 2026-10-28
+
+- tests: separate unit and integration suites
+
 ## 0.3.0 — 2026-10-27
 
 - workflow prompt replaces pi rules; tool descriptions complete
