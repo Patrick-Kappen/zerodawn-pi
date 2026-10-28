@@ -116,6 +116,18 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.23.0 — 2026-10-28
+
+### lsp 0.1.1
+
+- end a clean file on quiet LSP progress, not a timeout
+
+### repository
+
+- lsp: end a clean file on quiet LSP progress, not a timeout
+- debug: add a debug tool that drives nvim-dap in the user's nvim
+- lsp: report LSP errors after edit and write from the user's nvim
+
 ## 0.22.0 — 2026-10-28
 
 ### bash 0.11.0
@@ -157,17 +169,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ### repository
 
 - bash: run long commands and tests in the background at once
-
-## 0.20.1 — 2026-10-28
-
-### handoff 0.4.1
-
-- keep the first dirty path whole
-
-### repository
-
-- docs: add tasks for handoff accuracy and the checker note
-- ci: make ci-nixos-update.sh executable
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

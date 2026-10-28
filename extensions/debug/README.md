@@ -18,3 +18,13 @@ A stop reports the reason, `file:line`, the source line, the top 10 stack frames
 - If the socket does not answer, pi runs `systemctl --user start nvim@main.service` once and waits 5 s, then fails naming the socket and `journalctl --user -u nvim@main`.
 - The session stops when the pi session ends.
 - nvim is `nvim` in `config.json` (default `nvim`).
+
+## Changes
+
+<!-- changelog:start -->
+## 0.1.0 — Unreleased
+
+- First release.
+
+[All changes](CHANGELOG.md)
+<!-- changelog:end -->
