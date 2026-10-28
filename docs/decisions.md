@@ -2,6 +2,14 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 40. A bash call alone in its message waits up to 10 s (2026-10-28)
+
+Changes the immediate background of commit 455d015 for one case. Each command that was not quick became a job at once.
+The agent then often ended its turn only to wait for a command of 1 to 3 s, for example `ssh host journalctl | grep`.
+The visible intention is the assistant message: a call that is its only tool call has no parallel work beside it.
+Such a call waits up to `ALONE_WAIT_S` and returns its result inline. A longer command still moves to the background.
+A call beside other tool calls, or a nested call from codemode, keeps the old rule: quick commands wait `INLINE_WAIT_S`, others start as jobs.
+
 ## 39. Tests run after each edit, at commit for the staged files, at push in full (2026-10-28)
 
 The tests extension runs the tests of a file after each `edit` or `write`, in the background, and reports only a failure. The pre-commit hook `tests-changed` runs `scripts/test-changed.sh` with the staged files. The pre-push hook `tests-all` runs the unit and integration tests. `run_tests` and the test and check commands in bash run only when a file changed since the last run; the `rerun` option is gone. Reason: the agent tested too often, and a full suite at each commit was slow. A failure shows directly after the edit that causes it. Cost: a flaky test cannot run again without a change. It changes the commit hook of decision 38.

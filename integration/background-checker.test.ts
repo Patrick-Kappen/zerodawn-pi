@@ -136,7 +136,14 @@ async function createHarness() {
       { type: "message", message: { role: "user", content: prompt } },
       {
         type: "message",
-        message: { role: "assistant", content: [{ type: "toolCall", id: toolCallId, name: "bash", arguments: { command } }] },
+        // A second tool call in the message: a bash call alone in its message waits for its result inline.
+        message: {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: toolCallId, name: "bash", arguments: { command } },
+            { type: "toolCall", id: `${toolCallId}-read`, name: "read", arguments: { path: "README.md" } },
+          ],
+        },
       },
     );
     return bash.execute(toolCallId, { command }, undefined, undefined, ctx).then((result: any) => {
