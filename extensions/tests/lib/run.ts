@@ -45,6 +45,18 @@ function report(run: Run, kind: "tests" | "check", command: string, uncovered: s
   return { text: lines.join("\n"), ok };
 }
 
+/** The short result of a test or check command that ran as one part of a bash chain; bash keeps the full output in a second log. */
+export function partReport(kind: "tests" | "check", output: string, code: number): string {
+  const warned = warningLines(output);
+  const ok = code === 0 && !warned;
+  const status = [counts(output) ?? `exit ${code}`, warned ? `${warned} warning lines` : ""].filter(Boolean).join(" · ");
+  const lines = [`${kind} ${ok ? "green" : "red"}: ${status}`];
+  if (ok) return lines[0];
+  if (warned) lines.push("A warning is an error here: fix each one.");
+  lines.push(code !== 0 && kind === "tests" ? failures(output) : diagnose(output).text);
+  return lines.join("\n");
+}
+
 function fingerprint(cwd: string, what: string, changed: string[]): string {
   const read = reader(cwd);
   return JSON.stringify([cwd, what, changed.map((p) => [p, read(p) ?? null])]);

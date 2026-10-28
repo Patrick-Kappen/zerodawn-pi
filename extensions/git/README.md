@@ -13,6 +13,8 @@
 
 `git status`, `git diff`, `git log` and `git show` in a bash command are blocked with a hint to use the tool. Add `# raw-git` to the bash command to run them anyway.
 
+In a chain, bash runs such a part with the git command of the tool, and the part gets the compact output of the tool. The known options of the part go into the tool parameters: `--cached`, `-n 5`, `-5`, a ref, and the paths after `--`. Options that the tool replaces, such as `--short` or `--oneline`, have no effect. Another option refuses the chain with the `# raw-git` hint, and so do two refs without `--`. A part with shell syntax (pipe, quote, redirect, `$`) runs as written.
+
 ## Changes
 
 <!-- changelog:start -->

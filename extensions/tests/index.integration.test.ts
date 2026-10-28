@@ -3,11 +3,17 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
+import { createEventBus } from "@earendil-works/pi-coding-agent";
+import { ROUTES_CHAINS, routePart } from "../../shared/route.ts";
 import extension from "./index.ts";
 
 const handlers = new Map<string, (event: any, ctx?: any) => any>();
 const tools: any[] = [];
-extension({ on: (name: string, fn: any) => handlers.set(name, fn), registerTool: (t: any) => tools.push(t), sendMessage: () => {} } as any);
+const events = createEventBus();
+events.on(ROUTES_CHAINS, (q) => {
+  (q as { on: boolean }).on = true;
+});
+extension({ events, on: (name: string, fn: any) => handlers.set(name, fn), registerTool: (t: any) => tools.push(t), sendMessage: () => {} } as any);
 
 const dir = mkdtempSync(join(tmpdir(), "tests-index-"));
 after(() => rmSync(dir, { recursive: true, force: true }));
@@ -36,6 +42,21 @@ test("recipes go into the system prompt; a test command in bash runs run_tests, 
   assert.equal(await result("t1"), undefined);
   assert.match((await bash("cc main.c"))?.reason, /Run "make build"/);
   assert.equal(await bash("ls"), undefined);
+});
+
+test("in a chain with other commands, bash runs the test and check parts, and they get a short result", async () => {
+  const input: Record<string, unknown> = { command: "git add . && bun test && just lint && git commit -m x" };
+  assert.equal(await bash("", "m1", input), undefined);
+  assert.deepEqual(input, { command: "git add . && bun test && just lint && git commit -m x" });
+  const tests = routePart({ events }, "bun test") as { command: string; format: (out: string, exit: number) => string };
+  assert.equal(tests.command, "bun test");
+  assert.equal(tests.format("a\n 3 pass\n 0 fail\n", 0), "tests green: 3 pass, 0 fail");
+  const check = routePart({ events }, "just lint") as { format: (out: string, exit: number) => string };
+  assert.match(
+    check.format("src/a.ts:1:2 lint/x\n! bad\nerror: lint failed", 1),
+    /^check red: exit 1 · 1 warning lines\nA warning is an error here: fix each one\.\nsrc\/a\.ts:1:2: lint\/x\n/,
+  );
+  assert.equal(routePart({ events }, "git add ."), undefined);
 });
 
 test("a long command that runs the third time gets a hint in its result", async () => {

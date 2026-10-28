@@ -4,6 +4,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
+import { createEventBus } from "@earendil-works/pi-coding-agent";
+import { onRoutePart } from "../../../shared/route.ts";
 import { INLINE_WAIT_S } from "../config.ts";
 import { createState } from "../state.ts";
 import { registerBash } from "./bash.ts";
@@ -15,8 +17,10 @@ after(() => rmSync(dir, { recursive: true, force: true }));
 const s = createState();
 const reported: Job[] = [];
 const tools: any[] = [];
+const events = createEventBus();
+onRoutePart({ events }, (part) => (part === "echo routed" ? { command: "echo raw", format: (out, exit) => `${out} formatted ${exit}` } : undefined));
 registerBash(
-  { registerTool: (t: any) => tools.push(t) } as any,
+  { registerTool: (t: any) => tools.push(t), events } as any,
   s,
   { refresh() {}, stop() {} },
   {
@@ -35,6 +39,11 @@ test("a quick command returns its result inline", async () => {
   const r = await bash({ command: "echo hi" }, "a");
   assert.match(r.content[0].text, /^exit 0 \(\d+s\)\nhi$/);
   assert.equal(s.jobs.get(r.details.job)?.bg, false);
+});
+
+test("a routed part of a chain gets its format, and the other parts stay as they are", async () => {
+  const r = await bash({ command: "echo a && echo routed; echo b" }, "r");
+  assert.match(r.content[0].text, /^exit 0 \(\d+s\)\na\nraw formatted 0\nb\nfull output: \S+\.raw\.bash\S*$/);
 });
 
 test("a failing command throws its result", async () => {

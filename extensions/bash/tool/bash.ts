@@ -1,4 +1,4 @@
-import { existsSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Key } from "@earendil-works/pi-tui";
@@ -18,6 +18,7 @@ import {
 } from "../config.ts";
 import type { State } from "../state.ts";
 import type { Widget } from "../ui/dashboard.ts";
+import { formatOutput, routeChain } from "./chain.ts";
 import { aloneInMessage } from "./intent.ts";
 import { type Job, kill, limitText, type Meta, render, resultText, saveMeta, spawnJob, statsOf } from "./jobproc.ts";
 import type { Reports } from "./jobs.ts";
@@ -60,7 +61,8 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       const id = freeId(callFileId(ctx, toolCallId), (i) => existsSync(join(outDir, `${i}.bash.log`)) || existsSync(join(jobsDir, `${i}.json`)));
       const log = join(outDir, `${id}.bash.log`);
       const base = join(jobsDir, id);
-      writeFileSync(`${base}.sh`, `${params.command}\n`);
+      const routed = routeChain(pi, params.command);
+      writeFileSync(`${base}.sh`, `${routed?.script ?? params.command}\n`);
       const limit = Math.round(params.timeout ?? (params.command.includes(NO_TIME_LIMIT) ? 0 : DEFAULT_LIMIT_S));
       const child = spawnJob({ commandFile: `${base}.sh`, status: `${base}.status`, limit, log, cwd: ctx.cwd });
       const meta: Meta = {
@@ -105,7 +107,18 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
                 : `exit ${code} (${elapsed})`;
           const ok = !spawnError && !sig && code === 0;
           job.ok = ok;
-          resolve({ text: resultText(log, status), ok });
+          let note = "";
+          if (routed)
+            try {
+              const raw = log.replace(/\.bash\.log$/, ".raw.bash.log");
+              const formatted = formatOutput(readFileSync(log, "utf8"), routed);
+              renameSync(log, raw);
+              writeFileSync(log, formatted);
+              note = `\nfull output: ${outRef(raw)}`;
+            } catch (err) {
+              note = `\nbash: the output of the chain stays unchanged: ${(err as Error).message}`;
+            }
+          resolve({ text: resultText(log, status) + note, ok });
         };
         child.on("error", (err) => finish(null, null, err));
         child.on("exit", (code, sig) => finish(code, sig));
