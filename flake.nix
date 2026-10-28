@@ -443,10 +443,10 @@
                 pass_filenames = false;
                 always_run = true;
               };
-              tests-unit = {
+              tests-changed = {
                 enable = true;
-                name = "tests: unit tests";
-                entry = "${pkgs.writeShellScript "tests-unit" ''
+                name = "tests: the tests of the staged files";
+                entry = "${pkgs.writeShellScript "tests-changed" ''
                   set -eu
                   export PATH=${
                     pkgs.lib.makeBinPath [
@@ -455,9 +455,28 @@
                     ]
                   }:$PATH
                   [ -e node_modules ] || ln -s ${piModules pkgs}/node_modules node_modules
-                  exec bun test --path-ignore-patterns '**/*.integration.test.ts' --path-ignore-patterns '**/integration/**'
+                  exec scripts/test-changed.sh "$@"
                 ''}";
                 stages = [ "pre-commit" ];
+                pass_filenames = true;
+                require_serial = true;
+              };
+              tests-all = {
+                enable = true;
+                name = "tests: every test";
+                entry = "${pkgs.writeShellScript "tests-all" ''
+                  set -eu
+                  export PATH=${
+                    pkgs.lib.makeBinPath [
+                      pkgs.bun
+                      pkgs.coreutils
+                    ]
+                  }:$PATH
+                  [ -e node_modules ] || ln -s ${piModules pkgs}/node_modules node_modules
+                  bun test --path-ignore-patterns '**/*.integration.test.ts' --path-ignore-patterns '**/integration/**'
+                  exec bun test .integration.test.ts integration/
+                ''}";
+                stages = [ "pre-push" ];
                 pass_filenames = false;
                 always_run = true;
               };
@@ -472,7 +491,7 @@
           };
         in
         {
-          pre-commit = (preCommit.overrideAttrs { SKIP = "tests,tests-unit"; }) // {
+          pre-commit = (preCommit.overrideAttrs { SKIP = "tests-changed,tests-all"; }) // {
             inherit (preCommit)
               config
               enabledPackages

@@ -7,8 +7,8 @@ Deleted paths remain in the selection, including files renamed into documentatio
 ## Selection
 
 Every run keeps formatting, lint, and safety checks through `pre-commit`.
-That Nix check skips both `tests` and `tests-unit`. The unit split does not enable the hook in CI.
-Local commits still run the configured test hook.
+That Nix check skips the test hooks `tests-changed` and `tests-all`; CI selects its own tests.
+A local commit runs the tests of the staged files. A local push runs every test.
 
 | Changed input | Additional checks |
 |---|---|
