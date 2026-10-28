@@ -195,6 +195,7 @@ test("turn_end warns and cuts from 150k or after the handoff tool; settle cuts a
 
 test("a cut uses the card of the background update when it covers the same entries", async () => {
   const dir = mkdtempSync(join(tmpdir(), "handoff-reuse-"));
+  after(() => rmSync(dir, { recursive: true, force: true }));
   const config = join(dir, "config.json");
   writeFileSync(config, JSON.stringify({ handoffModels: ["p/m"] }));
   process.env.ZERODAWN_PI_CONFIG = config;
