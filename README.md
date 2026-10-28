@@ -68,7 +68,7 @@ Some extensions read `config.json` next to `package.json`; copy `config.example.
 
 - [docs/decisions.md](docs/decisions.md): the choices that shape this repository, with reasons.
 - [docs/ci-baseline.md](docs/ci-baseline.md): measured test coverage, behavior contracts, and CI gaps.
-- [docs/todo.md](docs/todo.md): open points.
+- [docs/todo/TODO.md](docs/todo/TODO.md) and [docs/todo/BACKLOG.md](docs/todo/BACKLOG.md): open work, one file per task in [docs/tasks/](docs/tasks/).
 - [shared/README.md](shared/README.md): the shared helpers and their compatibility rule.
 - [CONTRIBUTING.md](CONTRIBUTING.md): branch, commit, test and release workflow.
 - [SECURITY.md](SECURITY.md): what the extensions can do on your machine, and how to report a problem.
