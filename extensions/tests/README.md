@@ -6,8 +6,15 @@ Gives the agent the tool `run_tests`. It runs the tests for the files that chang
 
 - `scope: "changed"` (default): the tests for the changed, new and deleted files of `git status`.
 - `scope: "all"`: the recipe `test`, or else `bun test`.
-- `rerun: true`: run again when no file changed. Without it, the tool gives the earlier result.
 - `path`: the project directory, such as a git worktree. Default: the current directory.
+
+A call runs only when a file changed since the last run. Else it gives the earlier result, and nothing runs. The runs after an edit count too: when no file changed since the last of them, `run_tests` runs nothing.
+
+## After an edit
+
+After each `edit` or `write`, the extension runs the tests of that one file in the background, with the same selection as `changed`. Files that need no test and files outside git run nothing. The runs go one after another. A later edit of the same file replaces a run that did not start.
+
+A green run gives no message. A red run gives the agent a message, as a steer during a run, else as a new turn. The message does not come when the file changed again during the run, and the same failure comes once. In print and json mode the agent waits for these runs before it settles.
 
 The run gets the dev environment of the project: when the git root of the directory has an `.envrc`, the command runs through `direnv exec <git root>`. A blocked `.envrc` fails the run with the direnv message: run `direnv allow <git root>`. The check commands in bash run the same way; for a check that starts with `cd <dir> &&`, the directory is `<dir>`, so a check in a worktree gets the environment of that worktree.
 
@@ -37,9 +44,9 @@ A run that takes more than 15 s continues in the background. The tool result the
 
 Each bash command goes through these steps, in this order:
 
-1. A test command (`just test`, `bun test`, `bun x.test.ts`, `pytest`, `python -m unittest`, `cargo test`, `go test`, `dotnet test`, `Invoke-Pester`, ...): `run_tests` runs for the changed files, in the directory of a leading `cd <dir> &&`. The bash result is the `run_tests` result, and tells the agent to use `run_tests`. `# rerun` in the command runs it again when no file changed.
+1. A test command (`just test`, `bun test`, `bun x.test.ts`, `pytest`, `python -m unittest`, `cargo test`, `go test`, `dotnet test`, `Invoke-Pester`, ...): `run_tests` runs for the changed files, in the directory of a leading `cd <dir> &&`. The bash result is the `run_tests` result, and tells the agent to use `run_tests`. It runs only when a file changed since the last run.
 2. A command that is the body of a recipe is blocked: run the recipe instead.
-3. A check command (`just check`, `just lint`, `nix flake check`, `biome check`, `eslint`, `tsc`, `cargo clippy`, `ruff check`, `go vet`, ...): the extension runs it, and the bash result is the same short result as for the tests. A warning makes it red. When no file changed, it gives the earlier result; `# rerun` runs it again.
+3. A check command (`just check`, `just lint`, `nix flake check`, `biome check`, `eslint`, `tsc`, `cargo clippy`, `ruff check`, `go vet`, ...): the extension runs it, and the bash result is the same short result as for the tests. A warning makes it red. When no file changed, it gives the earlier result and runs nothing. Outside git it runs each time.
 
 For 1 and 3 nothing is blocked. The extension starts the run in `tool_call`, and bash runs `:` in place of the command. The `tool_result` hook waits for the run and replaces the result and its error state, so the pi UI shows green or red. The transcript keeps the command of the agent: pi gives `tool_call` a copy of the arguments.
 
@@ -55,7 +62,7 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 
 ## Constants
 
-`lib/recipes.ts`: `REPEAT_MAX`, `LONG`, `TEST_TOOLS`, `CHECK_TOOLS`, `WRAPPERS`. `lib/run.ts`: `TIMEOUT_MS`, `CHANGED_RECIPE`, `ALL_RECIPE`, `RERUN`, `NO_TEST`, `JS_CONFIG`. `lib/report.ts`: `FAILURE_MAX`, `TAIL`, `WARNING`.
+`lib/recipes.ts`: `REPEAT_MAX`, `LONG`, `TEST_TOOLS`, `CHECK_TOOLS`, `WRAPPERS`. `lib/run.ts`: `TIMEOUT_MS`, `CHANGED_RECIPE`, `ALL_RECIPE`, `NO_TEST`, `JS_CONFIG`. `lib/report.ts`: `FAILURE_MAX`, `TAIL`, `WARNING`.
 
 ## Changes
 

@@ -14,7 +14,7 @@ test("Nix skips both test hook names so the unit split cannot repeat tests in CI
   const flake = readFileSync(fileURLToPath(new URL("../flake.nix", import.meta.url)), "utf8");
   const skip = flake.match(/preCommit\.overrideAttrs\s*\{\s*SKIP = "([^"]+)";/);
   assert.ok(skip, "the Nix pre-commit check must skip the local test hooks");
-  assert.deepEqual(skip[1].split(","), ["tests", "tests-unit"]);
+  assert.deepEqual(skip[1].split(","), ["tests-changed", "tests-all"]);
 });
 
 function fixture(t: { after(fn: () => void): void }) {
