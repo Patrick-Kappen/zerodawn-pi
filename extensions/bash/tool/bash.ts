@@ -5,9 +5,20 @@ import { Key } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { callFileId, freeId, outRef, storeDir } from "../../../shared/store.ts";
 import { age } from "../../../shared/util.ts";
-import { DEFAULT_LIMIT_S, INLINE_BYTES, INLINE_LINES, INLINE_WAIT_S, NO_TIME_LIMIT, STREAM_LINES, STREAM_MS, STREAM_TAIL_BYTES } from "../config.ts";
+import {
+  ALONE_WAIT_S,
+  DEFAULT_LIMIT_S,
+  INLINE_BYTES,
+  INLINE_LINES,
+  INLINE_WAIT_S,
+  NO_TIME_LIMIT,
+  STREAM_LINES,
+  STREAM_MS,
+  STREAM_TAIL_BYTES,
+} from "../config.ts";
 import type { State } from "../state.ts";
 import type { Widget } from "../ui/dashboard.ts";
+import { aloneInMessage } from "./intent.ts";
 import { type Job, kill, limitText, type Meta, render, resultText, saveMeta, spawnJob, statsOf } from "./jobproc.ts";
 import type { Reports } from "./jobs.ts";
 import { isQuick } from "./quick.ts";
@@ -30,7 +41,7 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
   pi.registerTool({
     name: "bash",
     label: "bash",
-    description: `Run a bash command for builds, scripts and tools. Read files with read, search with grep, and look at git history with git. Returns the exit status and the output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB; longer output gives its size and an out:<name> reference for read (offset=-N for the end) and grep. A failure adds every distinct error line. A quick command (ls, cd, pwd, echo, file operations, git status) returns its result. Every other command returns a job id at once and runs in the background; a message reports its result. Continue with other work, or end your turn when the next step needs the result. Chain dependent steps in one command with &&, also a wait for a condition: timeout 30 bash -c 'until CHECK; do sleep 1; done' && NEXT.`,
+    description: `Run a bash command for builds, scripts and tools. Read files with read, search with grep, and look at git history with git. Returns the exit status and the output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB; longer output gives its size and an out:<name> reference for read (offset=-N for the end) and grep. A failure adds every distinct error line. A quick command (ls, cd, pwd, echo, file operations, git status) returns its result. A bash call that is the only tool call of its message returns its result when it ends within ${ALONE_WAIT_S} s. Every other command returns a job id and runs in the background; a message reports its result. Continue with other work, or end your turn when the next step needs the result. Chain dependent steps in one command with &&, also a wait for a condition: timeout 30 bash -c 'until CHECK; do sleep 1; done' && NEXT.`,
     promptSnippet: "Run a bash command; quick commands give the result, others run in the background",
     parameters: Type.Object({
       command: Type.String({ description: "Bash command to execute" }),
@@ -110,10 +121,13 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       let toBackground!: () => void;
       const moved = new Promise<undefined>((r) => (toBackground = () => r(undefined)));
       waiting.set(id, toBackground);
-      // A quick command that still runs after INLINE_WAIT_S (a big directory, a slow disk) moves to the background too.
-      const autoMove = setTimeout(toBackground, INLINE_WAIT_S * 1000);
+      // The agent waits for a call that is alone in its message anyway, so a short command saves it a stop.
+      // A command that still runs after the wait (a build, a big directory, a slow disk) moves to the background.
+      const alone = aloneInMessage(ctx.sessionManager.getBranch(), toolCallId);
+      const wait = alone ? ALONE_WAIT_S : isQuick(params.command) ? INLINE_WAIT_S : 0;
+      const autoMove = setTimeout(toBackground, wait * 1000);
       ctx.ui.setStatus("bash-wait", ctx.ui.theme.fg("dim", "bash running · ctrl+shift+b: background"));
-      const inline = isQuick(params.command) ? await Promise.race([done, moved]) : undefined;
+      const inline = wait > 0 ? await Promise.race([done, moved]) : undefined;
       clearTimeout(autoMove);
       clearInterval(stream);
       waiting.delete(id);

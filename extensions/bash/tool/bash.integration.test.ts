@@ -60,6 +60,17 @@ test("a command that is not quick returns the job id at once, keeps the turn, an
   assert.equal(reported[0].id, r.details.job);
 });
 
+test("a command that is the only tool call of its message returns its result inline", async () => {
+  const call = { type: "toolCall", id: "e", name: "bash", arguments: { command: "sleep 0.3; echo late" } };
+  const branch = [{ type: "message", message: { role: "assistant", content: [call] } }];
+  const r = await tools[0].execute("e", call.arguments, undefined, undefined, {
+    ...ctx,
+    sessionManager: { ...ctx.sessionManager, getBranch: () => branch },
+  });
+  assert.match(r.content[0].text, /^exit 0 \(\d+s\)\nlate$/);
+  assert.equal(s.jobs.get(r.details.job)?.bg, false);
+});
+
 test(`a quick command that runs longer than ${INLINE_WAIT_S} s moves to the background and keeps the turn`, {
   timeout: (INLINE_WAIT_S + 10) * 1000,
 }, async () => {

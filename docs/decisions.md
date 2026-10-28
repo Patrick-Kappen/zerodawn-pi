@@ -2,6 +2,14 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 39. A bash call alone in its message waits up to 10 s (2026-10-28)
+
+Changes the immediate background of commit 455d015 for one case. Each command that was not quick became a job at once.
+The agent then often ended its turn only to wait for a command of 1 to 3 s, for example `ssh host journalctl | grep`.
+The visible intention is the assistant message: a call that is its only tool call has no parallel work beside it.
+Such a call waits up to `ALONE_WAIT_S` and returns its result inline. A longer command still moves to the background.
+A call beside other tool calls, or a nested call from codemode, keeps the old rule: quick commands wait `INLINE_WAIT_S`, others start as jobs.
+
 ## 38. Unit tests and integration tests run as separate groups (2026-10-28)
 
 The commit hook ran processes, Git, and tmux on every commit. Source edits also selected integration tests for unrelated extensions.
