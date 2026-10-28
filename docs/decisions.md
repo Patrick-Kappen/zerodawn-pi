@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 40. LSP errors come from the user's running nvim server (2026-10-29)
+
+The `lsp` extension asks the nvim server in `PI_NVIM_SERVER` for diagnostics after each edit. Reason: the user's LSP servers and settings are configured in one place (nixos-config), and the agent sees the same errors as the editor. A buffer with unsaved changes is never reloaded: the check is skipped and the agent gets a conflict message, so the user's work is safe. A buffer that pi creates is unlisted (`buflisted=false`) and wiped after the check, so it does not show up in the user's buffer list.
+
 ## 39. Tests run after each edit, at commit for the staged files, at push in full (2026-10-28)
 
 The tests extension runs the tests of a file after each `edit` or `write`, in the background, and reports only a failure. The pre-commit hook `tests-changed` runs `scripts/test-changed.sh` with the staged files. The pre-push hook `tests-all` runs the unit and integration tests. `run_tests` and the test and check commands in bash run only when a file changed since the last run; the `rerun` option is gone. Reason: the agent tested too often, and a full suite at each commit was slow. A failure shows directly after the edit that causes it. Cost: a flaky test cannot run again without a change. It changes the commit hook of decision 38.

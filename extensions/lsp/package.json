@@ -1,0 +1,6 @@
+{
+  "name": "lsp",
+  "version": "0.1.0",
+  "description": "Reports LSP errors after each edit or write, through the user's running nvim server",
+  "type": "module"
+}

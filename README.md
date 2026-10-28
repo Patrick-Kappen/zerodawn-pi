@@ -17,6 +17,7 @@ Extensions for [pi](https://pi.dev), the terminal coding agent, packaged as one 
 | [systemstate](extensions/systemstate/README.md) | Puts the active NixOS system and, inside your flake checkout, the deployed revision against `HEAD` in the system prompt; updates them during the session. |
 | [watchdog](extensions/watchdog/README.md) | Detects a run that hangs, asks a classifier model to confirm, aborts, goes back to the last good point and continues. `/unstick` does it by hand. |
 | [checker](extensions/checker/README.md) | Before the agent finishes, asks a classifier whether the work is done. It sends the agent back with a hidden message when it left an error in scope, asked a question it can answer itself, or stopped halfway. At most 3 times per message. |
+| [lsp](extensions/lsp/README.md) | Reports LSP errors to the agent after each `edit` or `write`, using the user's running nvim server (`PI_NVIM_SERVER`). |
 | [gateway](extensions/gateway/README.md) | Sends the pi session id to agentgateway so its logs group requests by session. |
 | [handoff](extensions/handoff/README.md) | `/handoff`: a cheap model writes a handoff card from a stripped transcript; the code adds git, PR and job facts; a new session starts with it. |
 
