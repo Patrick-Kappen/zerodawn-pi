@@ -22,9 +22,9 @@ A stop reports the reason, `file:line`, the source line, the top 10 stack frames
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.0 — Unreleased
+## 0.1.1 — 2026-10-28
 
-- First release.
+- README: add the changelog block
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
