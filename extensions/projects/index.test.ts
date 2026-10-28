@@ -7,6 +7,8 @@ import { loadItems, newWorktree, removeWorktree, slug, switchTo } from "./lib/ac
 import { frame, type Item, initial, mark, parseWorktrees, render, step, typedPath, visible } from "./lib/model.ts";
 import { toInput } from "./lib/picker.ts";
 
+const env = { PI_PAIR_COMMAND: "pair" };
+
 const item = (path: string, open = false, agent = false): Item => ({ path, label: path, open, agent, window: open ? "@1" : undefined });
 const state = () =>
   initial({ open: [item("/a/one", true, true), item("/a/two")], worktrees: [item("/a/one", true, true), item("/a/one-x")], projects: [item("/p/far")] });
@@ -86,13 +88,20 @@ test("toInput maps keys", () => {
   assert.deepEqual(toInput("a"), { kind: "text", text: "a" });
 });
 
+test("loadItems and switchTo without PI_PAIR_COMMAND fail before they run pair", async () => {
+  const calls: string[][] = [];
+  await assert.rejects(loadItems(fake({}, calls), {}), /\/switch: PI_PAIR_COMMAND is not set/);
+  await assert.rejects(switchTo(fake({}, calls), "%1", "/w", {}), /\/switch: PI_PAIR_COMMAND is not set/);
+  assert.deepEqual(calls, []);
+});
+
 test("loadItems lists the open entries, the worktrees and the zoxide projects", async () => {
   const open = "/r/.git\t/r\t@1\t1\n";
   const twice = "/r/.git\t/r\t@1\t0\n/r/.git\t/r\t@2\t1\n";
   const wt = "worktree /r\nHEAD x\n\nworktree /r-x\nHEAD y\n";
   const a = await loadItems(
     fake({ "pair list": { stdout: open }, "git worktree list --porcelain": { stdout: wt }, "zoxide query -l": { stdout: "/r\n/p/one\n" } }),
-    {},
+    env,
   );
   assert.deepEqual(
     a.open.map((i) => [i.path, i.agent]),
@@ -112,28 +121,28 @@ test("loadItems lists the open entries, the worktrees and the zoxide projects", 
       ["/r-x", false],
     ],
   );
-  const b = await loadItems(fake({ "zoxide query -l": { stdout: "/p/one\n/p/two\n" } }), {});
+  const b = await loadItems(fake({ "zoxide query -l": { stdout: "/p/one\n/p/two\n" } }), env);
   assert.deepEqual(b.open, []);
   assert.deepEqual(
     b.projects.map((i) => i.path),
     ["/p/one", "/p/two"],
   );
-  const c = await loadItems(fake({ "pair list": { stdout: twice }, "zoxide query -l": { stdout: "/r\n" } }), {});
+  const c = await loadItems(fake({ "pair list": { stdout: twice }, "zoxide query -l": { stdout: "/r\n" } }), env);
   assert.deepEqual(
     c.projects.map((i) => [i.path, i.open, i.agent]),
     [["/r", true, true]],
   );
-  await assert.rejects(loadItems(fake({ "zoxide query -l": { code: 127, stderr: "not found" } }), {}), /zoxide query -l failed \(exit 127\): not found/);
+  await assert.rejects(loadItems(fake({ "zoxide query -l": { code: 127, stderr: "not found" } }), env), /zoxide query -l failed \(exit 127\): not found/);
   assert.equal(parseWorktrees(wt).length, 2);
 });
 
 test("switchTo goes through the pair script and fails loud without a pair", async () => {
   const calls: string[][] = [];
   const run = fake({ "tmux display-message -p -t %1 #{client_name}": { stdout: "c1\n" }, "tmux show-option -gqv @pair-c1": { stdout: "/s.sock\n" } }, calls);
-  await switchTo(run, "%1", "/w", {});
+  await switchTo(run, "%1", "/w", env);
   assert.deepEqual(calls.at(-1), ["pair", "open", "/s.sock", "/w"]);
-  await assert.rejects(switchTo(run, undefined, "/w", {}), /TMUX_PANE/);
-  await assert.rejects(switchTo(fake({ "tmux display-message -p -t %1 #{client_name}": { stdout: "c1\n" } }), "%1", "/w", {}), /Run \/ide/);
+  await assert.rejects(switchTo(run, undefined, "/w", env), /TMUX_PANE/);
+  await assert.rejects(switchTo(fake({ "tmux display-message -p -t %1 #{client_name}": { stdout: "c1\n" } }), "%1", "/w", env), /Run \/ide/);
 });
 
 test("newWorktree adds a branch next to the main worktree", async () => {
