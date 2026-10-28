@@ -48,13 +48,13 @@ Every check goes to the session as a custom entry `checker` and as one JSON line
 ## Changes
 
 <!-- changelog:start -->
-## 0.2.1 — 2026-10-27
+## 0.3.0 — 2026-10-28
 
-- accept a rebuttal, fixed limit per user message
+- handoff: short warning, tool handoff for an early cut
 
-- a step for the user is not an open point
+- check a final answer after a handoff warning
 
-- handoff: cut at the end of a run after the warning
+- send back a check that the agent left open
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

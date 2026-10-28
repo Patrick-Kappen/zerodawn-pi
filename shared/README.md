@@ -27,11 +27,9 @@ Tests: `util.test.ts`, `store.test.ts`, `config.test.ts`, `testrun.test.ts`. The
 ## Changes
 
 <!-- changelog:start -->
-## 0.9.0 — 2026-10-27
+## 0.10.0 — 2026-10-28
 
-- a red check shows biome errors without a position
-
-- handoffModels in config.json and the Home Manager module
+- projects: /switch picker, /ide pair, pi-tui-kit dependency
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1 — 2026-10-28
+
+- docs: split open work in TODO.md and BACKLOG.md
+
 ## 0.5.0 — 2026-10-27
 
 - core: workflow prompt replaces pi rules; tool descriptions complete

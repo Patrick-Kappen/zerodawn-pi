@@ -60,9 +60,11 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 ## Changes
 
 <!-- changelog:start -->
-## 0.6.1 — 2026-10-27
+## 0.6.2 — 2026-10-28
 
-- a check with cd runs in the environment of that directory
+- docs: split open work in TODO.md and BACKLOG.md
+
+- a check with a pipe reports the failure of any part
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

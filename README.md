@@ -96,6 +96,98 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.19.0 — 2026-10-28
+
+### shared 0.10.0
+
+- projects: /switch picker, /ide pair, pi-tui-kit dependency
+
+### ast-grep 0.3.1
+
+- docs: split open work in TODO.md and BACKLOG.md
+
+### bash 0.8.1
+
+- docs: split open work in TODO.md and BACKLOG.md
+
+### checker 0.3.0
+
+- handoff: short warning, tool handoff for an early cut
+
+- check a final answer after a handoff warning
+
+- send back a check that the agent left open
+
+### ctx-manager 0.2.2
+
+- docs: split open work in TODO.md and BACKLOG.md
+
+### files 0.5.1
+
+- docs: split open work in TODO.md and BACKLOG.md
+
+### git 0.5.1
+
+- docs: split open work in TODO.md and BACKLOG.md
+
+### handoff 0.3.0
+
+- short warning, tool handoff for an early cut
+
+- keep the boundary entries of other extensions
+
+- cut in the middle of the work, keep the final answer
+
+### opencode 0.3.1
+
+- docs: split open work in TODO.md and BACKLOG.md
+
+### pair 0.1.0
+
+- First release.
+
+### projects 0.1.0
+
+- First release.
+
+### subagents 0.8.4
+
+- docs: split open work in TODO.md and BACKLOG.md
+
+### systemstate 0.2.1
+
+- docs: split open work in TODO.md and BACKLOG.md
+
+### tests 0.6.2
+
+- docs: split open work in TODO.md and BACKLOG.md
+
+- a check with a pipe reports the failure of any part
+
+### ui 0.2.2
+
+- docs: split open work in TODO.md and BACKLOG.md
+
+### watchdog 0.2.1
+
+- docs: split open work in TODO.md and BACKLOG.md
+
+### repository
+
+- projects: keep the dependencies of pi-tui-kit in its own node_modules
+- projects: /switch picker, /ide pair, pi-tui-kit dependency
+- docs: record the automatic checks and test quality plan
+- docs: split open work in TODO.md and BACKLOG.md
+- docs: name the checklist TODO.md
+- docs: collect all open points in one checklist with a file per task
+- handoff: short warning, tool handoff for an early cut
+- handoff: keep the boundary entries of other extensions
+- handoff: cut in the middle of the work, keep the final answer
+- docs: record accepted NixOS warnings for continued pi work
+- ci: record baseline and run behavior contracts
+- tests: cover release preparation behavior
+- tests: cover checker and background job behavior
+
 ## 0.18.0 — 2026-10-27
 
 ### checker 0.2.1
@@ -177,74 +269,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 - shared: handoffModels in config.json and the Home Manager module
 - docs: backlog item to restart pi sessions after a rebuild
 - docs: open points from the v0.15.0 release session
-
-## 0.16.0 — 2026-10-27
-
-### ast-grep 0.3.0
-
-- docs: open points of 2026-10-27 in the TODO files
-
-- core: each tool rule in one place, description or parameter
-
-- core: workflow prompt replaces pi rules; tool descriptions complete
-
-### bash 0.8.0
-
-- checker: skip the check while a bash job runs in the background
-
-- docs: open points of 2026-10-27 in the TODO files
-
-- core: each tool rule in one place, description or parameter
-
-- a reported job stays out of the status note after a restart
-
-- core: workflow prompt replaces pi rules; tool descriptions complete
-
-### checker 0.1.1
-
-- skip the check while a bash job runs in the background
-
-### core 0.3.0
-
-- workflow prompt replaces pi rules; tool descriptions complete
-
-### ctx-manager 0.2.1
-
-- docs: open points of 2026-10-27 in the TODO files
-
-### files 0.5.0
-
-- docs: open points of 2026-10-27 in the TODO files
-
-- core: each tool rule in one place, description or parameter
-
-- core: workflow prompt replaces pi rules; tool descriptions complete
-
-### git 0.5.0
-
-- core: workflow prompt replaces pi rules; tool descriptions complete
-
-### opencode 0.3.0
-
-- core: each tool rule in one place, description or parameter
-
-- core: workflow prompt replaces pi rules; tool descriptions complete
-
-### subagents 0.8.2
-
-- docs: open points of 2026-10-27 in the TODO files
-
-- core: each tool rule in one place, description or parameter
-
-### tests 0.6.0
-
-- core: each tool rule in one place, description or parameter
-
-- core: workflow prompt replaces pi rules; tool descriptions complete
-
-### repository
-
-- docs: open points of 2026-10-27 in the TODO files
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

@@ -22,9 +22,9 @@ The user name in `row` style is the OS user name.
 ## Changes
 
 <!-- changelog:start -->
-## 0.2.1 — 2026-10-27
+## 0.2.2 — 2026-10-28
 
-- no crash when the terminal is 0 or 1 column wide
+- docs: split open work in TODO.md and BACKLOG.md
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

@@ -206,13 +206,9 @@ The main pi connects to the supervisor when the first subagent starts. At `sessi
 ## Changes
 
 <!-- changelog:start -->
-## 0.8.3 — 2026-10-27
+## 0.8.4 — 2026-10-28
 
-- no provider tool choice for the end tools
-
-- the model probe sends a session id for opencode-go
-
-- no start error in a repository without a commit
+- docs: split open work in TODO.md and BACKLOG.md
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

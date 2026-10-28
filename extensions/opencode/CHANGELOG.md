@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 — 2026-10-28
+
+- docs: split open work in TODO.md and BACKLOG.md
+
 ## 0.3.0 — 2026-10-27
 
 - core: each tool rule in one place, description or parameter
