@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 40. LSP diagnostics come from the user's own Neovim server (2026-10-28)
+
+The new `lsp` extension shows the agent the LSP errors of a file after each `edit` or `write`. It does not start its own LSP clients. It asks the user's headless nvim (`systemd nvim@main`, socket from `PI_LSP_SERVER`) for the diagnostics of the file. Reason: the LSP configuration lives in one place, the NixOS configuration of the user, and the agent sees the same errors as the user in the editor. A second set of LSP clients in pi would duplicate the setup and could disagree with the editor. Worktrees work because nvim starts an LSP client per project root. The extension polls from TypeScript with short `--remote-expr` calls so it does not block nvim's main loop, reloads only unmodified buffers, wipes the buffers it created, and sends only errors. Cost: the feature is off without `PI_LSP_SERVER`, and a failed server or check is reported as an error, never as "no errors".
+
 ## 39. Tests run after each edit, at commit for the staged files, at push in full (2026-10-28)
 
 The tests extension runs the tests of a file after each `edit` or `write`, in the background, and reports only a failure. The pre-commit hook `tests-changed` runs `scripts/test-changed.sh` with the staged files. The pre-push hook `tests-all` runs the unit and integration tests. `run_tests` and the test and check commands in bash run only when a file changed since the last run; the `rerun` option is gone. Reason: the agent tested too often, and a full suite at each commit was slow. A failure shows directly after the edit that causes it. Cost: a flaky test cannot run again without a change. It changes the commit hook of decision 38.

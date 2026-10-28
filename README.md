@@ -19,6 +19,7 @@ Extensions for [pi](https://pi.dev), the terminal coding agent, packaged as one 
 | [checker](extensions/checker/README.md) | Before the agent finishes, asks a classifier whether the work is done. It sends the agent back with a hidden message when it left an error in scope, asked a question it can answer itself, or stopped halfway. At most 3 times per message. |
 | [gateway](extensions/gateway/README.md) | Sends the pi session id to agentgateway so its logs group requests by session. |
 | [handoff](extensions/handoff/README.md) | `/handoff`: a cheap model writes a handoff card from a stripped transcript; the code adds git, PR and job facts; a new session starts with it. |
+| [lsp](extensions/lsp/README.md) | After each `edit` or `write`, reports the LSP errors of the file from the user's Neovim server (`PI_LSP_SERVER`); only errors, and never a clean result when the query failed. |
 
 Every extension has its own README with tools, keys, commands and constants, an `AGENTS.md` for coding agents, a `CHANGELOG.md` and tests. [shared/](shared/README.md) holds the few helpers they share.
 
@@ -48,7 +49,8 @@ programs.zerodawn-pi = {
 The module:
 - installs the package with a generated `config.json` at `~/.pi/agent/packages/zerodawn-pi` (option `path`); `astGrep` defaults to `pkgs.ast-grep`, `nvim` to `pkgs.neovim-unwrapped`, `treesitterGrammars` to the grammars for bash, javascript, json, nix, python, tsx, typescript and yaml;
 - adds that path to `~/.pi/agent/settings.json` `packages` on activation with an idempotent `jq` edit, and leaves the rest of the file alone, so `/ext` keeps working;
-- adds a daily timer that removes the tool output of sessions that are gone or unchanged for 30 days (`logCleanup.enable`, `logCleanup.days`).
+- adds a daily timer that removes the tool output of sessions that are gone or unchanged for 30 days (`logCleanup.enable`, `logCleanup.days`);
+- sets `PI_LSP_SERVER` from `lspServer` (default `null`, off) so the `lsp` extension uses the user's Neovim server.
 
 Pin a tag (`github:Patrick-Kappen/zerodawn-pi/v0.2.0`) or follow `main` and update with `nix flake update zerodawn-pi`; `flake.lock` pins the commit either way. Releases are tagged `v<version>`; each extension also gets `<name>-v<version>` when it changes.
 
