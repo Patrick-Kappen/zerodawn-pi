@@ -63,9 +63,14 @@
           ];
           dontBuild = true;
           dontFixup = true;
+          # The dependencies of the kit go in its own node_modules: at the top they replaced the versions of pi,
+          # for example highlight.js 10 with 11.
           installPhase = ''
-            mkdir -p $out
-            cp -r node_modules/. $out/
+            mkdir -p $out/@narumitw/pi-tui-kit/node_modules
+            cp -r node_modules/@narumitw/pi-tui-kit/. $out/@narumitw/pi-tui-kit/
+            for dep in node_modules/*; do
+              [ "$dep" = node_modules/@narumitw ] || cp -r "$dep" $out/@narumitw/pi-tui-kit/node_modules/
+            done
           '';
         };
       piModules =

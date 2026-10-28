@@ -326,7 +326,7 @@
         {
           "always_run": true,
           "args": [],
-          "entry": "/nix/store/ksp35w2rw78541sh42did0xzr2m831qb-tests",
+          "entry": "/nix/store/x2ly7q1c9x066pv7zq0iv9j2vf9z1486-tests",
           "exclude": "^$",
           "exclude_types": [],
           "fail_fast": false,
