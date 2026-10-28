@@ -305,6 +305,12 @@
               ];
               description = "Tree-sitter grammars (each with parser/<lang>.so) for the syntax check. A file type without its grammar fails the check.";
             };
+            debugServer = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              example = "/run/user/1000/nvim/main.sock";
+              description = "Socket of the Neovim server with nvim-dap. Sets PI_DEBUG_SERVER; the debug tool exists only when it is set. null = off.";
+            };
             nixosRepo = lib.mkOption {
               type = lib.types.nullOr lib.types.str;
               default = null;
@@ -355,9 +361,9 @@
           config = lib.mkIf cfg.enable {
             home = {
               file.${cfg.path}.source = configured;
-              sessionVariables = lib.optionalAttrs (cfg.lspServer != null) {
-                PI_LSP_SERVER = cfg.lspServer;
-              };
+              sessionVariables =
+                lib.optionalAttrs (cfg.lspServer != null) { PI_LSP_SERVER = cfg.lspServer; }
+                // lib.optionalAttrs (cfg.debugServer != null) { PI_DEBUG_SERVER = cfg.debugServer; };
 
               # settings.json is also written by pi and by /ext, so it is merged, not replaced.
               activation.zerodawn-pi = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
