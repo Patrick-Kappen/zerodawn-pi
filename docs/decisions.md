@@ -2,6 +2,20 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 37. CI selects affected suites and does not repeat the local test hook (2026-10-28)
+
+Changes decision 26 for Nix checks, not local commits.
+A documentation PR selected every check because its files were outside `extensions/`.
+The Nix formatting check also ran all tests, and each extension check repeated shared tests.
+These repetitions added work without testing a different behavior.
+
+CI now classifies changed files on PRs and pushes to main.
+Known documentation runs safety checks only. Unknown inputs still select every check.
+Extension changes include integration tests because extensions share event contracts.
+Shared code and build inputs select every suite and compatibility tests.
+Nix skips the local test hook and runs each suite through its own check.
+No behavior tests are removed. The separate unit and integration work remains in PR #121.
+
 ## 36. pi-tui-kit is a dependency of shared/, an exception to "do not add a dependency" (2026-10-27)
 
 The user chose `@narumitw/pi-tui-kit` 0.67.0 for the pickers of the `projects` extension, over writing the interaction lifecycle (owner and abort handling, disposal, confirmations) by hand. It is declared in `shared/package.json`. Nix gets it from the npm registry: `nix/pi-tui-kit/` holds a `package.json` that mirrors the dependency and a `package-lock.json` (made with `npm install --package-lock-only --legacy-peer-deps`; the peers are pi, which `piModules` already brings). `fetchNpmDeps` pins the lock, and its modules are copied into the same `node_modules` as pi, for the tests, and into the installed package, for run time. Updating it: change the version in both manifests, regenerate the lock, update the `hash` in `flake.nix`. Cost: a second npm lock to maintain, and a pi API change can break the kit before it is updated.

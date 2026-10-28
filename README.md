@@ -91,6 +91,13 @@ Some extensions read `config.json` next to `package.json`; copy `config.example.
 The tests in `integration/` use real local processes and fixed model responses. They do not call paid providers.
 Affected extension tests also run this group. Nix runs it as `tests-integration`.
 
+CI selects checks from changed files on PRs and pushes to main.
+Documentation changes run formatting and safety checks, without tests.
+Extension changes run that extension, integration tests, and type checks.
+Shared code and build inputs run every suite. Each Nix test check runs only its own suite.
+The Nix formatting check skips the local test hook; local commits keep that hook.
+See [docs/ci-selection.md](docs/ci-selection.md) for selection rules and test review limits.
+
 Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Changes

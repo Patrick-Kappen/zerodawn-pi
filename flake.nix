@@ -178,7 +178,7 @@
             chmod -R u+w src
             ln -s ${piModules pkgs}/node_modules src/node_modules
             cd src
-            HOME="$TMPDIR" bun test
+            HOME="$TMPDIR" bun test ./${if name == "shared" then "shared" else "extensions/${name}"}
             touch "$out"
           '';
       # The pi package: manifest and sources, without tests. Pi loads it from settings.json "packages".
@@ -380,8 +380,8 @@
 
       checks = forAll (
         { system, pkgs }:
-        {
-          pre-commit = git-hooks.lib.${system}.run {
+        let
+          preCommit = git-hooks.lib.${system}.run {
             src = self;
             hooks = {
               detect-private-keys.enable = true;
@@ -442,7 +442,7 @@
                 pass_filenames = false;
                 always_run = true;
               };
-              # The full test suite before each commit; CI runs it again with the other checks.
+              # Local commits keep this guard; Nix runs each suite through its own check.
               tests = {
                 enable = true;
                 name = "tests: the full test suite";
@@ -466,6 +466,16 @@
                 pass_filenames = false;
               };
             };
+          };
+        in
+        {
+          pre-commit = (preCommit.overrideAttrs { SKIP = "tests,tests-unit"; }) // {
+            inherit (preCommit)
+              config
+              enabledPackages
+              shellHook
+              extendModules
+              ;
           };
 
           hooks-config = pkgs.runCommand "hooks-config" { } ''
@@ -501,6 +511,7 @@
                   fileset = lib.fileset.unions [
                     ./package.json
                     ./biome.json
+                    ./flake.nix
                     ./integration
                     ./scripts
                     ./extensions
