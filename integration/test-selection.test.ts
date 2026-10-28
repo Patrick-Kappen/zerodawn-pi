@@ -87,7 +87,9 @@ test("real Bun discovery partitions every fixture once and keeps affected units 
     const result = spawnSync("bash", args, { cwd: root, encoding: "utf8", timeout: 10_000 });
     if (result.error) throw result.error;
     assert.equal(result.status, 0, `${args.join(" ")}: ${result.stderr}`);
-    return [...`${result.stdout}\n${result.stderr}`.matchAll(/\(pass\) (\w+)/g)].map((match) => match[1]).sort();
+    // FORCE_COLOR of the caller gives colour codes, and bun prints a check mark or (pass) after the environment.
+    const output = `${result.stdout}\n${result.stderr}`.replace(/\x1b\[[0-9;]*m/g, "");
+    return [...output.matchAll(/(?:\(pass\)|\u2713) (\w+)/g)].map((match) => match[1]).sort();
   };
   const justfile = readFileSync(join(sourceRoot, "justfile"), "utf8");
   const recipe = (name: string) => {
@@ -116,34 +118,40 @@ test("real Bun discovery partitions every fixture once and keeps affected units 
   assert.match(failed.stderr, /unit failure/);
 });
 
-test("commit hooks run unit tests automatically and reject failures without integration tests", (t) => {
+test("the commit hook runs the tests of the staged files; the push hook runs every test", (t) => {
   const hooks = JSON.parse(readFileSync(join(sourceRoot, ".pre-commit-config.yaml"), "utf8").replace(/^#.*\n/gm, ""));
   type Hook = { id: string; entry: string; always_run: boolean; pass_filenames: boolean; stages: string[] };
   const entries: Hook[] = hooks.repos.flatMap((repo: { hooks: Hook[] }) => repo.hooks);
   assert.ok(entries.some((hook) => hook.id === "biome"));
   assert.ok(entries.some((hook) => hook.id === "gitleaks"));
-  const unit = entries.find((hook) => hook.id === "tests-unit");
-  assert.ok(unit, "commit hooks must run unit tests without an agent request");
-  assert.equal(unit.always_run, true);
-  assert.equal(unit.pass_filenames, false);
-  assert.deepEqual(unit.stages, ["pre-commit"]);
+  const changed = entries.find((hook) => hook.id === "tests-changed");
+  assert.ok(changed, "the commit hook must run the tests of the staged files");
+  assert.equal(changed.pass_filenames, true);
+  assert.deepEqual(changed.stages, ["pre-commit"]);
+  assert.match(readFileSync(changed.entry, "utf8"), /exec scripts\/test-changed\.sh "\$@"/);
+  const all = entries.find((hook) => hook.id === "tests-all");
+  assert.ok(all, "the push hook must run every test");
+  assert.equal(all.always_run, true);
+  assert.deepEqual(all.stages, ["pre-push"]);
 
-  const root = mkdtempSync(join(tmpdir(), "pi-unit-hook-"));
+  const root = mkdtempSync(join(tmpdir(), "pi-push-hook-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, "integration"));
-  writeFileSync(join(root, "unit.test.ts"), 'import { test } from "bun:test"; test("UNIT_HOOK", () => {});\n');
-  const integration = 'throw new Error("integration tests must not run in the commit hook");\n';
-  writeFileSync(join(root, "files.integration.test.ts"), integration);
-  writeFileSync(join(root, "integration", "contract.test.ts"), integration);
+  writeFileSync(
+    join(root, "unit.test.ts"),
+    'import { test } from "bun:test"; test("UNIT_HOOK", () => { if (process.env.GIT_INDEX_FILE) throw new Error("GIT_INDEX_FILE leaked"); });\n',
+  );
+  writeFileSync(join(root, "integration", "contract.test.ts"), 'import { test } from "bun:test"; test("INTEGRATION_HOOK", () => {});\n');
   const run = () => {
-    const result = spawnSync(unit.entry, [], { cwd: root, encoding: "utf8", timeout: 10_000 });
+    const env = { ...process.env, GIT_INDEX_FILE: join(root, "index") };
+    const result = spawnSync(all.entry, [], { cwd: root, env, encoding: "utf8", timeout: 20_000 });
     if (result.error) throw result.error;
     return result;
   };
   const passed = run();
   assert.equal(passed.status, 0, passed.stderr);
   assert.match(passed.stderr, /UNIT_HOOK/);
-  assert.doesNotMatch(passed.stderr, /integration tests must not run/);
+  assert.match(passed.stderr, /INTEGRATION_HOOK/);
   writeFileSync(join(root, "unit.test.ts"), 'import { test } from "bun:test"; test("UNIT_HOOK", () => { throw new Error("unit hook failure"); });\n');
   const failed = run();
   assert.notEqual(failed.status, 0);

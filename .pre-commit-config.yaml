@@ -326,16 +326,38 @@
         {
           "always_run": true,
           "args": [],
-          "entry": "/nix/store/qyj41kv0d866cv44s25zi0l435gbbclm-tests-unit",
+          "entry": "/nix/store/4ydl9cm5d23vfr3760lpqynkd4p695da-tests-all",
           "exclude": "^$",
           "exclude_types": [],
           "fail_fast": false,
           "files": "",
-          "id": "tests-unit",
+          "id": "tests-all",
           "language": "unsupported",
-          "name": "tests: unit tests",
+          "name": "tests: every test",
           "pass_filenames": false,
           "require_serial": false,
+          "stages": [
+            "pre-push"
+          ],
+          "types": [
+            "file"
+          ],
+          "types_or": [],
+          "verbose": false
+        },
+        {
+          "always_run": false,
+          "args": [],
+          "entry": "/nix/store/axl7q8a98q41j0vr59lgysilfmrpv5km-tests-changed",
+          "exclude": "^$",
+          "exclude_types": [],
+          "fail_fast": false,
+          "files": "",
+          "id": "tests-changed",
+          "language": "unsupported",
+          "name": "tests: the tests of the staged files",
+          "pass_filenames": true,
+          "require_serial": true,
           "stages": [
             "pre-commit"
           ],

@@ -15,10 +15,10 @@ const bash = (command: string, id = "c1", input: Record<string, unknown> = { com
   handlers.get("tool_call")?.({ toolName: "bash", toolCallId: id, input }, { cwd: dir });
 const result = (id: string) => handlers.get("tool_result")?.({ toolName: "bash", toolCallId: id, content: [{ type: "text", text: "out" }] });
 
-test("registers run_tests with a schema for scope and rerun", () => {
+test("registers run_tests with a schema for scope and path", () => {
   assert.equal(tools.length, 1);
   assert.equal(tools[0].name, "run_tests");
-  assert.deepEqual(Object.keys(tools[0].parameters.properties), ["scope", "rerun", "path"]);
+  assert.deepEqual(Object.keys(tools[0].parameters.properties), ["scope", "path"]);
 });
 
 test("recipes go into the system prompt; a test command in bash runs run_tests, without a block; other commands run", async () => {
