@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.24.0 — 2026-10-28
+
+### bash 0.12.0
+
+- let the agent start a job at once with background
+
+### repository
+
+- bash: let the agent start a job at once with background
+
 ## 0.23.0 — 2026-10-28
 
 ### lsp 0.1.1

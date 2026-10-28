@@ -55,9 +55,9 @@ Jobs survive a pi restart: `session_start` reads the job files, reports jobs tha
 ## Changes
 
 <!-- changelog:start -->
-## 0.11.0 — 2026-10-28
+## 0.12.0 — 2026-10-28
 
-- wait inline for a call alone in its message
+- let the agent start a job at once with background
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

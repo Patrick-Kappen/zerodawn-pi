@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0 — 2026-10-28
+
+- let the agent start a job at once with background
+
 ## 0.11.0 — 2026-10-28
 
 - wait inline for a call alone in its message
