@@ -71,6 +71,19 @@ test("a command that is the only tool call of its message returns its result inl
   assert.equal(s.jobs.get(r.details.job)?.bg, false);
 });
 
+test("background starts a command alone in its message as a job at once", async () => {
+  const call = { type: "toolCall", id: "f", name: "bash", arguments: { command: "sleep 0.3; echo late", background: true } };
+  const branch = [{ type: "message", message: { role: "assistant", content: [call] } }];
+  const start = Date.now();
+  const r = await tools[0].execute("f", call.arguments, undefined, undefined, {
+    ...ctx,
+    sessionManager: { ...ctx.sessionManager, getBranch: () => branch },
+  });
+  assert.ok(Date.now() - start < 250, "the tool does not wait for the command");
+  assert.equal(r.details.background, true);
+  while (!reported.some((j) => j.id === r.details.job)) await new Promise((done) => setTimeout(done, 50));
+});
+
 test(`a quick command that runs longer than ${INLINE_WAIT_S} s moves to the background and keeps the turn`, {
   timeout: (INLINE_WAIT_S + 10) * 1000,
 }, async () => {

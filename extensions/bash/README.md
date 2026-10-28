@@ -4,12 +4,13 @@ Replaces pi's `bash` tool. Every command runs as a job without a terminal, like 
 
 ## Tools
 
-`bash` — `command`, `timeout` (seconds, default 3600; `# no-time-limit` in the command removes it), `group`.
+`bash` — `command`, `timeout` (seconds, default 3600; `# no-time-limit` in the command removes it), `group`, `background`.
 
 - Result: the exit status. Output of at most 50 lines and 4 KB comes with it; longer output gives its size and a reference `out:<id>.bash`, and the agent reads it with `read` or `grep`, which take `out:<name>` as a path. Job, check, test, git and codemode results name their logs the same way. This is the same for a success and a failure. A failure with longer output adds every distinct error line with its line numbers, from the whole log, or the last 3 lines when there is none.
 - A working directory that does not exist (for example a removed worktree) fails before the command starts, with its path.
 - A quick command (`ls`, `cat`, `git status` and similar) that ends within 5 s returns its output inline.
 - A call that is the only tool call of its assistant message returns its output inline when it ends within 10 s. The agent waits for it anyway, so a short command does not cost it a stop.
+- `background: true` starts the command as a job at once. The agent sets it when it has other work during the run.
 - Every other command returns the job id and keeps the turn. The result comes as a `bash-job` message. Jobs with the same `group` report together.
 - In print and json mode (`pi -p`), pi ends when the agent settles. So before it settles, the extension waits for the next background job and sends its report; the agent then continues. pi ends only when no background job runs.
 - A report that pi did not record is sent again after 20 s of idle time.
