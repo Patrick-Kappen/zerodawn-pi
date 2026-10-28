@@ -96,6 +96,17 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.19.1 — 2026-10-28
+
+### pair 0.1.1
+
+- /ide finds the Neovide window by its nvim socket
+
+### repository
+
+- docs: add astra latency task and guard block measurement
+- docs: task to record mistakes and turn frequent ones into fixes
+
 ## 0.19.0 — 2026-10-28
 
 ### shared 0.10.0
@@ -215,60 +226,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 - flake
 - handoff: gpt-6-luna first in the default card ladder
 - handoff: resume after a cut, check PR status of the card
-
-## 0.17.0 — 2026-10-27
-
-### shared 0.9.0
-
-- a red check shows biome errors without a position
-
-- handoffModels in config.json and the Home Manager module
-
-### checker 0.2.0
-
-- send back an offered step, no notice per follow-up
-
-- also check runs that end on assistant text
-
-- count follow-ups in a row; a tool call resets the count
-
-- shorter follow-up text, no reason for skipped tests
-
-- shorter follow-up text, no reason for skipped tests
-
-### handoff 0.1.0
-
-- First release.
-
-### subagents 0.8.3
-
-- no provider tool choice for the end tools
-
-- the model probe sends a session id for opencode-go
-
-- no start error in a repository without a commit
-
-### tests 0.6.1
-
-- a check with cd runs in the environment of that directory
-
-### ui 0.2.1
-
-- no crash when the terminal is 0 or 1 column wide
-
-### repository
-
-- handoff: short card with state, next actions and PR status
-- subagents: no provider tool choice for the end tools
-- checker: count follow-ups in a row; a tool call resets the count
-- checker: shorter follow-up text, no reason for skipped tests
-- checker: shorter follow-up text, no reason for skipped tests
-- flake: run the full test suite in a pre-commit hook
-- flake: run the full test suite in a pre-commit hook
-- handoff: card from a stripped transcript, /handoff to a new session
-- shared: handoffModels in config.json and the Home Manager module
-- docs: backlog item to restart pi sessions after a rebuild
-- docs: open points from the v0.15.0 release session
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

@@ -19,9 +19,9 @@ Needs the zerodawn-tmux addon `pair` and the zerodawn-nvim addon `pair` (`requir
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.0 — 2026-10-28
+## 0.1.1 — 2026-10-28
 
-- First release.
+- /ide finds the Neovide window by its nvim socket
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

@@ -1,6 +1,6 @@
 {
   "name": "pair",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "`/ide`: open or focus the paired Neovide on this worktree; publishes the pi session id to tmux",
   "type": "module"
 }
