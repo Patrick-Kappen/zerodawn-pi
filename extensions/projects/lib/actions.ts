@@ -6,21 +6,18 @@ const fail = (what: string, result: { code: number; stderr: string }) => new Err
 
 export async function loadItems(run: Run, env: NodeJS.ProcessEnv = process.env): Promise<Record<Scope, Item[]>> {
   const open: PairEntry[] = await pairList(run, env);
-  let projects = openItems(open);
-  if (projects.length === 0) {
-    const recent = await run("zoxide", ["query", "-l"]);
-    if (recent.code !== 0) throw fail("zoxide query -l", recent);
-    projects = recentItems(
-      recent.stdout
-        .split("\n")
-        .filter((l) => l !== "")
-        .slice(0, 30),
-      open,
-    );
-  }
+  const recent = await run("zoxide", ["query", "-l"]);
+  if (recent.code !== 0) throw fail("zoxide query -l", recent);
+  const projects = recentItems(
+    recent.stdout
+      .split("\n")
+      .filter((l) => l !== "")
+      .slice(0, 30),
+    open,
+  );
   const listed = await run("git", ["worktree", "list", "--porcelain"]);
   const worktrees = listed.code === 0 ? worktreeItems(parseWorktrees(listed.stdout), open) : [];
-  return { projects, worktrees };
+  return { open: openItems(open), worktrees, projects };
 }
 
 export async function switchTo(run: Run, pane: string | undefined, path: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {

@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import type { Run } from "../../shared/pair.ts";
 import register from "./index.ts";
 import { loadItems, newWorktree, removeWorktree, slug, switchTo } from "./lib/actions.ts";
-import { type Item, initial, mark, parseWorktrees, render, step, typedPath, visible } from "./lib/model.ts";
+import { frame, type Item, initial, mark, parseWorktrees, render, step, typedPath, visible } from "./lib/model.ts";
 import { toInput } from "./lib/picker.ts";
 
 const item = (path: string, open = false, agent = false): Item => ({ path, label: path, open, agent, window: open ? "@1" : undefined });
-const state = () => initial({ projects: [item("/a/one", true, true), item("/a/two")], worktrees: [item("/a/one", true, true), item("/a/one-x")] });
+const state = () =>
+  initial({ open: [item("/a/one", true, true), item("/a/two")], worktrees: [item("/a/one", true, true), item("/a/one-x")], projects: [item("/p/far")] });
 
 const fake =
   (replies: Record<string, { code?: number; stdout?: string; stderr?: string }>, calls: string[][] = []): Run =>
@@ -18,11 +20,18 @@ const fake =
     return { code: r.code ?? 0, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
   };
 
-test("tab switches the scope and resets the cursor", () => {
+test("the picker starts on open, and tab goes to worktrees, projects and open again", () => {
+  assert.equal(state().scope, "open");
   const s = step(step(state(), { kind: "down" }).state, { kind: "tab" }).state;
   assert.equal(s.scope, "worktrees");
   assert.equal(s.cursor, 0);
-  assert.equal(step(s, { kind: "tab" }).state.scope, "projects");
+  const p = step(s, { kind: "tab" }).state;
+  assert.equal(p.scope, "projects");
+  assert.deepEqual(
+    visible(p).map((i) => i.path),
+    ["/p/far"],
+  );
+  assert.equal(step(p, { kind: "tab" }).state.scope, "open");
 });
 
 test("typing filters, enter selects the cursor item, escape cancels", () => {
@@ -54,9 +63,19 @@ test("render marks open and pi-running entries", () => {
   assert.equal(mark(item("/x", true, true)), "●π");
   assert.equal(mark(item("/x")), "○ ");
   const lines = render(state());
-  assert.match(lines[0], /\[projects\].*worktrees/);
+  assert.match(lines[0], /\[open\] +worktrees +projects/);
+  assert.match(lines.at(-1) ?? "", /^tab worktrees /);
   assert.match(lines[1], /^› ●π /);
   assert.match(lines[2], /○ /);
+});
+
+test("frame draws a box of the full width around the lines", () => {
+  const box = frame(["a", "a very long line that does not fit"], 12);
+  assert.deepEqual(box[0], `╭${"─".repeat(10)}╮`);
+  assert.equal(box[1], "│ a        │");
+  assert.match(box[2], /^│ a ver.*\.\.\..* │$/);
+  assert.equal(box.length, 4);
+  for (const line of box) assert.equal(visibleWidth(line), 12);
 });
 
 test("toInput maps keys", () => {
@@ -67,13 +86,24 @@ test("toInput maps keys", () => {
   assert.deepEqual(toInput("a"), { kind: "text", text: "a" });
 });
 
-test("loadItems lists open entries, and zoxide when none is open", async () => {
+test("loadItems lists the open entries, the worktrees and the zoxide projects", async () => {
   const open = "/r/.git\t/r\t@1\t1\n";
+  const twice = "/r/.git\t/r\t@1\t0\n/r/.git\t/r\t@2\t1\n";
   const wt = "worktree /r\nHEAD x\n\nworktree /r-x\nHEAD y\n";
-  const a = await loadItems(fake({ "pair list": { stdout: open }, "git worktree list --porcelain": { stdout: wt } }), {});
+  const a = await loadItems(
+    fake({ "pair list": { stdout: open }, "git worktree list --porcelain": { stdout: wt }, "zoxide query -l": { stdout: "/r\n/p/one\n" } }),
+    {},
+  );
   assert.deepEqual(
-    a.projects.map((i) => [i.path, i.agent]),
+    a.open.map((i) => [i.path, i.agent]),
     [["/r", true]],
+  );
+  assert.deepEqual(
+    a.projects.map((i) => [i.path, i.open]),
+    [
+      ["/r", true],
+      ["/p/one", false],
+    ],
   );
   assert.deepEqual(
     a.worktrees.map((i) => [i.path, i.open]),
@@ -83,10 +113,17 @@ test("loadItems lists open entries, and zoxide when none is open", async () => {
     ],
   );
   const b = await loadItems(fake({ "zoxide query -l": { stdout: "/p/one\n/p/two\n" } }), {});
+  assert.deepEqual(b.open, []);
   assert.deepEqual(
     b.projects.map((i) => i.path),
     ["/p/one", "/p/two"],
   );
+  const c = await loadItems(fake({ "pair list": { stdout: twice }, "zoxide query -l": { stdout: "/r\n" } }), {});
+  assert.deepEqual(
+    c.projects.map((i) => [i.path, i.open, i.agent]),
+    [["/r", true, true]],
+  );
+  await assert.rejects(loadItems(fake({ "zoxide query -l": { code: 127, stderr: "not found" } }), {}), /zoxide query -l failed \(exit 127\): not found/);
   assert.equal(parseWorktrees(wt).length, 2);
 });
 

@@ -1,17 +1,17 @@
 # projects
 
-`/switch` and alt+p open a compact picker that moves the tmux/nvim pair (zerodawn-tmux addon `pair`) to a project or worktree. Built with `@narumitw/pi-tui-kit`.
+`/switch` and alt+p open a popup picker, like the picker of the zerodawn-nvim addon `projects`. It moves the tmux/nvim pair (zerodawn-tmux addon `pair`) to a project or worktree. Built with `@narumitw/pi-tui-kit`.
 
 | Key | What |
 |---|---|
 | type | filter; a path (`/…`, `~/…`, `./…`) is accepted as typed |
 | up / down, enter | choose and switch the pair with `pair open` |
-| tab | scope: projects or worktrees of the current repo |
+| tab | next scope: open, worktrees, projects, then open again |
 | ctrl-n | new worktree and branch next to the main worktree, then switch |
 | ctrl-d | remove the worktree (worktrees scope); confirms when pi runs there |
 | esc | close |
 
-Projects are the open worktree windows of `pair list`; when none is open, the recent folders of `zoxide`. `●` open, `○` not open, `π` pi runs in the window.
+The picker always starts on `open`, the open worktree windows of `pair list`. `worktrees` are the worktrees of the current repo. `projects` are the recent folders of `zoxide`. `●` open, `○` not open, `π` pi runs in the window.
 
 ## Environment
 

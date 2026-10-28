@@ -1,14 +1,18 @@
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { PairEntry } from "../../../shared/pair.ts";
 
-export type Scope = "projects" | "worktrees";
+export const SCOPES = ["open", "worktrees", "projects"] as const;
+export type Scope = (typeof SCOPES)[number];
 export type Item = { path: string; label: string; open: boolean; agent: boolean; window?: string };
 export type State = { scope: Scope; items: Record<Scope, Item[]>; query: string; cursor: number };
 export type Input = { kind: "up" | "down" | "tab" | "enter" | "escape" | "backspace" | "ctrl-n" | "ctrl-d" } | { kind: "text"; text: string };
 export type Outcome = { kind: "select"; path: string } | { kind: "new" } | { kind: "remove"; item: Item } | { kind: "cancel" };
 
-export const initial = (items: Record<Scope, Item[]>): State => ({ scope: "projects", items, query: "", cursor: 0 });
+export const initial = (items: Record<Scope, Item[]>): State => ({ scope: "open", items, query: "", cursor: 0 });
+
+const nextScope = (scope: Scope): Scope => SCOPES[(SCOPES.indexOf(scope) + 1) % SCOPES.length];
 
 export function labelOf(path: string): string {
   return `${basename(dirname(path))}/${basename(path)}`;
@@ -36,8 +40,8 @@ export function openItems(entries: PairEntry[]): Item[] {
 
 export function recentItems(paths: string[], open: PairEntry[]): Item[] {
   return paths.map((path) => {
-    const entry = open.find((e) => e.worktree === path);
-    return { path, label: labelOf(path), open: entry !== undefined, agent: entry?.agent ?? false, window: entry?.window };
+    const entries = open.filter((e) => e.worktree === path);
+    return { path, label: labelOf(path), open: entries.length > 0, agent: entries.some((e) => e.agent), window: entries[0]?.window };
   });
 }
 
@@ -61,7 +65,7 @@ export function step(state: State, input: Input): { state: State; outcome?: Outc
     case "down":
       return { state: { ...state, cursor: clamp(state, state.cursor + 1) } };
     case "tab":
-      return { state: { ...state, scope: state.scope === "projects" ? "worktrees" : "projects", cursor: 0 } };
+      return { state: { ...state, scope: nextScope(state.scope), cursor: 0 } };
     case "escape":
       return { state, outcome: { kind: "cancel" } };
     case "backspace": {
@@ -94,12 +98,22 @@ export function mark(item: Item): string {
 export function render(state: State, rows = 8): string[] {
   const list = visible(state);
   const start = Math.max(0, Math.min(state.cursor - Math.floor(rows / 2), list.length - rows));
-  const scopes = (["projects", "worktrees"] as const).map((s) => (s === state.scope ? `[${s}]` : ` ${s} `)).join(" ");
+  const scopes = SCOPES.map((s) => (s === state.scope ? `[${s}]` : ` ${s} `)).join(" ");
   const lines = [`${scopes}  › ${state.query}`];
   for (const [i, item] of list.slice(start, start + rows).entries()) {
     lines.push(`${start + i === state.cursor ? "›" : " "} ${mark(item)} ${item.label}  ${item.path}`);
   }
   if (list.length === 0) lines.push(typedPath(state.query) ? `  enter: switch to ${state.query}` : "  nothing matches");
-  lines.push("tab scope · enter switch · ^n new worktree · ^d remove · esc close");
+  lines.push(`tab ${nextScope(state.scope)} · enter switch · ^n new worktree · ^d remove · esc close`);
   return lines;
+}
+
+export function frame(lines: string[], width: number, paint: (border: string) => string = (b) => b): string[] {
+  const inner = Math.max(1, width - 4);
+  const rule = "─".repeat(inner + 2);
+  const row = (line: string) => {
+    const text = truncateToWidth(line, inner);
+    return `${paint("│")} ${text}${" ".repeat(inner - visibleWidth(text))} ${paint("│")}`;
+  };
+  return [paint(`╭${rule}╮`), ...lines.map(row), paint(`╰${rule}╯`)];
 }

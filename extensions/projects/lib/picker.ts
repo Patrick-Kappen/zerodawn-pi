@@ -1,7 +1,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Key, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
-import { runCustomInteraction } from "@narumitw/pi-tui-kit";
-import { type Input, type Item, initial, type Outcome, render, type Scope, step } from "./model.ts";
+import { Key, matchesKey } from "@earendil-works/pi-tui";
+import { frame, type Input, type Item, initial, type Outcome, render, type Scope, step } from "./model.ts";
 
 export function toInput(data: string): Input | undefined {
   if (matchesKey(data, Key.up)) return { kind: "up" };
@@ -16,23 +15,28 @@ export function toInput(data: string): Input | undefined {
 }
 
 export async function pick(ctx: ExtensionContext, items: Record<Scope, Item[]>): Promise<Outcome> {
-  const result = await runCustomInteraction<Outcome, ExtensionContext>(ctx, {
-    create: ({ theme, complete }) => {
+  if (ctx.mode !== "tui" || !ctx.hasUI) throw new Error("/switch needs the pi TUI; start pi in interactive mode.");
+  return ctx.ui.custom<Outcome>(
+    (tui, theme, _keybindings, done) => {
       let state = initial(items);
       return {
-        render: (width) => render(state).map((line, i) => truncateToWidth(i === 0 ? theme.fg("accent", line) : line, width)),
+        render: (width) =>
+          frame(
+            render(state).map((line, i) => (i === 0 ? theme.fg("accent", line) : line)),
+            width,
+            (border) => theme.fg("border", border),
+          ),
         invalidate() {},
         handleInput(data) {
           const input = toInput(data);
           if (!input) return;
           const next = step(state, input);
           state = next.state;
-          if (next.outcome) complete(next.outcome);
+          if (next.outcome) return done(next.outcome);
+          tui.requestRender();
         },
       };
     },
-    onUnsupportedMode: (c) => c.ui.notify("/switch needs the pi TUI.", "warning"),
-    onError: (c, error) => c.ui.notify(`/switch: ${error instanceof Error ? error.message : String(error)}`, "error"),
-  });
-  return result.kind === "completed" ? result.value : { kind: "cancel" };
+    { overlay: true, overlayOptions: { anchor: "top-center", width: "80%", margin: { top: 2 } } },
+  );
 }
