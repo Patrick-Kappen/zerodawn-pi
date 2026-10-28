@@ -54,9 +54,9 @@ Jobs survive a pi restart: `session_start` reads the job files, reports jobs tha
 ## Changes
 
 <!-- changelog:start -->
-## 0.10.0 — 2026-10-28
+## 0.11.0 — 2026-10-28
 
-- run long commands and tests in the background at once (breaking)
+- wait inline for a call alone in its message
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

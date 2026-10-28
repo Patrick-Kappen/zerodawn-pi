@@ -113,6 +113,24 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.22.0 — 2026-10-28
+
+### bash 0.11.0
+
+- wait inline for a call alone in its message
+
+### tests 0.9.0
+
+- run the tests of a file after each edit, report only red (breaking)
+
+### repository
+
+- docs: put the test hook decision on top as 39
+- ci: read the bun pass lines also with colour codes
+- ci: keep the git variables of a hook away from the tests
+- ci: test staged files at commit, every test at push
+- bash: wait inline for a call alone in its message
+
 ## 0.21.0 — 2026-10-28
 
 ### bash 0.10.0
@@ -147,82 +165,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 - docs: add tasks for handoff accuracy and the checker note
 - ci: make ci-nixos-update.sh executable
-
-## 0.20.0 — 2026-10-28
-
-### shared 0.11.0
-
-- tests: separate unit and integration suites
-
-### bash 0.9.0
-
-- tests: separate unit and integration suites
-
-- tests: clean fixtures and isolate the supervisor environment
-
-### checker 0.4.0
-
-- tests: separate unit and integration suites
-
-### core 0.4.0
-
-- tests: separate unit and integration suites
-
-### files 0.6.0
-
-- tests: separate unit and integration suites
-
-- tests: clean fixtures and isolate the supervisor environment
-
-### git 0.6.0
-
-- tests: separate unit and integration suites
-
-### handoff 0.4.0
-
-- remove the reused card fixture after tests
-
-- tests: separate unit and integration suites
-
-- tests: clean fixtures and isolate the supervisor environment
-
-### pair 0.1.2
-
-- /ide requires PI_PAIR_COMMAND
-
-### projects 0.2.0
-
-- /switch requires PI_PAIR_COMMAND
-
-- mark pi when any window of a folder runs it
-
-- popup picker with open, worktrees and projects scopes
-
-### subagents 0.9.0
-
-- tests: separate unit and integration suites
-
-- tests: clean fixtures and isolate the supervisor environment
-
-### tests 0.7.0
-
-- separate unit and integration suites
-
-### repository
-
-- tests: regenerate the pre-commit config after the rebase
-- docs: record automatic unit hook timings
-- tests: restore automatic unit tests in commit hooks
-- docs: record final test separation measurements
-- tests: separate unit and integration suites
-- tests: clean fixtures and isolate the supervisor environment
-- docs: tmux update-environment is the cause of the lost SSH agent
-- docs: name the missing SSH_AUTH_SOCK as cause in random failures
-- docs: tasks for recall memory, failures, bash, docs flow, test VM
-- docs: record status and next steps of the Nixos update PRs
-- ci: ask Nixos for an update PR after a package release
-- ci: keep renamed test hooks disabled in Nix checks
-- ci: select affected checks without repeated test suites
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

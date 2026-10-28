@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0 — 2026-10-28
+
+- wait inline for a call alone in its message
+
 ## 0.10.0 — 2026-10-28
 
 - run long commands and tests in the background at once (breaking)

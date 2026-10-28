@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.22.0 — 2026-10-28
+
+### bash 0.11.0
+
+- wait inline for a call alone in its message
+
+### tests 0.9.0
+
+- run the tests of a file after each edit, report only red (breaking)
+
+### repository
+
+- docs: put the test hook decision on top as 39
+- ci: read the bun pass lines also with colour codes
+- ci: keep the git variables of a hook away from the tests
+- ci: test staged files at commit, every test at push
+- bash: wait inline for a call alone in its message
+
 ## 0.21.0 — 2026-10-28
 
 ### bash 0.10.0
