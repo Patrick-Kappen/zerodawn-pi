@@ -146,6 +146,7 @@ test("a check command runs in place: green, red on a failure, red on a warning, 
   assert.match(await check("echo ok"), /^Check result \(do not run it again in another form\):\ngreen: exit 0 · [\d.]+ s · log: .*\.check\.log$/);
   assert.equal((await checks.check("call-5", `cd ${dir} && exit 1`, ctx)).isError, true);
   assert.match(await check("echo boom; exit 3"), /\nred: exit 3 · [\d.]+ s\nboom\nlog: /);
+  assert.match(await check("(echo piped; exit 4) 2>&1 | tail -1"), /\nred: exit 4 · /, "a pipe to tail keeps the failure");
   assert.match(await check("echo 'warning: unused x'"), /\nred: exit 0 · 1 warning lines · (.*\n)*warning: unused x/);
   assert.match(await check("echo ok"), /green: exit 0 · .* · no file changed since the last run; same result \(add "# rerun" to run it again\)/);
   assert.doesNotMatch(await check("echo ok # rerun"), /same result/);

@@ -140,7 +140,7 @@ export class RunTests {
       if (earlier && !command.includes(RERUN))
         return { text: `${CHECK_HEAD}\n${again(earlier, `add "${RERUN}" to run it again`).content[0].text}`, isError: earlier.isError, background: false };
       const r = await this.inline(key, `check ${callFileId(ctx, toolCallId)}`, ctx.signal, async (signal) => {
-        const run = await execute(inProjectEnv(["bash", "-c", command], dir), ctx.cwd, signal);
+        const run = await execute(inProjectEnv(["bash", "-o", "pipefail", "-c", command], dir), ctx.cwd, signal);
         const log = callOutFile(ctx, toolCallId, "check");
         writeFileSync(log, run.output);
         const { text: t, ok } = report(run, "check", command, [], log);
