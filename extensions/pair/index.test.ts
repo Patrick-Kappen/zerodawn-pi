@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Run } from "../../shared/pair.ts";
-import register, { type Deps, followExpr, ide, parentExpr, publishSession, startExpr } from "./index.ts";
+import register, { type Deps, followExpr, ide, publishSession, startExpr } from "./index.ts";
 
 function setup(replies: Record<string, { code?: number; stdout?: string; stderr?: string }>, socketAppears = true) {
   const calls: string[][] = [];
@@ -18,31 +18,38 @@ function setup(replies: Record<string, { code?: number; stdout?: string; stderr?
     sleep: async () => {},
     env: { XDG_RUNTIME_DIR: "/run/u" },
     pid: 7,
+    cmdline: (pid) => ({ 41: ["neovide", "--server", "/other.sock"], 42: ["neovide", "--server", "/s.sock"] })[pid] ?? [],
   };
   return { calls, spawned, deps };
 }
 const client = { "tmux display-message -p -t %1 #{client_name}": { stdout: "c1\n" } };
 
-const paired = {
-  ...client,
-  "tmux show-option -gqv @pair-c1": { stdout: "/s.sock\n" },
-  [`nvim --clean --headless --server /s.sock --remote-expr ${parentExpr}`]: { stdout: "42\n" },
-};
+const windows = JSON.stringify([
+  { address: "0xa", class: "kitty", pid: 40 },
+  { address: "0xb", class: "neovide", pid: 41 },
+  { address: "0xc", class: "neovide", pid: 42 },
+]);
+const paired = { ...client, "tmux show-option -gqv @pair-c1": { stdout: "/s.sock\n" }, "hyprctl clients -j": { stdout: windows } };
 
-test("ide moves the paired Neovide to the worktree and focuses its window", async () => {
-  const { calls, spawned, deps } = setup({ ...paired, "hyprctl dispatch focuswindow pid:42": { stdout: "ok\n" } });
+test("ide moves the paired Neovide to the worktree and focuses the window on its socket", async () => {
+  const { calls, spawned, deps } = setup({ ...paired, "hyprctl dispatch focuswindow address:0xc": { stdout: "ok\n" } });
   assert.match(await ide(deps, "%1", "/w"), /follows \/w/);
   assert.deepEqual(calls.slice(-3), [
     ["nvim", "--clean", "--headless", "--server", "/s.sock", "--remote-expr", followExpr("/w")],
-    ["nvim", "--clean", "--headless", "--server", "/s.sock", "--remote-expr", parentExpr],
-    ["hyprctl", "dispatch", "focuswindow", "pid:42"],
+    ["hyprctl", "clients", "-j"],
+    ["hyprctl", "dispatch", "focuswindow", "address:0xc"],
   ]);
   assert.equal(spawned.length, 0);
 });
 
+test("ide fails loud when no Neovide window uses the socket", async () => {
+  const { deps } = setup({ ...paired, "hyprctl clients -j": { stdout: "[]" } });
+  await assert.rejects(ide(deps, "%1", "/w"), /no Neovide window uses the nvim server \/s.sock/);
+});
+
 test("ide fails loud when Hyprland does not focus the window", async () => {
-  const { deps } = setup({ ...paired, "hyprctl dispatch focuswindow pid:42": { stdout: "No such window found" } });
-  await assert.rejects(ide(deps, "%1", "/w"), /focuswindow pid:42 failed: No such window found/);
+  const { deps } = setup({ ...paired, "hyprctl dispatch focuswindow address:0xc": { stdout: "No such window found" } });
+  await assert.rejects(ide(deps, "%1", "/w"), /focuswindow address:0xc failed: No such window found/);
 });
 
 test("ide starts Neovide and the pair when none exists", async () => {
