@@ -469,7 +469,7 @@
           };
         in
         {
-          pre-commit = (preCommit.overrideAttrs { SKIP = "tests"; }) // {
+          pre-commit = (preCommit.overrideAttrs { SKIP = "tests,tests-unit"; }) // {
             inherit (preCommit)
               config
               enabledPackages
@@ -511,6 +511,7 @@
                   fileset = lib.fileset.unions [
                     ./package.json
                     ./biome.json
+                    ./flake.nix
                     ./integration
                     ./scripts
                     ./extensions

@@ -10,6 +10,13 @@ const source = fileURLToPath(new URL("../scripts/", import.meta.url));
 const all = ["pre-commit", "hooks-config", "types", "tests-alpha", "tests-beta", "tests-shared", "tests-integration"].sort();
 const extension = ["pre-commit", "types", "tests-alpha", "tests-integration"].sort();
 
+test("Nix skips both test hook names so the unit split cannot repeat tests in CI", () => {
+  const flake = readFileSync(fileURLToPath(new URL("../flake.nix", import.meta.url)), "utf8");
+  const skip = flake.match(/preCommit\.overrideAttrs\s*\{\s*SKIP = "([^"]+)";/);
+  assert.ok(skip, "the Nix pre-commit check must skip the local test hooks");
+  assert.deepEqual(skip[1].split(","), ["tests", "tests-unit"]);
+});
+
 function fixture(t: { after(fn: () => void): void }) {
   const root = mkdtempSync(join(tmpdir(), "pi-ci-selection-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
