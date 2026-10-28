@@ -205,11 +205,9 @@ The main pi connects to the supervisor when the first subagent starts. At `sessi
 ## Changes
 
 <!-- changelog:start -->
-## 0.9.0 — 2026-10-28
+## 0.10.0 — 2026-10-28
 
-- tests: separate unit and integration suites
-
-- tests: clean fixtures and isolate the supervisor environment
+- start and answer return the id; a message gives the result (breaking)
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

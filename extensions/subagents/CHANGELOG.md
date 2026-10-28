@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0 — 2026-10-28
+
+- start and answer return the id; a message gives the result (breaking)
+
 ## 0.9.0 — 2026-10-28
 
 - tests: separate unit and integration suites

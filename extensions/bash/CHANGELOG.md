@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0 — 2026-10-28
+
+- run long commands and tests in the background at once (breaking)
+
 ## 0.9.0 — 2026-10-28
 
 - tests: separate unit and integration suites
