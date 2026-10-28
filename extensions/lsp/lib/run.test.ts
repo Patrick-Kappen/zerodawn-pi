@@ -1,19 +1,20 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { conflict, noResult } from "./format.ts";
-import { type Deps, findBufferExpr, Lsp, pollBufferExpr, readDiagnosticsExpr, wipeBufferExpr } from "./run.ts";
+import { cleanupBufferExpr, type Deps, findBufferExpr, Lsp, pollBufferExpr, readDiagnosticsExpr, wipeBufferExpr } from "./run.ts";
 
 const dir = "/w";
 const file = "/w/a.ts";
 
 type Options = {
   buffer?: Record<string, unknown>;
-  polls?: { clients: number; counter: number }[];
+  polls?: { clients: number; counter: number; busy?: number; quiet?: number }[];
   diagnostics?: { lnum: number; col: number; source?: string | null; message: string }[];
   read?: () => string | undefined;
   exists?: (path: string) => boolean;
   env?: NodeJS.ProcessEnv;
   failPoll?: boolean;
+  failCleanup?: boolean;
 };
 
 const json = (value: unknown) => ({ code: 0, stdout: JSON.stringify(value), stderr: "" });
@@ -44,7 +45,9 @@ function setup(options: Options = {}) {
         return json(samples[Math.min(poll++, samples.length - 1)]);
       }
       if (expr === readDiagnosticsExpr(buf)) return json({ diagnostics: options.diagnostics ?? [] });
-      if (expr === wipeBufferExpr(buf)) return json({ ok: true });
+      if (expr === wipeBufferExpr(buf) || expr === cleanupBufferExpr(buf)) {
+        return options.failCleanup ? { code: 1, stdout: "", stderr: "wipe broke" } : json({ ok: true });
+      }
       return { code: 1, stdout: "", stderr: `unexpected ${expr}` };
     },
   };
@@ -85,6 +88,33 @@ test("an attached client without a result in 15 s is an error; a created buffer 
   await lsp.afterEdit("a.ts", dir);
   assert.deepEqual(messages, [noResult(file)]);
   assert.equal(wiped(), true);
+});
+
+test("a clean file: a quiet client without diagnostics gives no message and no error", async () => {
+  const { lsp, messages } = setup({
+    polls: [
+      { clients: 1, counter: 0, busy: 1, quiet: 0 },
+      { clients: 1, counter: 0, busy: 0, quiet: 3000 },
+    ],
+  });
+  await lsp.afterEdit("a.ts", dir);
+  assert.deepEqual(messages, []);
+});
+
+test("a failed wipe is reported; the first error stays", async () => {
+  const created = { buf: 1, created: true, modified: false, clients: 1 };
+  const wipe = setup({ buffer: created, failCleanup: true });
+  await wipe.lsp.afterEdit("a.ts", dir);
+  assert.equal(wipe.messages.length, 1);
+  assert.match(wipe.messages[0], /wiping the buffer failed on the nvim server \/s\.sock: wipe broke$/);
+
+  const both = setup({ buffer: created, failCleanup: true, polls: [{ clients: 1, counter: 0 }] });
+  await both.lsp.afterEdit("a.ts", dir);
+  assert.deepEqual(both.messages, [noResult(file)], "the first error stays");
+
+  const user = setup({ failCleanup: true });
+  await user.lsp.afterEdit("a.ts", dir);
+  assert.match(user.messages[0], /removing the autocmds failed/);
 });
 
 test("a failed poll is a clear error and still wipes a created buffer", async () => {

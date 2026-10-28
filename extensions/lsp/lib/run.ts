@@ -20,7 +20,7 @@ export type Deps = {
 export type Notify = (text: string) => void;
 
 type BufferReply = { buf?: unknown; created?: unknown; modified?: unknown };
-type PollReply = { clients?: unknown; counter?: unknown };
+type PollReply = { clients?: unknown; counter?: unknown; busy?: unknown; quiet?: unknown };
 type DiagnoseReply = { diagnostics?: unknown };
 
 const FIND_BUFFER = `
@@ -47,6 +47,32 @@ const FIND_BUFFER = `
   -- Before the reload or BufRead: an LSP that answers at once must count too.
   local group = vim.api.nvim_create_augroup("PiLspDiag" .. buf, { clear = true })
   vim.b[buf].pi_lsp_diag = 0
+  vim.b[buf].pi_lsp_busy = 0
+  vim.b[buf].pi_lsp_last = (vim.uv or vim.loop).now()
+  -- A server that finds nothing may publish nothing: progress events tell when it is quiet.
+  vim.api.nvim_create_autocmd("LspProgress", {
+    group = group,
+    callback = function(args)
+      local data = args.data or {}
+      if not vim.api.nvim_buf_is_valid(buf) or not data.client_id or not vim.lsp.buf_is_attached(buf, data.client_id) then
+        return
+      end
+      local value = data.params and data.params.value or {}
+      if value.kind == "begin" then
+        vim.b[buf].pi_lsp_busy = (vim.b[buf].pi_lsp_busy or 0) + 1
+      elseif value.kind == "end" then
+        vim.b[buf].pi_lsp_busy = math.max((vim.b[buf].pi_lsp_busy or 0) - 1, 0)
+      end
+      vim.b[buf].pi_lsp_last = (vim.uv or vim.loop).now()
+    end,
+  })
+  vim.api.nvim_create_autocmd("LspAttach", {
+    group = group,
+    buffer = buf,
+    callback = function()
+      vim.b[buf].pi_lsp_last = (vim.uv or vim.loop).now()
+    end,
+  })
   vim.api.nvim_create_autocmd("DiagnosticChanged", {
     group = group,
     buffer = buf,
@@ -85,7 +111,15 @@ const POLL_BUFFER = `
     end
     return #vim.lsp.buf_get_clients(buf)
   end
-  return vim.json.encode({ buf = buf, clients = count(), counter = vim.b[buf].pi_lsp_diag or 0, valid = true })
+  local now = (vim.uv or vim.loop).now()
+  return vim.json.encode({
+    buf = buf,
+    clients = count(),
+    counter = vim.b[buf].pi_lsp_diag or 0,
+    busy = vim.b[buf].pi_lsp_busy or 0,
+    quiet = now - (vim.b[buf].pi_lsp_last or now),
+    valid = true,
+  })
 end)(_A)
 `;
 
@@ -101,8 +135,22 @@ end)(_A)
 
 const WIPE_BUFFER = `
 (function(buf)
+  pcall(vim.api.nvim_del_augroup_by_name, "PiLspDiag" .. buf)
   if vim.api.nvim_buf_is_valid(buf) then
     pcall(vim.cmd, "silent! bwipeout! " .. buf)
+  end
+  return vim.json.encode({ ok = true })
+end)(_A)
+`;
+
+/** For a buffer of the user: only the autocmds and counters of pi go away. */
+const CLEANUP_BUFFER = `
+(function(buf)
+  pcall(vim.api.nvim_del_augroup_by_name, "PiLspDiag" .. buf)
+  if vim.api.nvim_buf_is_valid(buf) then
+    vim.b[buf].pi_lsp_diag = nil
+    vim.b[buf].pi_lsp_busy = nil
+    vim.b[buf].pi_lsp_last = nil
   end
   return vim.json.encode({ ok = true })
 end)(_A)
@@ -122,6 +170,7 @@ export const findBufferExpr = (file: string) => expression(FIND_BUFFER, file);
 export const pollBufferExpr = (buf: number) => expression(POLL_BUFFER, buf);
 export const readDiagnosticsExpr = (buf: number) => expression(READ_DIAGNOSTICS, buf);
 export const wipeBufferExpr = (buf: number) => expression(WIPE_BUFFER, buf);
+export const cleanupBufferExpr = (buf: number) => expression(CLEANUP_BUFFER, buf);
 
 const text = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
@@ -211,6 +260,7 @@ export class Lsp {
       return;
     }
     const buf = reply.buf;
+    let failed = false;
     try {
       const verdict = await this.poll(server, buf, stale);
       if (verdict === "stale" || verdict === "none") return;
@@ -220,8 +270,17 @@ export class Lsp {
       if (this.read(file) !== before) return;
       const diagnostics = Array.isArray(result.diagnostics) ? (result.diagnostics as Diagnostic[]) : [];
       if (diagnostics.length) this.report(formatDiagnostics(file, diagnostics));
+    } catch (err) {
+      failed = true;
+      throw err;
     } finally {
-      if (reply.created) await this.remote(server, wipeBufferExpr(buf), "wiping the buffer").catch(() => {});
+      // A buffer that pi created is wiped; a buffer of the user only loses the autocmds. The first error stays.
+      const expr = reply.created ? wipeBufferExpr(buf) : cleanupBufferExpr(buf);
+      try {
+        await this.remote(server, expr, reply.created ? "wiping the buffer" : "removing the autocmds");
+      } catch (err) {
+        if (!failed && !session.aborted) this.report(text(err));
+      }
     }
   }
 
@@ -233,12 +292,13 @@ export class Lsp {
       if (stale()) return "stale";
       const reply = (await this.remote(server, pollBufferExpr(buf), "polling the diagnostics")) as PollReply;
       const now = this.deps.now();
-      const sample = { clients: typeof reply.clients === "number" ? reply.clients : 0, counter: typeof reply.counter === "number" ? reply.counter : 0 };
+      const num = (value: unknown) => (typeof value === "number" ? value : 0);
+      const sample = { clients: num(reply.clients), counter: num(reply.counter), busy: num(reply.busy), quiet: num(reply.quiet) };
       if (sample.counter !== counter) {
         counter = sample.counter;
         changedAt = now;
       }
-      const verdict = pollDecision({ clients: sample.clients, counter }, now - start, now - changedAt);
+      const verdict = pollDecision({ ...sample, counter }, now - start, now - changedAt);
       if (verdict !== "wait") return verdict;
       await this.deps.sleep(POLL_MS);
     }
