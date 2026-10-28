@@ -1,13 +1,12 @@
+import { execFileSync } from "node:child_process";
 import { appendFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { callFileId, callOutFile, outRef } from "../../../shared/store.ts";
-import { CHANGED_RECIPE, changedFiles, execute, inGit, inProjectEnv, plan, type Run, reader, TIMEOUT_MS } from "../../../shared/testrun.ts";
+import { CHANGED_RECIPE, changedFiles, execute, inGit, inProjectEnv, NO_TEST, plan, type Run, reader, TIMEOUT_MS } from "../../../shared/testrun.ts";
 import { absolutePath } from "../../../shared/util.ts";
 import { loadRecipes } from "./recipes.ts";
 import { counts, type Diagnosis, diagnose, failures, warningLines } from "./report.ts";
-
-const RERUN = "# rerun";
 
 type Result = { content: { type: "text"; text: string }[]; details: Record<string, unknown>; isError: boolean };
 
@@ -61,12 +60,16 @@ export const TOOL = {
     "The result is one line when the tests pass. When they fail, it shows only the failures. The full output goes to a log file.",
     "A test command in bash runs run_tests in its place, and a check command in bash (lint, types, just check) gives a short result.",
     "A run returns at once and continues in the background; a message gives the result. Continue with other work, or end your turn when the next step needs the result.",
-    "With no changed file it gives the earlier result.",
+    "The tests of each file also run after each edit or write; a message comes only when they fail.",
+    "With no file changed since the last run, including the run after an edit, it runs nothing.",
   ].join(" "),
   promptSnippet: "Run the tests for the changed files; green in one line, or only the failures",
 };
 
-export type Params = { scope?: "changed" | "all"; rerun?: boolean; path?: string };
+export type Params = { scope?: "changed" | "all"; path?: string };
+
+const AFTER_EDIT =
+  "No file changed since the tests ran after your last edit; run_tests runs nothing. A message comes only when those tests fail, so no message means green.";
 
 const LEADING_CD = /^\s*cd\s+("[^"]+"|'[^']+'|\S+)\s*(&&|;)/;
 
@@ -95,6 +98,15 @@ export class RunTests {
   private last = new Map<string, Result>();
   private running = new Map<string, Promise<Result>>();
   private session = new AbortController();
+  /** Per git root: the state of the changed files when the tests last ran after an edit. */
+  private edited = new Map<string, string>();
+  /** The tail of the queue of runs after an edit, so they run one after another. */
+  private queue: Promise<void> = Promise.resolve();
+  /** Per edited file: the number of its last edit. */
+  private edits = new Map<string, number>();
+  /** The failures after an edit that notify gave; the same failure comes once. */
+  private sent = new Set<string>();
+  private pending = 0;
 
   constructor(
     private readonly notify: Notify,
@@ -105,6 +117,11 @@ export class RunTests {
   reset() {
     this.last.clear();
     this.running.clear();
+    this.edited.clear();
+    this.queue = Promise.resolve();
+    this.pending = 0;
+    this.edits.clear();
+    this.sent.clear();
     this.session.abort();
     this.session = new AbortController();
   }
@@ -121,7 +138,7 @@ export class RunTests {
   /** Runs the tests for the changed files in place of a test command in bash, in the directory of its leading cd. */
   async insteadOfBash(toolCallId: string, command: string, ctx: ExtensionContext): Promise<Replacement> {
     try {
-      const r = await this.execute(toolCallId, { path: cdOf(command), rerun: command.includes(RERUN) }, ctx.signal, ctx);
+      const r = await this.execute(toolCallId, { path: cdOf(command) }, ctx.signal, ctx);
       return { text: `${TEST_HEAD}\n${r.content[0].text}`, isError: r.isError, background: r.details.background === true };
     } catch (err) {
       return { text: `${TEST_HEAD}\n${(err as Error).message}`, isError: true };
@@ -132,11 +149,10 @@ export class RunTests {
   async check(toolCallId: string, command: string, ctx: ExtensionContext): Promise<Replacement> {
     try {
       const dir = absolutePath(cdOf(command) ?? ".", ctx.cwd);
-      const clean = command.replace(RERUN, "").trim();
-      const key = inGit(dir) ? fingerprint(dir, `check ${clean}`, changedFiles(dir)) : `check ${dir} ${clean}`;
+      // Outside git no change shows, so the check always runs there.
+      const key = inGit(dir) ? fingerprint(dir, `check ${command.trim()}`, changedFiles(dir)) : `check ${dir} ${command.trim()} ${Date.now()}`;
       const earlier = this.last.get(key);
-      if (earlier && !command.includes(RERUN))
-        return { text: `${CHECK_HEAD}\n${again(earlier, `add "${RERUN}" to run it again`).content[0].text}`, isError: earlier.isError };
+      if (earlier) return { text: `${CHECK_HEAD}\n${again(earlier).content[0].text}`, isError: earlier.isError };
       const r = await this.inline(key, `check ${callFileId(ctx, toolCallId)}`, ctx.signal, async (signal) => {
         const run = await execute(inProjectEnv(["bash", "-o", "pipefail", "-c", command], dir), ctx.cwd, signal);
         const log = callOutFile(ctx, toolCallId, "check");
@@ -186,13 +202,72 @@ export class RunTests {
     return text(`${label}: runs in the background. ${LATER}`, false, { background: true });
   }
 
+  /**
+   * Runs the tests of one edited file in the background, one run after the other.
+   * A later edit of the same file replaces a run that did not start. notify gets only a red result,
+   * only when the file did not change during the run, and the same failure only once.
+   */
+  afterEdit(toolCallId: string, path: string, ctx: ExtensionContext): Promise<void> {
+    const file = absolutePath(path, ctx.cwd);
+    const edit = (this.edits.get(file) ?? 0) + 1;
+    this.edits.set(file, edit);
+    const session = this.session.signal;
+    const run = async () => {
+      if (session.aborted || this.edits.get(file) !== edit) return;
+      let result: { text: string; ok: boolean };
+      let label = `tests after the edit of ${file}`;
+      let unchanged = () => true;
+      try {
+        if (!inGit(dirname(file))) return;
+        const root = gitRoot(dirname(file));
+        const rel = relative(root, file);
+        if (NO_TEST.test(rel)) return;
+        label = `tests after the edit of ${rel}`;
+        const before = fingerprint(root, "edit", [rel]);
+        unchanged = () => fingerprint(root, "edit", [rel]) === before;
+        this.edited.set(root, state(root));
+        const p = plan(root, loadRecipes(root), "changed", [rel]);
+        if ("nothing" in p) return;
+        if ("uncoveredOnly" in p) result = { text: `red: ${rel} has no test\n${noTest(p.uncoveredOnly)}`, ok: false };
+        else {
+          const out = await execute(inProjectEnv(p.run, root), root, session);
+          const log = callOutFile(ctx, toolCallId, "tests");
+          writeFileSync(log, out.output);
+          result = report(out, "tests", p.run.join(" "), p.uncovered, log);
+        }
+      } catch (err) {
+        result = { text: `failed: ${(err as Error).message}`, ok: false };
+      }
+      if (session.aborted || result.ok || !unchanged()) return;
+      const message = `${label}: ${result.text}`;
+      if (this.sent.has(message)) return;
+      this.sent.add(message);
+      this.notify(message, false);
+    };
+    this.pending++;
+    this.queue = this.queue.then(run).finally(() => {
+      if (!session.aborted) this.pending--;
+    });
+    return this.queue;
+  }
+
+  /** Ends when the runs after an edit end; true when one of them gave a failure to notify. undefined when none runs. */
+  editsDone(): Promise<boolean> | undefined {
+    if (this.pending === 0) return undefined;
+    const sent = this.sent.size;
+    const session = this.session.signal;
+    return this.queue.then(() => !session.aborted && this.sent.size > sent);
+  }
+
   async execute(toolCallId: string, params: Params, signal: AbortSignal | undefined, ctx: ExtensionContext): Promise<Result> {
     const scope = params.scope ?? "changed";
     const cwd = params.path ? absolutePath(params.path, ctx.cwd) : ctx.cwd;
     const changed = changedFiles(cwd);
     const key = fingerprint(cwd, scope, changed);
     const earlier = this.last.get(key);
-    if (earlier && !params.rerun) return again(earlier, "set rerun only for a flaky test");
+    if (earlier) return again(earlier);
+    if (scope === "changed" && this.edited.has(gitRoot(cwd)) && this.edited.get(gitRoot(cwd)) === state(gitRoot(cwd)))
+      return text(AFTER_EDIT, false, { changed });
 
     const p = plan(cwd, loadRecipes(cwd), scope, changed);
     if ("nothing" in p || "uncoveredOnly" in p) {
@@ -213,9 +288,20 @@ export class RunTests {
   }
 }
 
-function again(result: Result, how: string): Result {
+function gitRoot(dir: string): string {
+  try {
+    return execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: dir, encoding: "utf8" }).trim();
+  } catch (err) {
+    throw new Error(`run_tests: cannot find the git root of ${dir}. Run it in a git repository.`, { cause: err });
+  }
+}
+
+/** The changed files of a git root and their content. */
+const state = (root: string) => fingerprint(root, "state", changedFiles(root));
+
+function again(result: Result): Result {
   const [first, ...rest] = result.content[0].text.split("\n");
-  const text = [`${first} · no file changed since the last run; same result (${how})`, ...rest].join("\n");
+  const text = [`${first} · no file changed since the last run; same result, nothing ran`, ...rest].join("\n");
   return { ...result, content: [{ type: "text", text }] };
 }
 

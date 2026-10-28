@@ -79,7 +79,7 @@ test("green: one line with the counts and the log; the same result when no file 
   const r = await call({});
   assert.equal(r.isError, false);
   assert.match(r.text, /^green: 1 pass, 0 fail · [\d.]+ s · log: .*\.tests\.log$/);
-  assert.match((await call({})).text, /^green: .* · no file changed since the last run; same result \(set rerun only for a flaky test\)$/);
+  assert.match((await call({})).text, /^green: .* · no file changed since the last run; same result, nothing ran$/);
 });
 
 test("a warning makes a run red and shows the warning", async () => {
@@ -142,7 +142,7 @@ test("reset stops a background run without a message", async () => {
   assert.deepEqual(notes, []);
 });
 
-test("a check command runs in place: green, red on a failure, red on a warning, the same result until a change or # rerun", async () => {
+test("a check command runs in place: green, red on a failure, red on a warning, the same result until a change", async () => {
   const checks = new RunTests(notify, INLINE);
   const check = async (command: string) => (await checks.check("call-3", `cd ${dir} && ${command}`, ctx)).text;
   assert.match(await check("echo ok"), /^Check result \(do not run it again in another form\):\ngreen: exit 0 · [\d.]+ s · log: .*\.check\.log$/);
@@ -150,9 +150,13 @@ test("a check command runs in place: green, red on a failure, red on a warning, 
   assert.match(await check("echo boom; exit 3"), /\nred: exit 3 · [\d.]+ s\nboom\nlog: /);
   assert.match(await check("(echo piped; exit 4) 2>&1 | tail -1"), /\nred: exit 4 · /, "a pipe to tail keeps the failure");
   assert.match(await check("echo 'warning: unused x'"), /\nred: exit 0 · 1 warning lines · (.*\n)*warning: unused x/);
-  assert.match(await check("echo ok"), /green: exit 0 · .* · no file changed since the last run; same result \(add "# rerun" to run it again\)/);
-  assert.doesNotMatch(await check("echo ok # rerun"), /same result/);
-  assert.match((await checks.check("call-4", `cd ${plain} && echo outside`, ctx)).text, /green: exit 0/);
+  assert.match(await check("echo ok"), /green: exit 0 · .* · no file changed since the last run; same result, nothing ran/);
+  write("c.md", "x\n");
+  assert.doesNotMatch(await check("echo ok"), /same result/, "a change runs it again");
+  rmSync(join(dir, "c.md"));
+  const outside = async () => (await checks.check("call-4", `cd ${plain} && echo outside`, ctx)).text;
+  assert.match(await outside(), /green: exit 0/);
+  assert.doesNotMatch(await outside(), /same result/, "outside git no change shows, so it runs each time");
 });
 
 test("a red check that the parser does not understand is written to the anomalies file of the session", async () => {
@@ -206,6 +210,43 @@ test("the cache knows the directory: the same change in another worktree runs ag
   writeFileSync(join(other, "b.ts"), "export const b = 2;\n");
   const r = await tool.execute("call-5", { path: other }, undefined, ctx);
   assert.doesNotMatch(r.content[0].text, /same result/);
+});
+
+test("after an edit: the tests of the file run; only a red result gives a message, once; run_tests then runs nothing", async () => {
+  const edits = new RunTests(notify);
+  notes.length = 0;
+  write("a.ts", "export const a = 1; // edit\n");
+  await edits.afterEdit("call-e1", "a.ts", ctx);
+  assert.equal(notes.length, 0, "green gives no message");
+  const r = await edits.execute("call-e2", {}, undefined, ctx);
+  assert.match(r.content[0].text, /^No file changed since the tests ran after your last edit/);
+
+  write("a.ts", "export const a = 3;\n");
+  await edits.afterEdit("call-e3", join(dir, "a.ts"), ctx);
+  assert.equal(notes.length, 1);
+  assert.match(notes[0].text, /^tests after the edit of a\.ts: red: 0 pass, 1 fail/);
+
+  write("d.ts", "export const d = 1;\n");
+  await Promise.all([edits.afterEdit("call-e4", "d.ts", ctx), edits.afterEdit("call-e5", "d.ts", ctx)]);
+  await edits.afterEdit("call-e6", "d.ts", ctx);
+  assert.equal(notes.length, 2, "a later edit replaces a waiting run, and the same failure comes once");
+  assert.match(notes[1].text, /^tests after the edit of d\.ts: red: d\.ts has no test\nNo test for: d\.ts/);
+
+  await edits.afterEdit("call-e7", "notes.md", ctx);
+  await edits.afterEdit("call-e8", join(plain, "x.ts"), ctx);
+  assert.equal(notes.length, 2, "no run for a file that needs no test or is outside git");
+  rmSync(join(dir, "d.ts"));
+  write("a.ts", "export const a = 1;\n");
+});
+
+test("editsDone: undefined when no run after an edit waits; else true when a failure came", async () => {
+  const edits = new RunTests(notify);
+  assert.equal(edits.editsDone(), undefined);
+  write("e.ts", "export const e = 1;\n");
+  void edits.afterEdit("call-e9", "e.ts", ctx);
+  assert.equal(await edits.editsDone(), true);
+  assert.equal(edits.editsDone(), undefined);
+  rmSync(join(dir, "e.ts"));
 });
 
 test("a check that starts with cd runs in the dev environment of that directory, not of pi's cwd", async () => {

@@ -7,6 +7,7 @@ import { type Replacement, RunTests, TOOL } from "./lib/run.ts";
 
 /** Bash runs this in place of a test or check command; the extension runs the command itself. */
 const NO_OP = ":";
+const EDIT_TOOLS = new Set(["edit", "write"]);
 
 export default function (pi: ExtensionAPI) {
   let tracker = new Tracker();
@@ -20,7 +21,6 @@ export default function (pi: ExtensionAPI) {
     ...TOOL,
     parameters: Type.Object({
       scope: Type.Optional(StringEnum(["changed", "all"] as const, { description: "changed (default): tests for the changed files. all: every test." })),
-      rerun: Type.Optional(Type.Boolean({ description: "Run again when no file changed; only for a flaky test." })),
       path: Type.Optional(Type.String({ description: "Project directory, such as a git worktree. Default: the current directory." })),
     }),
     execute: (toolCallId, params, signal, _onUpdate, ctx) => runTests.execute(toolCallId, params, signal, ctx),
@@ -35,6 +35,8 @@ export default function (pi: ExtensionAPI) {
   // Print and json mode end when the agent settles, so a background result has nobody to read it: keep the run open for it.
   pi.on("agent_before_settle", async (_event, ctx) => {
     if (ctx.mode !== "print" && ctx.mode !== "json") return;
+    const edits = runTests.editsDone();
+    if (edits && (await edits)) return { continue: true };
     const next = runTests.nextResult();
     if (!next) return;
     await next;
@@ -71,7 +73,13 @@ export default function (pi: ExtensionAPI) {
     if (hint) hints.set(event.toolCallId, hint);
   });
 
-  pi.on("tool_result", async (event) => {
+  pi.on("tool_result", async (event, ctx) => {
+    if (EDIT_TOOLS.has(event.toolName)) {
+      const path = (event.input as { path?: unknown }).path;
+      // Not awaited: the run goes on in the background, and a message comes only for a failure.
+      if (!event.isError && typeof path === "string") void runTests.afterEdit(event.toolCallId, path, ctx);
+      return;
+    }
     if (event.toolName !== "bash") return;
     const pending = replaced.get(event.toolCallId);
     if (pending) {
