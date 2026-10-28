@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0 — 2026-10-28
+
+- run the tests of a file after each edit, report only red (breaking)
+
 ## 0.8.0 — 2026-10-28
 
 - bash: run long commands and tests in the background at once (breaking)
