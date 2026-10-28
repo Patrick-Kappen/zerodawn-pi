@@ -6,11 +6,12 @@ import { absolutePath } from "../../../shared/util.ts";
 export type Exec = (command: string, args: string[]) => Promise<RunResult>;
 export type Diagnostic = { line: number; col: number; source: string; message: string };
 export type LoadResult = { buf: number; modified: boolean; created: boolean };
-export type PollResult = { clients: number; changes: number };
+export type PollResult = { clients: number; changes: number; busy: number; quiet: number };
 export type Notify = (text: string) => void;
 
 export const NO_CLIENT_MS = 2_000;
 export const STABLE_MS = 500;
+export const QUIET_MS = 3_000;
 export const TIMEOUT_MS = 15_000;
 export const POLL_MS = 200;
 export const START_WAIT_MS = 5_000;
@@ -37,6 +38,15 @@ const LOAD_BODY = [
   "vim.b[buf].pi_lsp_changes = 0",
   'local group = vim.api.nvim_create_augroup("PiLsp" .. buf, {clear = true})',
   'vim.api.nvim_create_autocmd("DiagnosticChanged", {group = group, buffer = buf, callback = function() vim.b[buf].pi_lsp_changes = (vim.b[buf].pi_lsp_changes or 0) + 1 end})',
+  // vtsls sends no diagnostics for a clean file it did not check before: the end of LSP progress marks the result.
+  "vim.b[buf].pi_lsp_busy = 0 vim.b[buf].pi_lsp_last = vim.uv.now()",
+  'vim.api.nvim_create_autocmd("LspAttach", {group = group, buffer = buf, callback = function() vim.b[buf].pi_lsp_last = vim.uv.now() end})',
+  'vim.api.nvim_create_autocmd("LspProgress", {group = group, callback = function(ev)',
+  "if not vim.api.nvim_buf_is_valid(buf) or not vim.lsp.buf_is_attached(buf, ev.data.client_id) then return end",
+  "local kind = ev.data.params.value.kind",
+  'if kind == "begin" then vim.b[buf].pi_lsp_busy = vim.b[buf].pi_lsp_busy + 1 elseif kind == "end" then vim.b[buf].pi_lsp_busy = math.max(0, vim.b[buf].pi_lsp_busy - 1) end',
+  "vim.b[buf].pi_lsp_last = vim.uv.now()",
+  "end})",
   "return vim.json.encode({buf = buf, modified = false, created = created})",
   "end)(_A)",
 ].join(" ");
@@ -47,11 +57,12 @@ export const loadExpr = (file: string) => luaCall(LOAD_BODY, file);
 const POLL_BODY = [
   "(function(buf)",
   "local clients = #vim.lsp.get_clients({bufnr = buf})",
-  "return vim.json.encode({clients = clients, changes = vim.b[buf].pi_lsp_changes or 0})",
+  "local last = vim.b[buf].pi_lsp_last or vim.uv.now()",
+  "return vim.json.encode({clients = clients, changes = vim.b[buf].pi_lsp_changes or 0, busy = vim.b[buf].pi_lsp_busy or 0, quiet = vim.uv.now() - last})",
   "end)(_A)",
 ].join(" ");
 
-/** An expression with the attached LSP client count and the DiagnosticChanged counter of the buffer. */
+/** An expression with the attached LSP client count, the DiagnosticChanged counter, the open LSP progress and the ms since the last LSP event of the buffer. */
 export const pollExpr = (buf: number) => luaCall(POLL_BODY, buf);
 
 const DIAGNOSTICS_BODY = [
@@ -68,12 +79,21 @@ const DIAGNOSTICS_BODY = [
 /** An expression with the ERROR diagnostics of the buffer as JSON, with 1-based line and column. */
 export const diagnosticsExpr = (buf: number) => luaCall(DIAGNOSTICS_BODY, buf);
 
-const WIPE_BODY = ["(function(buf)", "if vim.api.nvim_buf_is_valid(buf) then vim.api.nvim_buf_delete(buf, {force = true}) end", 'return "ok"', "end)(_A)"].join(
-  " ",
-);
+const WIPE_BODY = [
+  "(function(buf)",
+  'pcall(vim.api.nvim_del_augroup_by_name, "PiLsp" .. buf)',
+  "if vim.api.nvim_buf_is_valid(buf) then vim.api.nvim_buf_delete(buf, {force = true}) end",
+  'return "ok"',
+  "end)(_A)",
+].join(" ");
 
 /** An expression that wipes a buffer that pi created. */
 export const wipeExpr = (buf: number) => luaCall(WIPE_BODY, buf);
+
+const RELEASE_BODY = ["(function(buf)", 'pcall(vim.api.nvim_del_augroup_by_name, "PiLsp" .. buf)', 'return "ok"', "end)(_A)"].join(" ");
+
+/** An expression that removes pi's autocmds from a buffer of the user. */
+export const releaseExpr = (buf: number) => luaCall(RELEASE_BODY, buf);
 
 function object(text: string): Record<string, unknown> {
   const value: unknown = JSON.parse(text);
@@ -90,8 +110,9 @@ export function parseLoad(text: string): LoadResult {
 
 export function parsePoll(text: string): PollResult {
   const raw = object(text);
-  if (typeof raw.clients !== "number" || typeof raw.changes !== "number") throw new Error(`LSP: nvim gave an unexpected poll result: ${text.slice(0, 200)}`);
-  return { clients: raw.clients, changes: raw.changes };
+  if (typeof raw.clients !== "number" || typeof raw.changes !== "number" || typeof raw.busy !== "number" || typeof raw.quiet !== "number")
+    throw new Error(`LSP: nvim gave an unexpected poll result: ${text.slice(0, 200)}`);
+  return { clients: raw.clients, changes: raw.changes, busy: raw.busy, quiet: raw.quiet };
 }
 
 export function parseDiagnostics(text: string): Diagnostic[] {
@@ -212,6 +233,7 @@ export class LspChecks {
         const poll = parsePoll(await this.remote(pollExpr(load.buf), signal));
         const elapsed = this.deps.now() - start;
         if (poll.clients === 0 && elapsed >= NO_CLIENT_MS) return undefined;
+        if (poll.clients > 0 && poll.changes === 0 && poll.busy === 0 && poll.quiet >= QUIET_MS) return undefined;
         if (poll.clients > 0 && poll.changes > 0) {
           if (poll.changes !== changes) {
             changes = poll.changes;
@@ -224,7 +246,7 @@ export class LspChecks {
       const diagnostics = parseDiagnostics(await this.remote(diagnosticsExpr(load.buf), signal));
       return diagnostics.length ? errorMessage(rel, diagnostics) : undefined;
     } finally {
-      if (load.created) await this.remote(wipeExpr(load.buf), signal, false);
+      await this.remote(load.created ? wipeExpr(load.buf) : releaseExpr(load.buf), signal, false);
     }
   }
 

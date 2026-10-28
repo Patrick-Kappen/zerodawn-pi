@@ -2,6 +2,14 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 43. A clean file ends on quiet LSP progress (2026-10-28)
+
+vtsls sends no diagnostics for a clean file that it did not check before, so DiagnosticChanged never comes.
+Each clean file then gave the false error "LSP gave no result in 15 s".
+The check now also counts the open `$/progress` tokens of the clients of the buffer.
+With no diagnostics, no open progress and 3 s without an LSP event, the file is clean.
+Limit: a server that reports no progress and sends its first errors after more than 3 s quiet gives a false clean result.
+
 ## 42. The debug tool drives the user's nvim-dap through a remote-expr poll (2026-10-29)
 
 The `debug` extension talks to the user's headless Neovim server (`PI_DEBUG_SERVER`) with `nvim --server --remote-expr` and one Lua script through `luaeval`, like `pair`. Without the variable the tool is not registered. TypeScript polls with short calls; Lua never uses `vim.wait`, so the server is never blocked, and listeners collect stops and output. Reasons: the user's adapters and configuration are reused, no new dependency or DAP client. Safety: one pi session at a time, an error when the user's own dap session runs, buffers that pi creates are unlisted and wiped on stop unless modified, buffers of the user are not touched, and only the breakpoints pi set are removed. The session stops at `session_shutdown`. A dead socket triggers one `systemctl --user start nvim@main.service` and a 5 s wait, then a loud error. The Home Manager option `debugServer` (default null) sets the variable.
@@ -9,7 +17,6 @@ The `debug` extension talks to the user's headless Neovim server (`PI_DEBUG_SERV
 ## 41. LSP diagnostics come from the user's own Neovim server (2026-10-28)
 
 The new `lsp` extension shows the agent the LSP errors of a file after each `edit` or `write`. It does not start its own LSP clients. It asks the user's headless nvim (`systemd nvim@main`, socket from `PI_LSP_SERVER`) for the diagnostics of the file. Reason: the LSP configuration lives in one place, the NixOS configuration of the user, and the agent sees the same errors as the user in the editor. A second set of LSP clients in pi would duplicate the setup and could disagree with the editor. Worktrees work because nvim starts an LSP client per project root. The extension polls from TypeScript with short `--remote-expr` calls so it does not block nvim's main loop, reloads only unmodified buffers, wipes the buffers it created, and sends only errors. Cost: the feature is off without `PI_LSP_SERVER`, and a failed server or check is reported as an error, never as "no errors".
-||||||| parent of 6313315 (debug: add a debug tool that drives nvim-dap in the user's nvim)
 
 ## 40. A bash call alone in its message waits up to 10 s (2026-10-28)
 
