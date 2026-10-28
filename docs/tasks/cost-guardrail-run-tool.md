@@ -15,10 +15,11 @@ A block costs a full call and gives nothing. Guardrail blocks are half of all to
 
 | days | guard blocks | part of all tool calls | part of all tool errors |
 |---|---|---|---|
-| 2026-10-21 to 2026-10-26 | 20 to 84 per day | 0.4% to 1.7% | 5% to 30% |
-| 2026-10-27 | 274 | 5.4% | 49% |
-| 2026-10-28 to 10:15 | 27 | 5.1% | 50% |
+| 2026-10-21 to 2026-10-26 | 12 to 80 per day | 0.4% to 2.1% | 5% to 35% |
+| 2026-10-27 | 247 | 5.5% | 50% |
+| 2026-10-28 to 13:20 | 94 | 6.4% | 56% |
 
-- Each block sends the full context again: about 27 × 66k = 1.8M tokens, 5% of the tokens on 2026-10-28.
+- Tool results are counted once per tool call id. Forked and handed-off sessions copy earlier results.
+- Each block sends the full context again: about 94 × 69k = 6.5M tokens, 5% of the tokens on 2026-10-28.
 - Blocked in bash: `grep`, `rg`, `cat`, `head`, `sed`, `git diff`, `git status`, `git log`, a wait without a next step.
 - Calls per user prompt: 12 on 2026-10-28, 5.4 to 11 before.
