@@ -1,0 +1,6 @@
+{
+  "name": "lsp",
+  "version": "0.1.0",
+  "description": "Reports the LSP errors of an edited file from the user's Neovim server",
+  "type": "module"
+}

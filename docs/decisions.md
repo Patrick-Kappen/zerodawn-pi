@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 41. LSP diagnostics come from the user's own Neovim server (2026-10-28)
+
+The new `lsp` extension shows the agent the LSP errors of a file after each `edit` or `write`. It does not start its own LSP clients. It asks the user's headless nvim (`systemd nvim@main`, socket from `PI_LSP_SERVER`) for the diagnostics of the file. Reason: the LSP configuration lives in one place, the NixOS configuration of the user, and the agent sees the same errors as the user in the editor. A second set of LSP clients in pi would duplicate the setup and could disagree with the editor. Worktrees work because nvim starts an LSP client per project root. The extension polls from TypeScript with short `--remote-expr` calls so it does not block nvim's main loop, reloads only unmodified buffers, wipes the buffers it created, and sends only errors. Cost: the feature is off without `PI_LSP_SERVER`, and a failed server or check is reported as an error, never as "no errors".
+
 ## 40. A bash call alone in its message waits up to 10 s (2026-10-28)
 
 Changes the immediate background of commit 455d015 for one case. Each command that was not quick became a job at once.
