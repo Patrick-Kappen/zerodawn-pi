@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { type Card, checkCard, HANDOFF_MAX_CHARS, openPrNumbers, render } from "./card.ts";
 import { decide, warmDecision, warning } from "./decider.ts";
-import { gitFacts, systemFacts } from "./facts.ts";
+import { gitFacts, run, systemFacts } from "./facts.ts";
 import { parseEntry, prompt, type Registry, writeCard } from "./summarize.ts";
 import { strip } from "./transcript.ts";
 import { UPDATE_CHARS, updateReasons } from "./triggers.ts";
@@ -139,6 +139,12 @@ test("writeCard walks the ladder until a model returns a valid write_card call",
   assert.match(String((seen[1][1] as any).content), /open: #93 is not open on GitHub/);
   assert.deepEqual(parseEntry("p/m:high"), { provider: "p", id: "m", thinking: "high" });
   assert.throws(() => parseEntry("nope"), /not "provider\/id\[:thinking\]"/);
+});
+
+test("run keeps the leading space of a porcelain status line, so the first dirty path stays whole", () => {
+  assert.equal(run("printf", [" M packages/a.lua\\n M README.md\\n"], "/"), " M packages/a.lua\n M README.md");
+  const exec = (_cmd: string, args: string[], cwd: string) => (args[0] === "status" ? run("printf", [" M packages/a.lua\\n"], cwd) : "main");
+  assert.equal(gitFacts("/", exec)[1], "dirty files (1): packages/a.lua");
 });
 
 test("gitFacts reads branch, dirty files, worktrees and PRs, and names a failing command", () => {
