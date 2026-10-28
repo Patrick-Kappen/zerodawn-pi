@@ -88,6 +88,7 @@ test("toInput maps keys", () => {
 
 test("loadItems lists the open entries, the worktrees and the zoxide projects", async () => {
   const open = "/r/.git\t/r\t@1\t1\n";
+  const twice = "/r/.git\t/r\t@1\t0\n/r/.git\t/r\t@2\t1\n";
   const wt = "worktree /r\nHEAD x\n\nworktree /r-x\nHEAD y\n";
   const a = await loadItems(
     fake({ "pair list": { stdout: open }, "git worktree list --porcelain": { stdout: wt }, "zoxide query -l": { stdout: "/r\n/p/one\n" } }),
@@ -116,6 +117,11 @@ test("loadItems lists the open entries, the worktrees and the zoxide projects", 
   assert.deepEqual(
     b.projects.map((i) => i.path),
     ["/p/one", "/p/two"],
+  );
+  const c = await loadItems(fake({ "pair list": { stdout: twice }, "zoxide query -l": { stdout: "/r\n" } }), {});
+  assert.deepEqual(
+    c.projects.map((i) => [i.path, i.open, i.agent]),
+    [["/r", true, true]],
   );
   await assert.rejects(loadItems(fake({ "zoxide query -l": { code: 127, stderr: "not found" } }), {}), /zoxide query -l failed \(exit 127\): not found/);
   assert.equal(parseWorktrees(wt).length, 2);

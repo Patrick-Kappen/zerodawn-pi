@@ -40,8 +40,8 @@ export function openItems(entries: PairEntry[]): Item[] {
 
 export function recentItems(paths: string[], open: PairEntry[]): Item[] {
   return paths.map((path) => {
-    const entry = open.find((e) => e.worktree === path);
-    return { path, label: labelOf(path), open: entry !== undefined, agent: entry?.agent ?? false, window: entry?.window };
+    const entries = open.filter((e) => e.worktree === path);
+    return { path, label: labelOf(path), open: entries.length > 0, agent: entries.some((e) => e.agent), window: entries[0]?.window };
   });
 }
 
