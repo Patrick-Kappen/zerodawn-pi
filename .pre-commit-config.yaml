@@ -326,7 +326,7 @@
         {
           "always_run": true,
           "args": [],
-          "entry": "/nix/store/g1hm879zk0bv7v0j7q869x7734n3p3v3-tests-unit",
+          "entry": "/nix/store/qyj41kv0d866cv44s25zi0l435gbbclm-tests-unit",
           "exclude": "^$",
           "exclude_types": [],
           "fail_fast": false,
