@@ -106,7 +106,7 @@ test("agent_end updates the card in the background after a commit; /quit and /ne
   assert.match(notes[1], /^handoff: card updated \(\/new\) by p\/m: .*handoff\/2\.json$/);
 });
 
-test("turn_end warns and cuts at the next tool turn; settle cuts and keeps the final answer; the hard limit cuts; warming follows jobs", async () => {
+test("turn_end warns and cuts from 150k or after the handoff tool; settle cuts and keeps the final answer; the hard limit cuts; warming follows jobs", async () => {
   const dir = mkdtempSync(join(tmpdir(), "handoff-decider-"));
   const config = join(dir, "config.json");
   writeFileSync(config, JSON.stringify({ handoffModels: ["p/m"] }));
@@ -121,25 +121,18 @@ test("turn_end warns and cuts at the next tool turn; settle cuts and keeps the f
     getContextUsage: () => ({ tokens }),
   } as any;
   const handlers = new Map<string, any>();
-  register({ registerCommand() {}, registerTool() {}, on: (name: string, fn: any) => handlers.set(name, fn) } as any);
-  const turnEnd = (tools: boolean) => handlers.get("turn_end")({ toolResults: tools ? [{}] : [], entries: [], continue: false }, own);
+  const tools = new Map<string, any>();
+  register({ registerCommand() {}, registerTool: (tool: any) => tools.set(tool.name, tool), on: (name: string, fn: any) => handlers.set(name, fn) } as any);
+  const turnEnd = (calls: boolean) => handlers.get("turn_end")({ toolResults: calls ? [{}] : [], entries: [], continue: false }, own);
   const settle = (event = { entries: [] as any[], continue: false }) => handlers.get("agent_before_settle")(event, own);
+  const callHandoff = async () => (await tools.get("handoff").execute("t1", {}, undefined, undefined, own)).content[0].text;
 
   tokens = 131_000;
-  assert.match((await turnEnd(true)).entries[0].content, /^System: context 131k of 150k\. After your next tool call/);
+  assert.equal((await turnEnd(true)).entries[0].content, "System: context 87%; 19k tokens left. Continue working or call handoff for an early handoff.");
   tokens = 133_000;
-  const work = await turnEnd(true);
-  assert.deepEqual(
-    work.entries.map((e: any) => e.customType ?? e.type),
-    ["compaction", "handoff-resume"],
-  );
-  assert.equal(work.entries[0].firstKeptEntryId, null);
-  assert.equal(work.continue, true);
-  assert.match(notes.at(-1) ?? "", /^handoff: context 133k after the warning, in the middle of the work/);
-
+  assert.equal(await turnEnd(true), undefined, "after the warning the agent continues working");
   tokens = 135_000;
-  assert.equal((await turnEnd(true)).entries[0].customType, "handoff-warning");
-  assert.equal(await turnEnd(false), undefined, "a final answer after the warning is no cut in the middle of the work");
+  assert.equal(await turnEnd(false), undefined, "a final answer is no cut in the middle of the work");
   const answer = await settle();
   assert.deepEqual(
     answer.entries.map((e: any) => e.type),
@@ -149,7 +142,26 @@ test("turn_end warns and cuts at the next tool turn; settle cuts and keeps the f
   assert.match(answer.entries[0].summary, /^# Handoff\nGoal: Ship it/);
   assert.equal(answer.continue, false);
   assert.match(notes.at(-1) ?? "", /^handoff: context 135k at the end of the run after the warning/);
+
+  tokens = 90_000;
+  assert.equal(await callHandoff(), "The handoff comes at the end of this turn.");
+  const early = await turnEnd(true);
+  assert.deepEqual(
+    early.entries.map((e: any) => e.customType ?? e.type),
+    ["compaction", "handoff-resume"],
+  );
+  assert.equal(early.entries[0].firstKeptEntryId, null);
+  assert.equal(early.continue, true);
+  assert.match(notes.at(-1) ?? "", /^handoff: context 90k, the agent called handoff/);
+  assert.equal(await turnEnd(true), undefined, "the request ends with the cut");
+
   tokens = 152_000;
+  const work = await turnEnd(true);
+  assert.deepEqual(
+    work.entries.map((e: any) => e.customType ?? e.type),
+    ["compaction", "handoff-resume"],
+  );
+  assert.match(notes.at(-1) ?? "", /^handoff: context 152k in the middle of the work/);
   assert.equal((await settle()).continue, false, "a run that ended from 150k waits for the user");
   const followup = { type: "custom_message", customType: "checker-followup", content: "Finish the task.", display: false };
   const checked = await settle({ entries: [followup], continue: true });
@@ -170,7 +182,8 @@ test("turn_end warns and cuts at the next tool turn; settle cuts and keeps the f
   mkdirSync(join(dir, "s", "jobs"), { recursive: true });
   writeFileSync(join(dir, "s", "jobs", "1.json"), JSON.stringify({ id: "1", command: "just check", bg: true, status: join(dir, "1.status") }));
   tokens = 155_000;
-  assert.match((await turnEnd(true)).entries[0].content, /The cut waits until the running bash jobs end\.$/);
+  assert.equal((await turnEnd(true)).entries[0].customType, "handoff-warning");
+  assert.equal(await callHandoff(), "The handoff comes after the running bash jobs end.");
   assert.equal(await turnEnd(true), undefined);
   assert.equal(await settle(), undefined);
   tokens = 50_000;
@@ -224,7 +237,7 @@ test("recall answers from the session file with entry ids, and names a missing s
       .join("\n"),
   );
   let tool: any;
-  register({ registerCommand() {}, on() {}, registerTool: (t: any) => (tool = t) } as any);
+  register({ registerCommand() {}, on() {}, registerTool: (t: any) => (tool = t.name === "recall" ? t : tool) } as any);
   let asked = "";
   const own = {
     sessionManager: { getSessionFile: () => undefined },

@@ -34,7 +34,12 @@ const call = (id: string, name: string, args: any) => ({ type: "toolCall", id, n
 const result = (id: string, toolName: string, t: string, isError = false) =>
   msg({ role: "toolResult", toolCallId: id, toolName, isError, content: [{ type: "text", text: t }] });
 const followup = (reasons: string[]) => ({ type: "custom_message", customType: FOLLOWUP_TYPE, content: followupText(reasons), display: false });
-const handoffWarning = { type: "custom_message", customType: "handoff-warning", content: "the cut comes after the next tool call", display: true };
+const handoffWarning = {
+  type: "custom_message",
+  customType: "handoff-warning",
+  content: "System: context 87%; 19k tokens left. Continue working or call handoff for an early handoff.",
+  display: true,
+};
 
 test("buildState takes only the run since the last user message", () => {
   const entries = [
