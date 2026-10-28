@@ -25,9 +25,13 @@ Needs pi inside tmux (`$TMUX_PANE`), a paired client (`/ide` starts it), and `zo
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.0 — 2026-10-28
+## 0.2.0 — 2026-10-28
 
-- First release.
+- /switch requires PI_PAIR_COMMAND
+
+- mark pi when any window of a folder runs it
+
+- popup picker with open, worktrees and projects scopes
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

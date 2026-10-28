@@ -55,13 +55,13 @@ The tool `recall { question, session? }` answers one question about earlier work
 ## Changes
 
 <!-- changelog:start -->
-## 0.3.0 — 2026-10-28
+## 0.4.0 — 2026-10-28
 
-- short warning, tool handoff for an early cut
+- remove the reused card fixture after tests
 
-- keep the boundary entries of other extensions
+- tests: separate unit and integration suites
 
-- cut in the middle of the work, keep the final answer
+- tests: clean fixtures and isolate the supervisor environment
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
