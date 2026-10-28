@@ -113,6 +113,17 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.20.1 — 2026-10-28
+
+### handoff 0.4.1
+
+- keep the first dirty path whole
+
+### repository
+
+- docs: add tasks for handoff accuracy and the checker note
+- ci: make ci-nixos-update.sh executable
+
 ## 0.20.0 — 2026-10-28
 
 ### shared 0.11.0
@@ -199,98 +210,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 - docs: add astra latency task and guard block measurement
 - docs: task to record mistakes and turn frequent ones into fixes
-
-## 0.19.0 — 2026-10-28
-
-### shared 0.10.0
-
-- projects: /switch picker, /ide pair, pi-tui-kit dependency
-
-### ast-grep 0.3.1
-
-- docs: split open work in TODO.md and BACKLOG.md
-
-### bash 0.8.1
-
-- docs: split open work in TODO.md and BACKLOG.md
-
-### checker 0.3.0
-
-- handoff: short warning, tool handoff for an early cut
-
-- check a final answer after a handoff warning
-
-- send back a check that the agent left open
-
-### ctx-manager 0.2.2
-
-- docs: split open work in TODO.md and BACKLOG.md
-
-### files 0.5.1
-
-- docs: split open work in TODO.md and BACKLOG.md
-
-### git 0.5.1
-
-- docs: split open work in TODO.md and BACKLOG.md
-
-### handoff 0.3.0
-
-- short warning, tool handoff for an early cut
-
-- keep the boundary entries of other extensions
-
-- cut in the middle of the work, keep the final answer
-
-### opencode 0.3.1
-
-- docs: split open work in TODO.md and BACKLOG.md
-
-### pair 0.1.0
-
-- First release.
-
-### projects 0.1.0
-
-- First release.
-
-### subagents 0.8.4
-
-- docs: split open work in TODO.md and BACKLOG.md
-
-### systemstate 0.2.1
-
-- docs: split open work in TODO.md and BACKLOG.md
-
-### tests 0.6.2
-
-- docs: split open work in TODO.md and BACKLOG.md
-
-- a check with a pipe reports the failure of any part
-
-### ui 0.2.2
-
-- docs: split open work in TODO.md and BACKLOG.md
-
-### watchdog 0.2.1
-
-- docs: split open work in TODO.md and BACKLOG.md
-
-### repository
-
-- projects: keep the dependencies of pi-tui-kit in its own node_modules
-- projects: /switch picker, /ide pair, pi-tui-kit dependency
-- docs: record the automatic checks and test quality plan
-- docs: split open work in TODO.md and BACKLOG.md
-- docs: name the checklist TODO.md
-- docs: collect all open points in one checklist with a file per task
-- handoff: short warning, tool handoff for an early cut
-- handoff: keep the boundary entries of other extensions
-- handoff: cut in the middle of the work, keep the final answer
-- docs: record accepted NixOS warnings for continued pi work
-- ci: record baseline and run behavior contracts
-- tests: cover release preparation behavior
-- tests: cover checker and background job behavior
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
