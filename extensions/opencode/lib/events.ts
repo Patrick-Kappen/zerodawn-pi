@@ -27,7 +27,7 @@ function errorText(error: unknown): string {
   return JSON.stringify(error);
 }
 
-export function applyEvent(run: Run, line: string): string | undefined {
+export function applyEvent(run: Run, line: string): void {
   if (!line.trim()) return;
   let event: any;
   try {
@@ -46,7 +46,7 @@ export function applyEvent(run: Run, line: string): string | undefined {
       const use: ToolUse = { tool: String(part.tool), status: String(state.status), input: brief(state.input) };
       if (state.status === "error") use.error = brief(state.error ?? state.output, 300);
       run.tools.push(use);
-      return `${use.tool} ${use.input}${use.error ? ` → ${use.error}` : ""}`;
+      return;
     }
     case "step_finish": {
       const tokens = part.tokens ?? {};

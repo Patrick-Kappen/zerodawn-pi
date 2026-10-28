@@ -7,7 +7,7 @@ const line = (event: object) => JSON.stringify({ sessionID: "ses_1", timestamp: 
 describe("OpenCode events", () => {
   test("collects text, tools, usage and the session", () => {
     const run = emptyRun();
-    const progress = [
+    for (const l of [
       line({ type: "step_start", part: { type: "step-start" } }),
       line({ type: "tool_use", part: { tool: "shell", state: { status: "completed", input: { command: "git status --short" }, output: "" } } }),
       line({
@@ -17,15 +17,8 @@ describe("OpenCode events", () => {
       line({ type: "step_finish", part: { cost: 0.5, tokens: { input: 10, output: 2, cache: { read: 7 } } } }),
       line({ type: "step_finish", part: { cost: 0.25, tokens: { input: 1, output: 3 } } }),
       line({ type: "text", part: { text: " DONE \n" } }),
-    ].map((l) => applyEvent(run, l));
-    assert.deepEqual(progress, [
-      undefined,
-      'shell {"command":"git status --short"}',
-      'shell {"command":"git commit -am x"} → Permission denied: shell',
-      undefined,
-      undefined,
-      undefined,
-    ]);
+    ])
+      applyEvent(run, l);
     assert.equal(run.session, "ses_1");
     assert.deepEqual(run.text, ["DONE"]);
     assert.deepEqual(run.tokens, { input: 11, output: 5, cacheRead: 7 });
@@ -54,10 +47,11 @@ describe("OpenCode events", () => {
 
   test("shortens long tool input and ignores blank lines", () => {
     const run = emptyRun();
-    assert.equal(applyEvent(run, "  "), undefined);
-    const progress = applyEvent(run, line({ type: "tool_use", part: { tool: "edit", state: { status: "completed", input: { text: "x".repeat(500) } } } }));
-    assert.ok(progress !== undefined && progress.length <= 5 + 120, `expected ${progress?.length} to be <= ${5 + 120}`);
-    assert.ok(progress?.endsWith("…"));
+    applyEvent(run, "  ");
+    applyEvent(run, line({ type: "tool_use", part: { tool: "edit", state: { status: "completed", input: { text: "x".repeat(500) } } } }));
+    assert.equal(run.tools.length, 1);
+    assert.equal(run.tools[0].input.length, 120);
+    assert.ok(run.tools[0].input.endsWith("…"));
   });
 
   test("rejects a line that is not JSON", () => {
