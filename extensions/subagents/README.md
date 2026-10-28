@@ -4,8 +4,8 @@ Delegate tasks to pi agents. Each agent runs as a normal interactive pi in a win
 
 Status: work in progress. The tool `subagent` has four actions:
 
-- `start` with `profile`, `task` and optional `base`: the supervisor creates a worktree (see "Worktrees") and starts a pi agent with that profile in a new window `sub-<first 4 characters of its id>`, with the worktree as its cwd. The tool waits and returns the final answer.
-- `answer` with `id` and `text`: sends `text` to the agent and waits for its next result, like `start`. The agent must have status `idle`, `question` or `blocked`.
+- `start` with `profile`, `task` and optional `base`: the supervisor creates a worktree (see "Worktrees") and starts a pi agent with that profile in a new window `sub-<first 4 characters of its id>`, with the worktree as its cwd. The tool returns the agent id when the supervisor accepts the start. A `subagent` message gives the result and starts a turn.
+- `answer` with `id` and `text`: sends `text` to the agent and returns at once, like `start`; a `subagent` message gives the next result. The agent must have status `idle`, `question` or `blocked`.
 - `merge` with `ids` and optional `into`: see "Merge".
 - `discard` with `id`: removes the worktree and the branch of an agent. It refuses while the agent runs.
 - `status`: starts or finds the supervisor, connects, and shows the agents.
@@ -186,9 +186,8 @@ The same kind of view as the `bash` extension:
 
 | bash | subagent |
 |---|---|
-| The tool waits and streams the last 40 lines | The tool waits and streams the last tool calls and text of the subagent |
-| `background: true` returns an id; a `bash-job` message reports the result | The same, with a `subagent` message |
-| `jobs wait / list / kill` | Tool `subagents`: `wait`, `list`, `abort` |
+| A job returns an id; a `bash-job` message reports the result | Done: `start` and `answer` return the id; a `subagent` message reports the result |
+| `jobs list / kill` | Tool `subagents`: `list`, `abort` |
 | `/jobs`, `ctrl+shift+j` follow a job | `/subagents` follows a subagent and shows `tmux attach -t pi-sub-<id>` |
 | Dashboard: status, time, last lines | Dashboard: each subagent with status, time, current tool call, cost |
 | `session_start` reports jobs that ended | `session_start` finds a running `pi-sub-<id>`, connects, reports what ended |

@@ -29,7 +29,9 @@ git("commit", "-qm", "init");
 
 const notes: { text: string; ok: boolean }[] = [];
 const notify = (text: string, ok: boolean) => notes.push({ text, ok });
-const tool = new RunTests(notify);
+// The tests read most results in the call; the tool itself never waits.
+const INLINE = 60_000;
+const tool = new RunTests(notify, INLINE);
 const ctx = { cwd: dir, sessionManager: { getSessionFile: () => join(session, "s.jsonl"), getBranch: () => [] } } as any;
 const call = async (params: object) => {
   const r = await tool.execute("call-1", params, undefined, ctx);
@@ -96,21 +98,21 @@ test("cdOf: the directory of a leading cd", () => {
 });
 
 test("in place of a bash test command: the run_tests result, in the directory of its cd", async () => {
-  const r = await new RunTests(notify).insteadOfBash("call-2", `cd ${dir} && bun test`, { ...ctx, cwd: tmpdir() });
+  const r = await new RunTests(notify, INLINE).insteadOfBash("call-2", `cd ${dir} && bun test`, { ...ctx, cwd: tmpdir() });
   assert.equal(r.isError, false);
   assert.match(r.text, /^run_tests result \(use run_tests next time\):\ngreen: 1 pass, 0 fail · /);
-  const failed = await new RunTests(notify).insteadOfBash("call-2", "bun test", { ...ctx, cwd: tmpdir() });
+  const failed = await new RunTests(notify, INLINE).insteadOfBash("call-2", "bun test", { ...ctx, cwd: tmpdir() });
   assert.equal(failed.isError, true);
   assert.match(failed.text, /\nrun_tests: "git rev-parse --show-toplevel" failed/);
 });
 
-test("a run longer than the inline time continues in the background; a message gives its result; a second call does not start it again", async () => {
-  const slow = new RunTests(notify, 50);
+test("a run continues in the background; a message gives its result; a second call does not start it again", async () => {
+  const slow = new RunTests(notify);
   notes.length = 0;
   const command = `cd ${dir} && sleep 0.3; echo done`;
   const first = await slow.check("call-6", command, ctx);
   assert.deepEqual([first.isError, first.background], [false, true]);
-  assert.match(first.text, /check \S+: background \(more than 0\.05 s\)\. A message gives the result\./);
+  assert.match(first.text, /check \S+: runs in the background\. A message gives the result\./);
   assert.match((await slow.check("call-7", command, ctx)).text, /still runs for this change/);
   await new Promise((resolve) => setTimeout(resolve, 600));
   assert.equal(notes.length, 1);
@@ -120,7 +122,7 @@ test("a run longer than the inline time continues in the background; a message g
 });
 
 test("nextResult ends after the notify of the next background run, and is undefined when none runs", async () => {
-  const slow = new RunTests(notify, 50);
+  const slow = new RunTests(notify);
   notes.length = 0;
   assert.equal(slow.nextResult(), undefined);
   await slow.check("call-n1", `cd ${dir} && sleep 0.3; echo next`, ctx);
@@ -132,7 +134,7 @@ test("nextResult ends after the notify of the next background run, and is undefi
 });
 
 test("reset stops a background run without a message", async () => {
-  const slow = new RunTests(notify, 50);
+  const slow = new RunTests(notify);
   notes.length = 0;
   await slow.check("call-9", `cd ${dir} && sleep 5`, ctx);
   slow.reset();
@@ -141,7 +143,7 @@ test("reset stops a background run without a message", async () => {
 });
 
 test("a check command runs in place: green, red on a failure, red on a warning, the same result until a change or # rerun", async () => {
-  const checks = new RunTests(notify);
+  const checks = new RunTests(notify, INLINE);
   const check = async (command: string) => (await checks.check("call-3", `cd ${dir} && ${command}`, ctx)).text;
   assert.match(await check("echo ok"), /^Check result \(do not run it again in another form\):\ngreen: exit 0 · [\d.]+ s · log: .*\.check\.log$/);
   assert.equal((await checks.check("call-5", `cd ${dir} && exit 1`, ctx)).isError, true);
@@ -154,7 +156,7 @@ test("a check command runs in place: green, red on a failure, red on a warning, 
 });
 
 test("a red check that the parser does not understand is written to the anomalies file of the session", async () => {
-  const checks = new RunTests(notify);
+  const checks = new RunTests(notify, INLINE);
   await checks.check("call-6", `cd ${dir} && echo boom; exit 3`, ctx);
   const file = readdirSync(session, { recursive: true, encoding: "utf8" }).find((f) => f.endsWith(ANOMALIES));
   assert.ok(file, `no ${ANOMALIES} under ${session}`);
@@ -215,7 +217,7 @@ test("a check that starts with cd runs in the dev environment of that directory,
   const path = process.env.PATH;
   process.env.PATH = `${bin}:${path}`;
   try {
-    const r = await new RunTests(notify).check("call-env", `cd ${project} && echo inside`, { ...ctx, cwd: plain });
+    const r = await new RunTests(notify, INLINE).check("call-env", `cd ${project} && echo inside`, { ...ctx, cwd: plain });
     const log = r.text.match(/log: (\S+)/)?.[1] ?? "";
     assert.match(readFileSync(log.replace(/^~/, process.env.HOME ?? ""), "utf8"), new RegExp(`^env of ${project}\\ninside`));
   } finally {

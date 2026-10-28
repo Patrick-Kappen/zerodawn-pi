@@ -10,6 +10,7 @@ import type { State } from "../state.ts";
 import type { Widget } from "../ui/dashboard.ts";
 import { type Job, kill, limitText, type Meta, render, resultText, saveMeta, spawnJob, statsOf } from "./jobproc.ts";
 import type { Reports } from "./jobs.ts";
+import { isQuick } from "./quick.ts";
 
 export function registerBackgroundShortcut(pi: ExtensionAPI, { waiting }: State) {
   pi.registerShortcut(Key.ctrlShift("b"), {
@@ -29,14 +30,13 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
   pi.registerTool({
     name: "bash",
     label: "bash",
-    description: `Run a bash command for builds, scripts and tools. Read files with read, search with grep, and look at git history with git. Returns the exit status and the output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB; longer output gives its size and an out:<name> reference for read (offset=-N for the end) and grep. A failure adds every distinct error line. A command over ${INLINE_WAIT_S} s continues as a job and ends your turn; a message reports its result. Chain dependent steps in one command with &&, also a wait for a condition: timeout 30 bash -c 'until CHECK; do sleep 1; done' && NEXT.`,
-    promptSnippet: "Run a bash command; short output back, long commands continue in the background",
+    description: `Run a bash command for builds, scripts and tools. Read files with read, search with grep, and look at git history with git. Returns the exit status and the output up to ${INLINE_LINES} lines and ${INLINE_BYTES / 1024} KB; longer output gives its size and an out:<name> reference for read (offset=-N for the end) and grep. A failure adds every distinct error line. A quick command (ls, cd, pwd, echo, file operations, git status) returns its result. Every other command returns a job id at once and runs in the background; a message reports its result. Continue with other work, or end your turn when the next step needs the result. Chain dependent steps in one command with &&, also a wait for a condition: timeout 30 bash -c 'until CHECK; do sleep 1; done' && NEXT.`,
+    promptSnippet: "Run a bash command; quick commands give the result, others run in the background",
     parameters: Type.Object({
       command: Type.String({ description: "Bash command to execute" }),
       timeout: Type.Optional(
         Type.Number({ description: `Timeout in seconds; the job is killed after this time. Default ${DEFAULT_LIMIT_S}, or none with "${NO_TIME_LIMIT}".` }),
       ),
-      background: Type.Optional(Type.Boolean({ description: "Return the job id at once, for a server or a watcher." })),
       group: Type.Optional(Type.String({ description: "Give independent commands in one message the same group; they report together once." })),
     }),
 
@@ -110,10 +110,10 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       let toBackground!: () => void;
       const moved = new Promise<undefined>((r) => (toBackground = () => r(undefined)));
       waiting.set(id, toBackground);
+      // A quick command that still runs after INLINE_WAIT_S (a big directory, a slow disk) moves to the background too.
       const autoMove = setTimeout(toBackground, INLINE_WAIT_S * 1000);
       ctx.ui.setStatus("bash-wait", ctx.ui.theme.fg("dim", "bash running · ctrl+shift+b: background"));
-      // background: true returns the job id also when the command ends at once; a race with a 0 ms timer gives the result inline.
-      const inline = params.background ? undefined : await Promise.race([done, moved]);
+      const inline = isQuick(params.command) ? await Promise.race([done, moved]) : undefined;
       clearTimeout(autoMove);
       clearInterval(stream);
       waiting.delete(id);
@@ -135,12 +135,10 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
       saveMeta(job.meta, meta);
       widget.refresh();
       done.then((r) => reports.report(job, meta, r.text, true));
+      // No terminate: the agent goes on with other work; the bash-job message starts a turn after the run ends.
       return {
         content: [{ type: "text", text: `job ${id}: running · log: ${outRef(log)}` }],
         details: { log, job: id, background: true },
-        // A command that moved to the background ends the turn, so the user can chat; its message starts the next turn.
-        // A command started with background: true (a server) does not: the agent works with it.
-        terminate: params.background ? undefined : true,
       };
     },
   });

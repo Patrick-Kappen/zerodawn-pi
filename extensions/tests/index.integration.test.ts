@@ -28,10 +28,10 @@ test("recipes go into the system prompt; a test command in bash runs run_tests, 
   assert.match(event.systemPromptOptions.sections.project_recipes, /- make build: Build it/);
   const input: Record<string, unknown> = { command: "cd x && bun test" };
   assert.equal(await bash("", "t1", input), undefined);
-  assert.deepEqual(input, { command: ":", background: false });
+  assert.deepEqual(input, { command: ":" });
   const replaced = await result("t1");
   assert.equal(replaced.isError, true);
-  assert.equal(replaced.terminate, undefined, "a result in the turn does not end it");
+  assert.equal(replaced.terminate, undefined, "the agent goes on with other work");
   assert.match(replaced.content[0].text, /^run_tests result \(use run_tests next time\):\nrun_tests: "git rev-parse --show-toplevel" failed/);
   assert.equal(await result("t1"), undefined);
   assert.match((await bash("cc main.c"))?.reason, /Run "make build"/);

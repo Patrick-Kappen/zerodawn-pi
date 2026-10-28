@@ -51,7 +51,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("tool_call", (event, ctx) => {
-    const input = event.input as { command?: unknown; background?: boolean };
+    const input = event.input as { command?: unknown };
     const command = input.command;
     if (event.toolName !== "bash" || typeof command !== "string") return;
     const reason = tracker.check(command, recipes);
@@ -65,7 +65,6 @@ export default function (pi: ExtensionAPI) {
     if (replacement) {
       replaced.set(event.toolCallId, replacement);
       input.command = NO_OP;
-      input.background = false;
       return;
     }
     const hint = tracker.started(command, recipes);
@@ -78,7 +77,7 @@ export default function (pi: ExtensionAPI) {
     if (pending) {
       replaced.delete(event.toolCallId);
       const replacement = await pending;
-      return { content: [{ type: "text", text: replacement.text }], isError: replacement.isError, terminate: replacement.background || undefined };
+      return { content: [{ type: "text", text: replacement.text }], isError: replacement.isError };
     }
     const hint = hints.get(event.toolCallId);
     hints.delete(event.toolCallId);

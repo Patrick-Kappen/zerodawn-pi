@@ -13,10 +13,10 @@ export interface Status {
 
 export interface Client {
   status(): Promise<Status>;
-  start(task: string, args: string[], checks: string[], models: string[], source: Source, signal?: AbortSignal): Promise<AgentResult>;
+  start(task: string, args: string[], checks: string[], models: string[], source: Source, onStarted?: (id: string) => void): Promise<AgentResult>;
   begin(task: string, args: string[], checks: string[], models: string[], source: Source): Promise<string>;
   discard(id: string): Promise<string>;
-  answer(id: string, text: string, signal?: AbortSignal): Promise<AgentResult>;
+  answer(id: string, text: string, onStarted?: (id: string) => void): Promise<AgentResult>;
   isOpen(): boolean;
   close(): void;
 }
@@ -125,8 +125,8 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
       });
     }
 
-    function start(task: string, args: string[], checks: string[], models: string[], source: Source, signal?: AbortSignal): Promise<AgentResult> {
-      return run("start", (requestId) => ({ type: "start", requestId, task, args, checks, models, repo: source.repo, sha: source.sha }), signal);
+    function start(task: string, args: string[], checks: string[], models: string[], source: Source, onStarted?: (id: string) => void): Promise<AgentResult> {
+      return run("start", (requestId) => ({ type: "start", requestId, task, args, checks, models, repo: source.repo, sha: source.sha }), onStarted);
     }
 
     // Starts an agent and returns its id at once; the result message is not awaited.
@@ -138,37 +138,17 @@ export function connectMain(path: string, timers: Timers, timeoutMs = CLIENT_TIM
       return exchange(kind, "did not start the subagent", build, (message) => (message.type === "started" ? message.id : undefined), onStarted);
     }
 
-    function answer(id: string, text: string, signal?: AbortSignal): Promise<AgentResult> {
-      return run("answer", (requestId) => ({ type: "answer", requestId, id, text }), signal);
+    function answer(id: string, text: string, onStarted?: (id: string) => void): Promise<AgentResult> {
+      return run("answer", (requestId) => ({ type: "answer", requestId, id, text }), onStarted);
     }
 
-    // The supervisor accepts a start or an answer with "started"; the result follows.
-    function run(kind: "start" | "answer", build: (requestId: string) => ClientMessage, signal?: AbortSignal): Promise<AgentResult> {
+    // The supervisor accepts a start or an answer with "started"; the result follows. onStarted gets the id before the result.
+    function run(kind: "start" | "answer", build: (requestId: string) => ClientMessage, onStarted?: (id: string) => void): Promise<AgentResult> {
       return new Promise<AgentResult>((resolve, reject) => {
-        let id: string | undefined;
-        let aborted = false;
-        const onAbort = () => {
-          aborted = true;
-          if (id !== undefined) results.delete(id);
-          reject(new Error(`subagents: the wait for subagent ${id ?? "(not started)"} was aborted. The agent keeps running: tmux attach to see it.`));
-        };
-        function end<T>(settle: (value: T) => void): (value: T) => void {
-          return (value) => {
-            signal?.removeEventListener("abort", onAbort);
-            settle(value);
-          };
-        }
-        signal?.addEventListener("abort", onAbort, { once: true });
         accepted(kind, build, (started) => {
-          if (aborted) return;
-          id = started;
-          results.set(started, { resolve: end(resolve), reject: end(reject) });
-        }).then(
-          () => {},
-          (error: Error) => {
-            if (!aborted) end(reject)(error);
-          },
-        );
+          results.set(started, { resolve, reject });
+          onStarted?.(started);
+        }).then(() => {}, reject);
       });
     }
 

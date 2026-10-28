@@ -128,16 +128,18 @@ test("client start rejects an error reply, a closed connection and a missing sta
   );
 });
 
-test("client start stops waiting on abort", async () => {
+test("client start gives the id to onStarted before the result", async () => {
   await withServer(
     (data, write) => write(`{"type":"started","requestId":"${rid(data)}","id":"a1"}\n`),
     async (path) => {
       const client = await connectMain(path, timers, 1000);
-      const controller = new AbortController();
-      const waiting = client.start("t", ["--no-tools"], [], MODELS, SOURCE, controller.signal);
-      setTimeout(() => controller.abort(), 50);
-      await assert.rejects(waiting, /subagent a1 was aborted/);
+      let waiting: Promise<unknown> = Promise.resolve();
+      const id = await new Promise<string>((resolve) => {
+        waiting = client.start("t", ["--no-tools"], [], MODELS, SOURCE, resolve);
+      });
+      assert.equal(id, "a1");
       client.close();
+      await assert.rejects(waiting, /closed the connection/);
     },
   );
 });

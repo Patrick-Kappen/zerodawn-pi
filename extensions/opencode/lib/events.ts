@@ -27,7 +27,7 @@ function errorText(error: unknown): string {
   return JSON.stringify(error);
 }
 
-export function applyEvent(run: Run, line: string): string | undefined {
+export function applyEvent(run: Run, line: string): void {
   if (!line.trim()) return;
   let event: any;
   try {
@@ -46,7 +46,7 @@ export function applyEvent(run: Run, line: string): string | undefined {
       const use: ToolUse = { tool: String(part.tool), status: String(state.status), input: brief(state.input) };
       if (state.status === "error") use.error = brief(state.error ?? state.output, 300);
       run.tools.push(use);
-      return `${use.tool} ${use.input}${use.error ? ` → ${use.error}` : ""}`;
+      return;
     }
     case "step_finish": {
       const tokens = part.tokens ?? {};
@@ -60,6 +60,14 @@ export function applyEvent(run: Run, line: string): string | undefined {
       run.errors.push(errorText(event.error));
       return;
   }
+}
+
+/** The error of a finished run, or undefined. An error event names the cause better than the exit code, so it comes first. */
+export function runError(run: Run, code: number | null, stderr: string): string | undefined {
+  if (run.errors.length) return `${run.errors.join("\n")}\nSession: ${run.session}`;
+  if (code !== 0) return `exit ${code}: ${stderr}`;
+  if (!run.session) return "the output has no session ID. Check the OpenCode version.";
+  if (!run.text.length) return `the agent gave no answer. Session: ${run.session}`;
 }
 
 export function report(run: Run): string {

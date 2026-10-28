@@ -13,7 +13,6 @@ import { alive, describe, ending, exitStatus, type Job, kill, type Meta, saveMet
 
 const RESEND_MS = 20_000;
 const LIST_MAX = 50;
-const WAIT_MAX_S = 600;
 
 export type JobReport = { jobs: string; items: { id: string; command: string; status: string; ok: boolean; log: string }[] };
 
@@ -125,12 +124,6 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
     groups.delete(group);
     deliver(items, triggerTurn);
   };
-  const waiters = new Map<string, (() => void)[]>();
-  const waitFor = (job: Job) =>
-    new Promise<void>((resolve) => {
-      if (job.result) return resolve();
-      waiters.set(job.id, [...(waiters.get(job.id) ?? []), resolve]);
-    });
   const reported: (() => void)[] = [];
   const nextReport = () => new Promise<void>((resolve) => reported.push(resolve));
   const report = (job: Job, m: Meta, text: string, triggerTurn: boolean) => {
@@ -140,15 +133,6 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
     job.ok ??= /^exit 0\b/.test(text);
     job.endedAt = Date.now();
     widget.refresh();
-    const waiting = waiters.get(job.id);
-    if (waiting) {
-      waiters.delete(job.id);
-      delivered.add(job.id);
-      saveMeta(job.meta, { ...m, reported: true });
-      for (const resolve of waiting) resolve();
-      if (job.group) releaseGroup(job.group, triggerTurn);
-      return;
-    }
     if (!job.group) return deliver([{ job, m, text }], triggerTurn);
     groups.set(job.group, [...(groups.get(job.group) ?? []), { job, m, text }]);
     releaseGroup(job.group, triggerTurn);
@@ -260,44 +244,17 @@ export function registerJobs(pi: ExtensionAPI, s: State, widget: Widget): Report
   pi.registerTool({
     name: "jobs",
     label: "jobs",
-    description: `wait: block until the given jobs (default: all running) end and return their results; the user cannot chat while you wait, so only for a short job whose result the next step needs, at most ${WAIT_MAX_S} s. list: the running jobs; a message reports each result once. kill: stop a job.`,
-    promptSnippet: "Wait for, list or kill background jobs",
+    description:
+      "list: the running jobs; a message reports each result once. kill: stop a job. There is no wait: continue with other work, or end your turn when the next step needs a result.",
+    promptSnippet: "List or kill background jobs",
     parameters: Type.Object({
-      action: StringEnum(["wait", "list", "kill"] as const),
-      id: Type.Optional(Type.String({ description: "kill: the job id. wait: one id, or several separated by commas; default: all running jobs." })),
-      timeout: Type.Optional(Type.Number({ description: `wait: seconds to wait at most (default ${WAIT_MAX_S}).` })),
+      action: StringEnum(["list", "kill"] as const),
+      id: Type.Optional(Type.String({ description: "kill: the job id." })),
     }),
-    async execute(_toolCallId, params, signal) {
+    async execute(_toolCallId, params) {
       if (params.action === "kill") {
         if (!params.id) throw new Error("jobs kill: give the job id.");
         return { content: [{ type: "text", text: killById(params.id) }], details: { jobs: [params.id] } };
-      }
-      if (params.action === "wait") {
-        const pending = new Set([...held.map((it) => it.job.id), ...[...groups.values()].flat().map((it) => it.job.id)]);
-        const ids = params.id ? params.id.split(",").map((x) => x.trim()) : [...jobs.values()].filter((j) => !j.result || pending.has(j.id)).map((j) => j.id);
-        const targets = ids.map((id) => {
-          const job = jobs.get(id);
-          if (!job) throw new Error(`jobs wait: no job ${id}. Known jobs: ${[...jobs.keys()].join(", ") || "none"}.`);
-          return job;
-        });
-        if (!targets.length) return { content: [{ type: "text", text: "No running bash job to wait for." }], details: { jobs: [] as string[] } };
-        const limit = Math.min(params.timeout ?? WAIT_MAX_S, WAIT_MAX_S) * 1000;
-        let timer: ReturnType<typeof setTimeout> | undefined;
-        const timeout = new Promise<"timeout">((resolve) => (timer = setTimeout(() => resolve("timeout"), limit)));
-        const abort = new Promise<"abort">((resolve) => signal?.addEventListener("abort", () => resolve("abort"), { once: true }));
-        const outcome = await Promise.race([Promise.all(targets.map(waitFor)).then(() => "done" as const), timeout, abort]);
-        clearTimeout(timer);
-        for (let i = held.length - 1; i >= 0; i--) if (targets.includes(held[i].job)) held.splice(i, 1);
-        for (const [group, items] of groups) {
-          const rest = items.filter((it) => !targets.includes(it.job));
-          if (rest.length === items.length) continue;
-          groups.set(group, rest);
-          releaseGroup(group, false);
-        }
-        for (const j of targets) if (j.result) saveMeta(j.meta, { ...JSON.parse(readFileSync(j.meta, "utf8")), reported: true });
-        const lines = targets.map((j) => `job ${j.id}: ${j.result ?? "running"}`);
-        const head = outcome === "done" ? "" : outcome === "timeout" ? `wait limit ${limit / 1000}s\n` : "wait stopped\n";
-        return { content: [{ type: "text", text: `${head}${lines.join("\n")}` }], details: { jobs: targets.map((j) => j.id) } };
       }
       const now = `${changes}/${jobs.size}`;
       if (hasBackgroundJob(s) && listedAt === now) throw new Error("no change since the last jobs call; a message reports each result");
