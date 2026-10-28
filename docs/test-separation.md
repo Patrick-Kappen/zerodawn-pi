@@ -49,23 +49,24 @@ Hook measurements use `.githooks/pre-commit` with no staged files, before and af
 Before the change, public tests took 29.1 seconds and private tests took 5.6 seconds.
 Full checks took 58.3 seconds and 10.3 seconds. Commit hooks took 24.127 seconds and 0.831 seconds.
 
-## Initial measurements
+## Final measurements
 
-The initial public check includes the rebase onto `8b62f7d` and the cleanup fix for the new handoff reuse test.
+The public check includes the rebase onto `8b62f7d`, fixture cleanup, and automatic unit tests in commit hooks.
 The private base remains `4360cef`. Both complete checks pass without warnings.
 
 | Measurement | Public before | Public after | Private before | Private after |
 |---|---:|---:|---:|---:|
-| Full local check, seconds | 58.3 | 55.8 | 10.3 | 6.6 |
-| Commit hook, seconds | 24.127 | 0.126 | 0.831 | 0.127 |
-| Unit group, Bun seconds | Not separate | 0.194 | Not separate | 0.016 |
-| Integration group, Bun seconds | Not separate | 25.90 | Not separate | 0.682 |
+| Full local check, seconds | 58.3 | 57.2 | 10.3 | 6.8 |
+| Commit hook, seconds | 24.127 | 0.326 | 0.831 | 0.145 |
+| Unit group, Bun seconds | Not separate | 0.191 | Not separate | 0.017 |
+| Integration group, Bun seconds | Not separate | 25.98 | Not separate | 0.751 |
 
 The public groups contain 289 unit tests and 230 integration tests. The private groups contain 25 unit tests and 10 integration tests.
-The separate public `run_tests` run took 28.7 seconds for both groups, including setup.
+Separate `run_tests` runs took 30.8 seconds for the public repository and 5.3 seconds for the private repository, including setup.
 The full checks include cached Nix results where available. These times do not measure cold builds.
 The hook measurements contain no staged files. They do not measure static checks on changed files.
-The static-only hook was an intermediate mistake. The commit hook now runs unit tests automatically.
+The hook runs all unit tests automatically, also with no staged files. It does not run integration tests.
+The earlier static-only hook took 0.126 seconds publicly and 0.127 seconds privately, but removed the automatic test gate.
 
 ## Boundary
 
