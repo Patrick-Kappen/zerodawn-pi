@@ -2,5 +2,8 @@
   "name": "shared",
   "version": "0.9.0",
   "description": "helpers shared by the extensions: paths, output store, config",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@narumitw/pi-tui-kit": "0.67.0"
+  }
 }

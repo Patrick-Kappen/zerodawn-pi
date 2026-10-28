@@ -1,0 +1,6 @@
+{
+  "name": "projects",
+  "version": "0.1.0",
+  "description": "`/switch` and alt+p: a compact picker that switches the tmux/nvim pair between projects and worktrees",
+  "type": "module"
+}

@@ -1,0 +1,8 @@
+{
+  "name": "pi-tui-kit-modules",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "@narumitw/pi-tui-kit": "0.67.0"
+  }
+}
