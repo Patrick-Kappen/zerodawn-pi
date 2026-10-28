@@ -13,7 +13,7 @@ import type { Timers } from "./lib/lifecycle.ts";
 import { cleanupAt, cleanupMerged, mergeBranches } from "./lib/merge.ts";
 import { checkLadder, createAvailability, probeModel } from "./lib/models.ts";
 import { answers } from "./lib/probe.ts";
-import type { FailedModel } from "./lib/protocol.ts";
+import type { AgentResult, FailedModel } from "./lib/protocol.ts";
 import { nodeFiles, resolveProfile } from "./lib/resolve.ts";
 import { shapeResult } from "./lib/result.ts";
 import { askSchema, blockerSchema, continueSchema, doneSchema, handoffSchema } from "./lib/schemas.ts";
@@ -172,6 +172,29 @@ export default function (pi: ExtensionAPI): void {
     }
   }
 
+  // Returns the agent id when the supervisor accepts the request. The result comes later as a message that starts a turn.
+  function launch(run: (onStarted: (id: string) => void) => Promise<AgentResult>, skipped: FailedModel[]): Promise<string> {
+    const report = (content: string, details: Record<string, unknown>) =>
+      pi.sendMessage({ customType: "subagent", content, display: true, details }, { triggerTurn: true, deliverAs: "steer" });
+    return new Promise((resolve, reject) => {
+      let started = false;
+      run((id) => {
+        started = true;
+        resolve(id);
+      }).then(
+        (result) => {
+          const failedModels = [...skipped, ...(result.failedModels ?? [])];
+          const shaped = shapeResult(failedModels.length === 0 ? result : { ...result, failedModels });
+          report(shaped.content[0].text, shaped.details);
+        },
+        (error: Error) => {
+          if (!started) return reject(error);
+          report(`subagent: no result: ${error.message}`, {});
+        },
+      );
+    });
+  }
+
   pi.on("session_start", async (_event, ctx) => {
     const name = sessionName(ctx.sessionManager.getSessionId());
     if (await tmux.hasSession(name)) ctx.ui.notify(`subagents: tmux session "${name}" runs. Watch it with "tmux attach -t ${name}".`, "info");
@@ -189,7 +212,7 @@ export default function (pi: ExtensionAPI): void {
     name: "subagent",
     label: "subagent",
     description:
-      "Delegate a task to a pi agent in its own git worktree, in a tmux session. start runs the task and returns the final answer. answer sends text and waits for the next result. merge merges the branches of ids in order with a merge commit and removes their worktrees; on a conflict nothing of that agent is merged and a merge agent resolves it. discard removes the worktree and branch of an agent that does not run. status shows the agents. A result has status idle, failed, question, blocked or handoff: answer a question; for blocked, first try to solve it yourself, then answer with the solution; for handoff (token limit), start a new agent with the handoff text in its task.",
+      "Delegate a task to a pi agent in its own git worktree, in a tmux session. start runs the task and returns the agent id at once; a message gives the result. answer sends text to the agent; a message gives the next result. Continue with other work, or end your turn when the next step needs the result. merge merges the branches of ids in order with a merge commit and removes their worktrees; on a conflict nothing of that agent is merged and a merge agent resolves it. discard removes the worktree and branch of an agent that does not run. status shows the agents. A result has status idle, failed, question, blocked or handoff: answer a question; for blocked, first try to solve it yourself, then answer with the solution; for handoff (token limit), start a new agent with the handoff text in its task.",
     promptSnippet: "Delegate tasks to pi agents in tmux",
     // One object at the root: a root anyOf made the model send empty arguments.
     parameters: Type.Object({
@@ -206,12 +229,13 @@ export default function (pi: ExtensionAPI): void {
       into: Type.Optional(Type.String({ description: "For merge. The target branch. Default: the branch checked out in the current directory." })),
       text: Type.Optional(Type.String({ description: "Required for answer. The answer for the agent." })),
     }),
-    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       if (params.action === "answer") {
         if (params.id === undefined || params.id.trim() === "") throw new Error('subagent: action "answer" needs an "id".');
         if (params.text === undefined || params.text.trim() === "") throw new Error('subagent: action "answer" needs a non-empty "text".');
         const connected = await connection(ctx.sessionManager.getSessionId());
-        return shapeResult(await connected.answer(params.id, params.text, signal));
+        const id = await launch((onStarted) => connected.answer(params.id as string, params.text as string, onStarted), []);
+        return { content: [{ type: "text", text: `agent ${id}: the answer is sent. A message gives the next result.` }], details: { id } };
       }
       if (params.action === "discard") {
         if (params.id === undefined || params.id.trim() === "") throw new Error('subagent: action "discard" needs an "id".');
@@ -259,11 +283,10 @@ export default function (pi: ExtensionAPI): void {
         const { models, skipped } = await ladder(ctx);
         const source = await resolveBase((command, commandArgs, options) => pi.exec(command, commandArgs, options), ctx.cwd, params.base);
         const connected = await connection(ctx.sessionManager.getSessionId());
-        const result = await connected.start(params.task as string, args, profile.checks, models, source, signal);
-        const failedModels = [...skipped, ...(result.failedModels ?? [])];
-        const shaped = shapeResult(failedModels.length === 0 ? result : { ...result, failedModels });
-        if (source.dirty) shaped.content[0].text += `\nuncommitted changes in ${ctx.cwd} are not in the subagent`;
-        return shaped;
+        const id = await launch((onStarted) => connected.start(params.task as string, args, profile.checks, models, source, onStarted), skipped);
+        let text = `agent ${id}: started. A message gives the result.`;
+        if (source.dirty) text += `\nuncommitted changes in ${ctx.cwd} are not in the subagent`;
+        return { content: [{ type: "text", text }], details: { id } };
       }
       const connected = await connection(ctx.sessionManager.getSessionId());
       const status = await connected.status();
