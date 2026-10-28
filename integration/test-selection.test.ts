@@ -135,10 +135,14 @@ test("the commit hook runs the tests of the staged files; the push hook runs eve
   const root = mkdtempSync(join(tmpdir(), "pi-push-hook-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, "integration"));
-  writeFileSync(join(root, "unit.test.ts"), 'import { test } from "bun:test"; test("UNIT_HOOK", () => {});\n');
+  writeFileSync(
+    join(root, "unit.test.ts"),
+    'import { test } from "bun:test"; test("UNIT_HOOK", () => { if (process.env.GIT_INDEX_FILE) throw new Error("GIT_INDEX_FILE leaked"); });\n',
+  );
   writeFileSync(join(root, "integration", "contract.test.ts"), 'import { test } from "bun:test"; test("INTEGRATION_HOOK", () => {});\n');
   const run = () => {
-    const result = spawnSync(all.entry, [], { cwd: root, encoding: "utf8", timeout: 20_000 });
+    const env = { ...process.env, GIT_INDEX_FILE: join(root, "index") };
+    const result = spawnSync(all.entry, [], { cwd: root, env, encoding: "utf8", timeout: 20_000 });
     if (result.error) throw result.error;
     return result;
   };

@@ -448,6 +448,8 @@
                 name = "tests: the tests of the staged files";
                 entry = "${pkgs.writeShellScript "tests-changed" ''
                   set -eu
+                  # git sets GIT_INDEX_FILE and more for a hook; a test that runs git in a temp repository then changes this index.
+                  unset "''${!GIT_@}"
                   export PATH=${
                     pkgs.lib.makeBinPath [
                       pkgs.bun
@@ -466,6 +468,8 @@
                 name = "tests: every test";
                 entry = "${pkgs.writeShellScript "tests-all" ''
                   set -eu
+                  # git sets GIT_INDEX_FILE and more for a hook; a test that runs git in a temp repository then changes this index.
+                  unset "''${!GIT_@}"
                   export PATH=${
                     pkgs.lib.makeBinPath [
                       pkgs.bun

@@ -326,7 +326,7 @@
         {
           "always_run": true,
           "args": [],
-          "entry": "/nix/store/7spda9qgv3l7hd697cl47jkrh0vm9r1h-tests-all",
+          "entry": "/nix/store/4ydl9cm5d23vfr3760lpqynkd4p695da-tests-all",
           "exclude": "^$",
           "exclude_types": [],
           "fail_fast": false,
@@ -348,7 +348,7 @@
         {
           "always_run": false,
           "args": [],
-          "entry": "/nix/store/vr44pryfr97yw2piijz3ilr6696crh36-tests-changed",
+          "entry": "/nix/store/axl7q8a98q41j0vr59lgysilfmrpv5km-tests-changed",
           "exclude": "^$",
           "exclude_types": [],
           "fail_fast": false,
