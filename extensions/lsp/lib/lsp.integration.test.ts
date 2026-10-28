@@ -58,7 +58,9 @@ test("a real nvim loads unlisted buffers, reloads unmodified ones, keeps modifie
       name: file,
     },
   );
-  assert.deepEqual(parsePoll(await remote(pollExpr(created.buf))), { clients: 0, changes: 0 });
+  const poll = parsePoll(await remote(pollExpr(created.buf)));
+  assert.deepEqual({ clients: poll.clients, changes: poll.changes, busy: poll.busy }, { clients: 0, changes: 0, busy: 0 });
+  assert.ok(poll.quiet >= 0);
   assert.deepEqual(JSON.parse(await remote(diagnosticsExpr(created.buf))), []);
 
   writeFileSync(file, "local x = 2\nreturn x\n");

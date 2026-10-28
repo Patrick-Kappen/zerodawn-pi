@@ -10,7 +10,10 @@ import {
   parseLoad,
   parsePoll,
   pollExpr,
+  QUIET_MS,
+  releaseExpr,
   socketMessage,
+  TIMEOUT_MS,
   timeoutMessage,
   unsavedMessage,
   wipeExpr,
@@ -59,7 +62,7 @@ test("lua expressions use one-line Lua in a Vim string and name the nvim pieces"
 
 test("parses a buffer state, a poll result and the diagnostics", () => {
   assert.deepEqual(parseLoad('{"buf":3,"modified":false,"created":true}'), { buf: 3, modified: false, created: true });
-  assert.deepEqual(parsePoll('{"clients":1,"changes":2}'), { clients: 1, changes: 2 });
+  assert.deepEqual(parsePoll('{"clients":1,"changes":2,"busy":0,"quiet":0}'), { clients: 1, changes: 2, busy: 0, quiet: 0 });
   assert.deepEqual(parseDiagnostics('[{"line":2,"col":5,"source":"vtsls","message":"bad"}]'), [{ line: 2, col: 5, source: "vtsls", message: "bad" }]);
   assert.deepEqual(parseDiagnostics('[{"line":2,"col":5,"message":"bad"}]'), [{ line: 2, col: 5, source: "", message: "bad" }]);
   assert.throws(() => parseLoad("[]"), /no JSON object/);
@@ -84,7 +87,7 @@ test("the messages name the file, the error lines and the socket", () => {
 
 test("a file type without an LSP client gives no message and wipes the buffer pi created", async () => {
   const { deps, calls } = setup((expr) =>
-    expr.includes("vim.lsp.get_clients") ? ok('{"clients":0,"changes":0}') : load({ buf: 7, modified: false, created: true }),
+    expr.includes("vim.lsp.get_clients") ? ok('{"clients":0,"changes":0,"busy":0,"quiet":0}') : load({ buf: 7, modified: false, created: true }),
   );
   const messages: string[] = [];
   const checks = new LspChecks(deps, (text) => messages.push(text));
@@ -110,7 +113,7 @@ test("an unmodified buffer is reloaded, and a user buffer with unsaved changes i
 test("ERROR diagnostics come as one message, and a clean file sends none", async () => {
   const diag = '[{"line":3,"col":2,"source":"vtsls","message":"bad"}]';
   const { deps } = setup((expr) => {
-    if (expr.includes("vim.lsp.get_clients")) return ok('{"clients":1,"changes":1}');
+    if (expr.includes("vim.lsp.get_clients")) return ok('{"clients":1,"changes":1,"busy":0,"quiet":0}');
     if (expr.includes("vim.diagnostic.get")) return ok(diag);
     if (expr.includes("nvim_buf_delete")) return ok("ok");
     return load({ buf: 5, modified: false, created: true });
@@ -121,7 +124,7 @@ test("ERROR diagnostics come as one message, and a clean file sends none", async
   assert.deepEqual(messages, [errorMessage("a.ts", parseDiagnostics(diag))]);
 
   const clean = setup((expr) => {
-    if (expr.includes("vim.lsp.get_clients")) return ok('{"clients":1,"changes":1}');
+    if (expr.includes("vim.lsp.get_clients")) return ok('{"clients":1,"changes":1,"busy":0,"quiet":0}');
     if (expr.includes("vim.diagnostic.get")) return ok("[]");
     return load({ buf: 5, modified: false, created: false });
   });
@@ -130,9 +133,30 @@ test("ERROR diagnostics come as one message, and a clean file sends none", async
   assert.deepEqual(quiet, []);
 });
 
+test("a client that sends no diagnostics is clean after QUIET_MS without LSP progress, and busy progress waits until the timeout", async () => {
+  const user = setup((expr) => {
+    if (expr.includes("vim.lsp.get_clients")) return ok(`{"clients":1,"changes":0,"busy":0,"quiet":${QUIET_MS}}`);
+    if (expr.includes("nvim_del_augroup_by_name")) return ok("ok");
+    return load({ buf: 5, modified: false, created: false });
+  });
+  const clean: string[] = [];
+  await new LspChecks(user.deps, (text) => clean.push(text)).afterEdit("t", "a.ts", "/w");
+  assert.deepEqual(clean, []);
+  assert.deepEqual(user.calls.at(-1)?.slice(-1), [releaseExpr(5)]);
+  assert.ok(user.clock() < TIMEOUT_MS);
+
+  const busy = setup((expr) => {
+    if (expr.includes("vim.lsp.get_clients")) return ok(`{"clients":1,"changes":0,"busy":1,"quiet":${QUIET_MS}}`);
+    return load({ buf: 5, modified: false, created: true });
+  });
+  const late: string[] = [];
+  await new LspChecks(busy.deps, (text) => late.push(text)).afterEdit("t", "a.ts", "/w");
+  assert.deepEqual(late, [timeoutMessage("a.ts")]);
+});
+
 test("a newer edit of the same file replaces a waiting check, and a changed file drops its result", async () => {
   const { deps, calls } = setup((expr) => {
-    if (expr.includes("vim.lsp.get_clients")) return ok('{"clients":1,"changes":1}');
+    if (expr.includes("vim.lsp.get_clients")) return ok('{"clients":1,"changes":1,"busy":0,"quiet":0}');
     if (expr.includes("vim.diagnostic.get")) return ok('[{"line":1,"col":1,"source":"s","message":"bad"}]');
     return load({ buf: 5, modified: false, created: false });
   });
@@ -148,7 +172,7 @@ test("a newer edit of the same file replaces a waiting check, and a changed file
   let content = "old";
   const dropped = setup(
     (expr) => {
-      if (expr.includes("vim.lsp.get_clients")) return ok('{"clients":1,"changes":1}');
+      if (expr.includes("vim.lsp.get_clients")) return ok('{"clients":1,"changes":1,"busy":0,"quiet":0}');
       if (expr.includes("vim.diagnostic.get")) return ok('[{"line":1,"col":1,"source":"s","message":"bad"}]');
       return load({ buf: 5, modified: false, created: false });
     },
@@ -163,7 +187,7 @@ test("a newer edit of the same file replaces a waiting check, and a changed file
 
 test("the same message is sent once, and the queue waits for the checks", async () => {
   const { deps } = setup((expr) => {
-    if (expr.includes("vim.lsp.get_clients")) return ok('{"clients":1,"changes":1}');
+    if (expr.includes("vim.lsp.get_clients")) return ok('{"clients":1,"changes":1,"busy":0,"quiet":0}');
     if (expr.includes("vim.diagnostic.get")) return ok('[{"line":1,"col":1,"source":"s","message":"bad"}]');
     return load({ buf: 5, modified: false, created: false });
   });
