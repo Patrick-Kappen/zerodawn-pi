@@ -1,6 +1,5 @@
 import type { Route } from "../../../shared/route.ts";
 import { compact, type GitParams, gitArgs } from "./git.ts";
-import { RAW_GIT } from "./guard.ts";
 
 // Options that the tool output replaces; the tool gives its own compact form.
 const SAME: Record<GitParams["action"], RegExp> = {
@@ -13,12 +12,12 @@ const SHELL = /[|<>$`'"\\(){}*?[\];&#~]/;
 const quote = (word: string) => (/^[\w@%+=:,./-]+$/.test(word) ? word : `'${word.replaceAll("'", "'\\''")}'`);
 
 /**
- * The git tool for a "git status|diff|log|show" part of a chain: the shell runs the git command of the tool, and the
- * output gets the compact form of the tool. A part with shell syntax runs as written. An option that the tool
- * does not have refuses the chain.
+ * The git tool for a "git status|diff|log|show" part of a command: the shell runs the git command of the tool, and the
+ * output gets the compact form of the tool. A part with shell syntax, or with an option that the tool does not have,
+ * runs as written.
  */
 export function gitRoute(part: string): Route | undefined {
-  if (part.includes(RAW_GIT) || SHELL.test(part)) return undefined;
+  if (SHELL.test(part)) return undefined;
   const words = part.split(/\s+/);
   if (words[0] !== "git") return undefined;
   const global: string[] = [];
@@ -32,9 +31,6 @@ export function gitRoute(part: string): Route | undefined {
   if (!(action in SAME)) return undefined;
   const params: GitParams = { action, paths: [] };
   const refs: string[] = [];
-  const refuse = (what: string) => ({
-    block: `"${what}" in "git ${action}": the git tool has no such option. Use the git tool, or add "${RAW_GIT}" at the end of the bash command.`,
-  });
   const rest = words.slice(i + 1);
   for (let j = 0; j < rest.length; j++) {
     const w = rest[j];
@@ -47,11 +43,11 @@ export function gitRoute(part: string): Route | undefined {
     if (action === "diff" && (w === "--cached" || w === "--staged")) params.staged = true;
     else if (action === "log" && n) params.n = Number(n[1] ?? n[2]);
     else if (action === "log" && w === "-n" && /^\d+$/.test(rest[j + 1] ?? "")) params.n = Number(rest[++j]);
-    else if (w.startsWith("-")) return refuse(w);
+    else if (w.startsWith("-")) return undefined;
     else refs.push(w);
   }
   if (action === "status") params.paths = [...refs, ...(params.paths ?? [])];
-  else if (refs.length > 1) return refuse(`${refs.join(" ")} without --`);
+  else if (refs.length > 1) return undefined;
   else params.ref = refs[0];
   const args = gitArgs(params);
   return {

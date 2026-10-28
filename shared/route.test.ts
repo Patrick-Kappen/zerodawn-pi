@@ -6,9 +6,9 @@ import { onRoutePart, ROUTES_CHAINS, routedChain, routePart } from "./route.ts";
 test("the first extension that knows a part gives its route", () => {
   const pi = { events: createEventBus() };
   onRoutePart(pi, (part) => (part.startsWith("git ") ? { command: "git --no-pager log" } : undefined));
-  onRoutePart(pi, (part) => ({ block: `no ${part}` }));
+  onRoutePart(pi, (part) => ({ command: `${part} -x` }));
   assert.deepEqual(routePart(pi, "git log"), { command: "git --no-pager log" });
-  assert.deepEqual(routePart(pi, "cat a"), { block: "no cat a" });
+  assert.deepEqual(routePart(pi, "cat a"), { command: "cat a -x" });
 });
 
 test("no route without an extension that knows the part", () => {

@@ -10,7 +10,6 @@ function api() {
   onRoutePart(pi, (part) => {
     if (part === "git log") return { command: "git --no-pager log --oneline", format: (out, exit) => `log ${exit}: ${out.toUpperCase()}` };
     if (part === "git add .") return { command: "git add -A" };
-    if (part.startsWith("cat ")) return { block: "use read" };
     return undefined;
   });
   return pi;
@@ -27,10 +26,10 @@ test("a routed part runs between markers, and the other parts stay as they are",
   assert.deepEqual([...r.formats.keys()], [1]);
 });
 
-test("no routed part gives undefined, and a refused part refuses the chain", () => {
+test("no routed part gives undefined, and a single command is routed too", () => {
   assert.equal(routeChain(api(), "cd x && ls"), undefined);
-  assert.equal(routeChain(api(), "git log"), undefined);
-  assert.throws(() => routeChain(api(), "git log && cat a"), /use read/);
+  assert.equal(routeChain(api(), "ls"), undefined);
+  assert.deepEqual([...routeChain(api(), "git log")!.formats.keys()], [0]);
 });
 
 test("the output of a routed part goes through its format, and the markers go", () => {

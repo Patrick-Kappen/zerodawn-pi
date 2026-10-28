@@ -2,13 +2,15 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
-## 45. bash runs a chain part by part, with the tool of each part (2026-10-29)
+## 45. bash runs each part of a command with the tool of that part (2026-10-29)
 
 A guard refused a whole chain for one part, such as a `git log` after a `cd`. The other parts did not run, and the agent sent each chain again.
 The bash tool now splits a chain at `&&`, `||`, `;` and new lines, and asks the other extensions over `pi.events` how to run each part.
 The shell runs the whole chain, so `cd`, variables and the chain logic stay. A routed part runs between two markers, and its extension changes its output after the job.
 We did not let pi run the tools during the script: that needs a channel from the shell back to pi for each part.
-A single command keeps its guard. A chain of only `cd`, test and check commands keeps the run_tests replacement and its cache.
+A chain of only `cd`, test and check commands keeps the run_tests replacement and its cache.
+No extension refuses a part. A git read or a file view gets the output of the git, read or grep tool. A part that the tool cannot express runs as written, inside the output limits of bash.
+The guards and the `# raw-git` escape went: a refusal cost a turn, and the escape gave the full output back.
 
 ## 44. The agent can start a bash job at once (2026-10-28)
 

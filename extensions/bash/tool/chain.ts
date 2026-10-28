@@ -5,7 +5,7 @@ import { ROUTES_CHAINS, routePart } from "../../../shared/route.ts";
 
 type Format = (output: string, exit: number) => string;
 
-/** A chain with its routed parts: the script for the shell, and the format of each marked part. */
+/** A command with its routed parts: the script for the shell, and the format of each marked part. */
 export type Routed = { script: string; nonce: string; formats: Map<number, Format> };
 
 /** Tells the guards of the other extensions that bash runs a chain part by part. */
@@ -16,13 +16,12 @@ export function registerChainRouting(pi: Pick<ExtensionAPI, "events">): void {
 }
 
 /**
- * Asks the other extensions how to run each part of a chain. A routed part runs between two markers, so its
+ * Asks the other extensions how to run each part of a command. A routed part runs between two markers, so its
  * output can change after the job; the other parts stay as they are. Undefined when no part has a route.
- * Throws the reason of a part that refuses the chain.
  */
 export function routeChain(pi: Pick<ExtensionAPI, "events">, command: string): Routed | undefined {
   const parts = splitChain(command);
-  if (!parts || parts.length < 2) return undefined;
+  if (!parts) return undefined;
   const nonce = randomBytes(4).toString("hex");
   const formats = new Map<number, Format>();
   let routed = false;
@@ -32,7 +31,6 @@ export function routeChain(pi: Pick<ExtensionAPI, "events">, command: string): R
       // A background part writes into the output of the next parts, so its markers would not enclose it.
       const route = text && part.sep !== "&" ? routePart(pi, text) : undefined;
       if (!route) return part.text + part.sep;
-      if ("block" in route) throw new Error(route.block);
       routed = true;
       const [before, after] = [part.text.match(/^\s*/)![0], part.text.match(/\s*$/)![0]];
       if (!route.format) return `${before}${route.command}${after}${part.sep}`;

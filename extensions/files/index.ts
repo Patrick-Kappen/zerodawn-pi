@@ -1,17 +1,18 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { DEFAULT_MAX_LINES, type ExtensionAPI, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
+import { onRoutePart } from "../../shared/route.ts";
 import { outFile, outRef } from "../../shared/store.ts";
 import { absolutePath, textOf } from "../../shared/util.ts";
 import { registerFiles, WRITE_MAX_LINES } from "./lib/files.ts";
-import { GREP_LINE_MAX } from "./lib/grep.ts";
-import { registerViewGuard } from "./lib/guard.ts";
+import { cutLines } from "./lib/grep.ts";
+import { fileRoute } from "./lib/route.ts";
 
 const MAX_BYTES = 16 * 1024;
 const WORKFLOW = `Use codemode to run independent tool calls at once (Promise.allSettled), to chain them, or to filter large output. A codemode result above ${DEFAULT_MAX_LINES} lines or ${formatSize(MAX_BYTES)} is cut. The full text goes to a log file. Return only the data you need from codemode.`;
 
 export default function (pi: ExtensionAPI) {
   registerFiles(pi);
-  registerViewGuard(pi);
+  onRoutePart(pi, fileRoute);
 
   pi.on("before_agent_start", (event) => {
     event.systemPromptOptions.sections.tool_workflow = WORKFLOW;
@@ -39,10 +40,7 @@ export default function (pi: ExtensionAPI) {
     if (event.toolName === "grep") {
       const text = textOf(event.content);
       if (text === undefined) return;
-      const cut = text
-        .split("\n")
-        .map((l) => (l.length > GREP_LINE_MAX ? `${l.slice(0, GREP_LINE_MAX)}… [${l.length} chars]` : l))
-        .join("\n");
+      const cut = cutLines(text);
       return cut === text ? undefined : { content: [{ type: "text", text: cut }] };
     }
     if (event.toolName !== "codemode" || event.parentToolCallId) return;

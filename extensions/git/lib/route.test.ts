@@ -2,10 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { gitRoute } from "./route.ts";
 
-const command = (part: string) => {
-  const r = gitRoute(part);
-  return r && "command" in r ? r.command : r;
-};
+const command = (part: string) => gitRoute(part)?.command;
 
 test("a git read runs the git command of the tool", () => {
   assert.equal(command("git status --short"), "git --no-pager status --porcelain=v1 -b");
@@ -22,12 +19,7 @@ test("the output gets the compact form of the tool, and a failure stays as it is
   assert.equal(r.format("fatal: bad", 128), "fatal: bad");
 });
 
-test("other commands, git writes, shell syntax and raw-git are not routed", () => {
-  for (const part of ["ls", "git add .", "git log | head", "git log --format='%s'", "git log # raw-git", "git -c a=b log"])
+test("other commands, git writes, shell syntax and options that the tool does not have run as written", () => {
+  for (const part of ["ls", "git add .", "git log | head", "git log --format='%s'", "git -c a=b log", "git log --graph", "git diff main feature"])
     assert.equal(gitRoute(part), undefined, part);
-});
-
-test("an option that the tool does not have refuses the chain", () => {
-  assert.match((gitRoute("git log --graph") as { block: string }).block, /"--graph" in "git log": the git tool has no such option/);
-  assert.match((gitRoute("git diff main feature") as { block: string }).block, /"main feature without --"/);
 });

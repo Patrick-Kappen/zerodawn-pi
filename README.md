@@ -5,8 +5,8 @@ Extensions for [pi](https://pi.dev), the terminal coding agent, packaged as one 
 | Extension | What it does |
 |---|---|
 | [bash](extensions/bash/README.md) | `bash` runs in a PTY under `script`, so colors and progress lines survive. Long output comes back as head, error lines, tail and a log path. `background: true` returns a job id; a dashboard above the editor shows every running tool, and `jobs` waits, lists or kills. Jobs survive a pi restart. |
-| [files](extensions/files/README.md) | `read`, `grep`, `edit`, `write` with shorter descriptions. `edit` retries a mismatch with the file's indentation and shows the lines around each change. `write` refuses to overwrite a file of more than 100 lines. |
-| [git](extensions/git/README.md) | `git` tool for status, diff, log and show with compact output (per-file summaries, merged directories). The same commands in bash are blocked with a hint; `# raw-git` bypasses. |
+| [files](extensions/files/README.md) | `read`, `grep`, `edit`, `write` with shorter descriptions. `edit` retries a mismatch with the file's indentation and shows the lines around each change. `write` refuses to overwrite a file of more than 100 lines. A file view or search in bash gets the output of `read` or `grep`. |
+| [git](extensions/git/README.md) | `git` tool for status, diff, log and show with compact output (per-file summaries, merged directories). The same commands in bash get the compact output of the tool. |
 | [tests](extensions/tests/README.md) | Puts the recipes of the project's `justfile` or `Makefile` in the system prompt, blocks a repeated test run without an edit in between, and hints to turn a long repeated command into a recipe. |
 | [ctx-manager](extensions/ctx-manager/README.md) | At the end of a turn, replaces old large tool results in the model context by one line with the tool, size, first line and log path. The transcript on screen stays. |
 | [core](extensions/core/README.md) | `/ext`: a list with toggles for extensions, skills, prompts and themes, per user or per project, written in the format of `pi config`. |

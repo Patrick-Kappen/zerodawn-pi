@@ -1,16 +1,16 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { splitChain } from "./chain.ts";
 
-/** The channel where the bash tool asks the other extensions how to run one part of a command chain. */
+/** The channel where the bash tool asks the other extensions how to run one part of a command. */
 export const ROUTE_PART = "bash:route-part";
 /** The channel where a guard asks whether the bash tool runs a chain part by part. */
 export const ROUTES_CHAINS = "bash:routes-chains";
 
 /**
- * How the bash tool runs one part of a chain. `command` runs in the shell in place of the part, and `format`
- * changes the output of that part after the job. `block` refuses the whole chain with this reason.
+ * How the bash tool runs one part of a command. `command` runs in the shell in place of the part, and `format`
+ * changes the output of that part after the job.
  */
-export type Route = { block: string } | { command: string; format?: (output: string, exit: number) => string };
+export type Route = { command: string; format?: (output: string, exit: number) => string };
 
 /** bash emits one query per part. The first extension that knows the part sets route. */
 export type RouteQuery = { part: string; route?: Route };
