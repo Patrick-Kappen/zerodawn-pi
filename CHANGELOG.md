@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.23.0 — 2026-10-28
+
+### lsp 0.1.1
+
+- end a clean file on quiet LSP progress, not a timeout
+
+### repository
+
+- lsp: end a clean file on quiet LSP progress, not a timeout
+- debug: add a debug tool that drives nvim-dap in the user's nvim
+- lsp: report LSP errors after edit and write from the user's nvim
+
 ## 0.22.0 — 2026-10-28
 
 ### bash 0.11.0
