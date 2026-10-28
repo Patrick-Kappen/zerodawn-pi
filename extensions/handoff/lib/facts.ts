@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 export type Run = (cmd: string, args: string[], cwd: string) => string;
 
-export const run: Run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, encoding: "utf8", timeout: 15_000, stdio: ["ignore", "pipe", "pipe"] }).trim();
+export const run: Run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, encoding: "utf8", timeout: 15_000, stdio: ["ignore", "pipe", "pipe"] }).trimEnd();
 
 const firstLine = (err: unknown) => String((err as { stderr?: string }).stderr || (err as Error).message).split("\n")[0];
 
