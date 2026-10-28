@@ -2,9 +2,16 @@ import { basename, dirname } from "node:path";
 import { type PairEntry, pairList, pairOpen, pairServer, type Run } from "../../../shared/pair.ts";
 import { type Item, openItems, parseWorktrees, recentItems, type Scope, worktreeItems } from "./model.ts";
 
+const requirePair = (env: NodeJS.ProcessEnv) => {
+  if (!env.PI_PAIR_COMMAND) {
+    throw new Error("/switch: PI_PAIR_COMMAND is not set. Start pi again in a new tmux pane, or set it to the pair script of zerodawn-tmux.");
+  }
+};
+
 const fail = (what: string, result: { code: number; stderr: string }) => new Error(`${what} failed (exit ${result.code}): ${result.stderr.trim()}`);
 
 export async function loadItems(run: Run, env: NodeJS.ProcessEnv = process.env): Promise<Record<Scope, Item[]>> {
+  requirePair(env);
   const open: PairEntry[] = await pairList(run, env);
   const recent = await run("zoxide", ["query", "-l"]);
   if (recent.code !== 0) throw fail("zoxide query -l", recent);
@@ -22,6 +29,7 @@ export async function loadItems(run: Run, env: NodeJS.ProcessEnv = process.env):
 
 export async function switchTo(run: Run, pane: string | undefined, path: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {
   if (!pane) throw new Error("/switch: $TMUX_PANE is not set; start pi inside tmux.");
+  requirePair(env);
   const { server } = await pairServer(run, pane);
   if (!server) throw new Error("/switch: this tmux client has no nvim pair. Run /ide to start it, then switch again.");
   await pairOpen(run, server, path, env);
