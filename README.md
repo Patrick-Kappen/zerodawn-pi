@@ -116,6 +116,16 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.24.0 — 2026-10-28
+
+### bash 0.12.0
+
+- let the agent start a job at once with background
+
+### repository
+
+- bash: let the agent start a job at once with background
+
 ## 0.23.0 — 2026-10-28
 
 ### lsp 0.1.1
@@ -145,30 +155,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 - ci: keep the git variables of a hook away from the tests
 - ci: test staged files at commit, every test at push
 - bash: wait inline for a call alone in its message
-
-## 0.21.0 — 2026-10-28
-
-### bash 0.10.0
-
-- run long commands and tests in the background at once (breaking)
-
-### opencode 0.4.0
-
-- show the error event before the exit code
-
-- return at once; a message gives the report (breaking)
-
-### subagents 0.10.0
-
-- start and answer return the id; a message gives the result (breaking)
-
-### tests 0.8.0
-
-- bash: run long commands and tests in the background at once (breaking)
-
-### repository
-
-- bash: run long commands and tests in the background at once
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
