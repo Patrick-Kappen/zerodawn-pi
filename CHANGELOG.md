@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.20.1 — 2026-10-28
+
+### handoff 0.4.1
+
+- keep the first dirty path whole
+
+### repository
+
+- docs: add tasks for handoff accuracy and the checker note
+- ci: make ci-nixos-update.sh executable
+
 ## 0.20.0 — 2026-10-28
 
 ### shared 0.11.0

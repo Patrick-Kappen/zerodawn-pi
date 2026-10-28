@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 — 2026-10-28
+
+- keep the first dirty path whole
+
 ## 0.4.0 — 2026-10-28
 
 - remove the reused card fixture after tests

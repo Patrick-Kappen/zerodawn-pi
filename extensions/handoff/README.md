@@ -55,13 +55,9 @@ The tool `recall { question, session? }` answers one question about earlier work
 ## Changes
 
 <!-- changelog:start -->
-## 0.4.0 — 2026-10-28
+## 0.4.1 — 2026-10-28
 
-- remove the reused card fixture after tests
-
-- tests: separate unit and integration suites
-
-- tests: clean fixtures and isolate the supervisor environment
+- keep the first dirty path whole
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
