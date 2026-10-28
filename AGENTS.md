@@ -30,7 +30,10 @@ pi package with independent extensions in TypeScript. Nix flake with a Home Mana
 
 ## Tests and checks
 
-- Run tests with `run_tests`. Run checks with `just check`.
+- Run affected unit tests with `run_tests` during edits. Run both test groups with `run_tests` scope `all` before delivery.
+- Name tests with real files, processes, sockets, Git, or tmux `*.integration.test.ts`, or put them under `integration/`.
+- Keep unit tests free of external effects. Static fixture reads are allowed.
+- Run checks with `just check`. Keep commit hooks limited to static checks.
 - A warning is an error. Fix it.
 - Add a test for each new behaviour and each bug fix.
 - When CI fails, find the cause before you change code.

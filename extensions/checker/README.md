@@ -34,7 +34,7 @@ The checker sends the agent back when one of these is true:
 
 The follow-up message is hidden and lists only the reasons that apply. The checker shows no notice for a follow-up. At most 3 follow-ups per user message: a tool call does not reset the count, because the agent that works on the points still answers the checker. After the limit, a warning shows the open points. A run after a follow-up that ends on assistant text with no tool call is a rebuttal: the checker does not check again and sends nothing. When the agent did tool calls and stops again, the checker asks again but leaves out every reason that an earlier follow-up for this user message already sent. A run that was aborted or failed is not checked. A run is also not checked while a bash job runs in the background, because the job report starts the next turn. The checker asks the bash extension with `{ running: false }` on the `pi.events` channel `bash:background-jobs`. A missing model or a failed classify call shows a warning and does not send the agent back.
 
-The checker does not ask whether tests ran. The pre-commit hook and CI run the full test suite.
+The checker does not ask whether tests ran. CI runs both test groups. Commit hooks run static checks.
 
 Every check goes to the session as a custom entry `checker` and as one JSON line to the log file.
 

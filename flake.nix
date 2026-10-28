@@ -171,14 +171,15 @@
         pkgs.runCommand "tests-${name}"
           {
             inherit src;
-            nativeBuildInputs = testInputs pkgs;
+            nativeBuildInputs = [ pkgs.bun ];
           }
           ''
             cp -r "$src" src
             chmod -R u+w src
             ln -s ${piModules pkgs}/node_modules src/node_modules
             cd src
-            HOME="$TMPDIR" bun test ./${if name == "shared" then "shared" else "extensions/${name}"}
+            HOME="$TMPDIR" bun test ${if name == "shared" then "./shared" else "./extensions/${name}"} \
+              --path-ignore-patterns '**/*.integration.test.ts' --path-ignore-patterns '**/integration/**'
             touch "$out"
           '';
       # The pi package: manifest and sources, without tests. Pi loads it from settings.json "packages".
@@ -442,22 +443,6 @@
                 pass_filenames = false;
                 always_run = true;
               };
-              # Local commits keep this guard; Nix runs each suite through its own check.
-              tests = {
-                enable = true;
-                name = "tests: the full test suite";
-                entry = "${pkgs.writeShellScript "tests" ''
-                  export PATH=${pkgs.lib.makeBinPath (testInputs pkgs)}:$PATH
-                  [ -e node_modules ] || ln -s ${piModules pkgs}/node_modules node_modules
-                  # git gives a hook GIT_INDEX_FILE and more; a test that makes its own repository then changes this index.
-                  unset $(${pkgs.git}/bin/git rev-parse --local-env-vars)
-                  # The nix check sandbox has no writable HOME.
-                  [ -w "$HOME" ] || export HOME="$TMPDIR"
-                  exec bun test
-                ''}";
-                pass_filenames = false;
-                always_run = true;
-              };
               gitleaks = {
                 enable = true;
                 name = "gitleaks";
@@ -511,7 +496,9 @@
                   fileset = lib.fileset.unions [
                     ./package.json
                     ./biome.json
+                    ./.pre-commit-config.yaml
                     ./flake.nix
+                    ./justfile
                     ./integration
                     ./scripts
                     ./extensions
@@ -525,7 +512,7 @@
                 chmod -R u+w src
                 ln -s ${piModules pkgs}/node_modules src/node_modules
                 cd src
-                HOME="$TMPDIR" bun test ./integration
+                HOME="$TMPDIR" bun test .integration.test.ts integration/
                 touch "$out"
               '';
 

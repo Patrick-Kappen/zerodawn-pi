@@ -28,6 +28,8 @@ Done when: the current code passes, and the baseline identifies tested behaviour
 
 ## 2. Separate unit and integration tests
 
+The [separation record](test-separation.md) describes the test groups, checks, measurements, and delivery boundary.
+
 Unit tests cover isolated logic, such as parsing, formatting, test selection, and release calculation.
 
 - Run affected unit tests through `run_tests` during edits.

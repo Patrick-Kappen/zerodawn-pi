@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Runs the tests for the changed files that run_tests gives: the tests of each changed extension, every test for a
-# change in shared/ or the manifest, and every check (nix flake check) for a change in the repository behaviour.
 set -euo pipefail
 
 if [ $# -eq 0 ]; then
@@ -10,12 +8,13 @@ fi
 
 dirs=()
 all=false
+integration=false
 nix=false
 for f in "$@"; do
   case "$f" in
     *.md) ;;
+    integration/* | *.integration.test.ts) integration=true ;;
     extensions/*/*) dirs+=("./extensions/$(cut -d/ -f2 <<<"$f")") ;;
-    integration/*) dirs+=("./integration") ;;
     shared/* | package.json | tsconfig.json) all=true ;;
     *) nix=true ;;
   esac
@@ -25,12 +24,13 @@ if $nix; then
   exec nix flake check --option warn-dirty false
 fi
 if $all; then
-  exec bun test
-fi
-if [ ${#dirs[@]} -eq 0 ]; then
+  bun test --path-ignore-patterns '**/*.integration.test.ts' --path-ignore-patterns '**/integration/**'
+elif [ ${#dirs[@]} -gt 0 ]; then
+  mapfile -t unique < <(printf '%s\n' "${dirs[@]}" | sort -u)
+  bun test "${unique[@]}" --path-ignore-patterns '**/*.integration.test.ts' --path-ignore-patterns '**/integration/**'
+elif ! $integration; then
   echo "test-changed: only documentation changed: $*"
-  exit 0
 fi
-dirs+=("./integration")
-mapfile -t unique < <(printf '%s\n' "${dirs[@]}" | sort -u)
-exec bun test "${unique[@]}"
+if $integration; then
+  exec bun test .integration.test.ts integration/
+fi

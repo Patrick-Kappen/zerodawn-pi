@@ -14,14 +14,14 @@ test("filesystem and job fixtures remove their temporary directories", (t) => {
   mkdirSync(fixtures);
   mkdirSync(runtime);
   const files = [
-    "./extensions/bash/tool/jobproc.test.ts",
-    "./extensions/files/lib/files.test.ts",
-    "./extensions/files/lib/format.test.ts",
-    "./extensions/files/lib/grep.test.ts",
-    "./extensions/files/lib/read.test.ts",
-    "./extensions/files/lib/syntax.test.ts",
-    "./extensions/handoff/index.test.ts",
-    "./extensions/handoff/lib/lib.test.ts",
+    "./extensions/bash/tool/jobproc.integration.test.ts",
+    "./extensions/files/lib/files.integration.test.ts",
+    "./extensions/files/lib/format.integration.test.ts",
+    "./extensions/files/lib/grep.integration.test.ts",
+    "./extensions/files/lib/read.integration.test.ts",
+    "./extensions/files/lib/syntax.integration.test.ts",
+    "./extensions/handoff/index.integration.test.ts",
+    "./extensions/handoff/lib/lib.integration.test.ts",
   ];
   const result = spawnSync(process.execPath, ["test", ...files], {
     cwd: fileURLToPath(new URL("..", import.meta.url)),

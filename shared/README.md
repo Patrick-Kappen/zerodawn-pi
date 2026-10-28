@@ -22,7 +22,7 @@ Extensions are versioned and tagged on their own, and `just compat` runs the tes
 | `recipes.ts` | `Recipe`, `Recipes`, `parseJust`, `parseMake`, `loadRecipes` (justfile or Makefile of a directory) | tests |
 | `testrun.ts` | `changedFiles` (git working tree against HEAD, with untracked files), `inGit`, `uncoveredOf`, `plan` (what to run for scope `changed` or `all`), `execute` (run argv in its own process group), `verdict` (red for a failed run, a time-out or a warning), `reader`, `Run`, `Plan`, `NO_TEST`, `CHANGED_RECIPE`, `TIMEOUT_MS` | tests, subagents |
 
-Tests: `util.test.ts`, `store.test.ts`, `config.test.ts`, `testrun.test.ts`. The tests of `select.ts`, `report.ts` and `recipes.ts` are in `extensions/tests/lib/`, through the re-exports there.
+Unit tests: `util.test.ts` and `report.test.ts`. Integration tests: `store.integration.test.ts`, `config.integration.test.ts`, and `testrun.integration.test.ts`. The tests of `select.ts`, `report.ts` and `recipes.ts` are in `extensions/tests/lib/`, through the re-exports there.
 
 ## Changes
 
