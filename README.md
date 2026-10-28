@@ -12,6 +12,7 @@ Extensions for [pi](https://pi.dev), the terminal coding agent, packaged as one 
 | [core](extensions/core/README.md) | `/ext`: a list with toggles for extensions, skills, prompts and themes, per user or per project, written in the format of `pi config`. |
 | [ui](extensions/ui/README.md) | `/view` (normal, compact, text, silent), `/messages` (row, rule), a one-line footer, code blocks without fences, a working indicator without tool names. |
 | [ast-grep](extensions/ast-grep/README.md) | `ast_grep` tool: structural search by code pattern with `$NAME` and `$$$`; `rewrite` previews, never writes. |
+| [debug](extensions/debug/README.md) | `debug` tool: debugs a program or test through the user's Neovim server and nvim-dap (breakpoints, stepping, eval). Exists only when `PI_DEBUG_SERVER` is set; the Home Manager option `debugServer` sets it. |
 | [opencode](extensions/opencode/README.md) | `opencode` tool: hands one task to an OpenCode agent in the same project and returns its report. |
 | [subagents](extensions/subagents/README.md) | Work in progress. Delegates tasks to pi agents in a detached tmux session per main agent; a supervisor in window 0 owns them. |
 | [systemstate](extensions/systemstate/README.md) | Puts the active NixOS system and, inside your flake checkout, the deployed revision against `HEAD` in the system prompt; updates them during the session. |
