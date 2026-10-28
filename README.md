@@ -113,6 +113,30 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.21.0 — 2026-10-28
+
+### bash 0.10.0
+
+- run long commands and tests in the background at once (breaking)
+
+### opencode 0.4.0
+
+- show the error event before the exit code
+
+- return at once; a message gives the report (breaking)
+
+### subagents 0.10.0
+
+- start and answer return the id; a message gives the result (breaking)
+
+### tests 0.8.0
+
+- bash: run long commands and tests in the background at once (breaking)
+
+### repository
+
+- bash: run long commands and tests in the background at once
+
 ## 0.20.1 — 2026-10-28
 
 ### handoff 0.4.1
@@ -199,17 +223,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 - ci: ask Nixos for an update PR after a package release
 - ci: keep renamed test hooks disabled in Nix checks
 - ci: select affected checks without repeated test suites
-
-## 0.19.1 — 2026-10-28
-
-### pair 0.1.1
-
-- /ide finds the Neovide window by its nvim socket
-
-### repository
-
-- docs: add astra latency task and guard block measurement
-- docs: task to record mistakes and turn frequent ones into fixes
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

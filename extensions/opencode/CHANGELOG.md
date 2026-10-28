@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 — 2026-10-28
+
+- show the error event before the exit code
+
+- return at once; a message gives the report (breaking)
+
 ## 0.3.1 — 2026-10-28
 
 - docs: split open work in TODO.md and BACKLOG.md

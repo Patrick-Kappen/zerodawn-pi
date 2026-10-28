@@ -11,9 +11,11 @@ Needs `opencode` in `PATH`. No config. Tests: `events.test.ts`.
 ## Changes
 
 <!-- changelog:start -->
-## 0.3.1 — 2026-10-28
+## 0.4.0 — 2026-10-28
 
-- docs: split open work in TODO.md and BACKLOG.md
+- show the error event before the exit code
+
+- return at once; a message gives the report (breaking)
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

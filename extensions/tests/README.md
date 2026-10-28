@@ -60,9 +60,9 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 ## Changes
 
 <!-- changelog:start -->
-## 0.7.0 — 2026-10-28
+## 0.8.0 — 2026-10-28
 
-- separate unit and integration suites
+- bash: run long commands and tests in the background at once (breaking)
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

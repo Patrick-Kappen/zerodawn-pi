@@ -52,11 +52,9 @@ Jobs survive a pi restart: `session_start` reads the job files, reports jobs tha
 ## Changes
 
 <!-- changelog:start -->
-## 0.9.0 — 2026-10-28
+## 0.10.0 — 2026-10-28
 
-- tests: separate unit and integration suites
-
-- tests: clean fixtures and isolate the supervisor environment
+- run long commands and tests in the background at once (breaking)
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

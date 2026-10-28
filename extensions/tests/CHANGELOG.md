@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0 — 2026-10-28
+
+- bash: run long commands and tests in the background at once (breaking)
+
 ## 0.7.0 — 2026-10-28
 
 - separate unit and integration suites

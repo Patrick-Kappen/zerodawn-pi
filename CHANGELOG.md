@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.21.0 — 2026-10-28
+
+### bash 0.10.0
+
+- run long commands and tests in the background at once (breaking)
+
+### opencode 0.4.0
+
+- show the error event before the exit code
+
+- return at once; a message gives the report (breaking)
+
+### subagents 0.10.0
+
+- start and answer return the id; a message gives the result (breaking)
+
+### tests 0.8.0
+
+- bash: run long commands and tests in the background at once (breaking)
+
+### repository
+
+- bash: run long commands and tests in the background at once
+
 ## 0.20.1 — 2026-10-28
 
 ### handoff 0.4.1
