@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import register, { buildHandoff } from "./index.ts";
 
 const card = {
@@ -18,6 +18,7 @@ const card = {
   avoid: [],
 };
 const root = mkdtempSync(join(tmpdir(), "handoff-cmd-"));
+after(() => rmSync(root, { recursive: true, force: true }));
 const branch = [
   { id: "e1", type: "message", message: { role: "user", content: "Ship it" } },
   { id: "e2", type: "message", message: { role: "assistant", content: [{ type: "text", text: "Done." }] } },
@@ -71,6 +72,7 @@ test("/handoff starts a new session with the handoff; /handoff card only shows i
 
 test("agent_end updates the card in the background after a commit; /quit and /new update it when something is new", async () => {
   const dir = mkdtempSync(join(tmpdir(), "handoff-events-"));
+  after(() => rmSync(dir, { recursive: true, force: true }));
   const config = join(dir, "config.json");
   writeFileSync(config, JSON.stringify({ handoffModels: ["p/m"] }));
   process.env.ZERODAWN_PI_CONFIG = config;
@@ -108,6 +110,7 @@ test("agent_end updates the card in the background after a commit; /quit and /ne
 
 test("turn_end warns and cuts from 150k or after the handoff tool; settle cuts and keeps the final answer; the hard limit cuts; warming follows jobs", async () => {
   const dir = mkdtempSync(join(tmpdir(), "handoff-decider-"));
+  after(() => rmSync(dir, { recursive: true, force: true }));
   const config = join(dir, "config.json");
   writeFileSync(config, JSON.stringify({ handoffModels: ["p/m"] }));
   process.env.ZERODAWN_PI_CONFIG = config;
@@ -222,6 +225,7 @@ test("a cut uses the card of the background update when it covers the same entri
 
 test("recall answers from the session file with entry ids, and names a missing session file", async () => {
   const dir = mkdtempSync(join(tmpdir(), "handoff-recall-"));
+  after(() => rmSync(dir, { recursive: true, force: true }));
   const config = join(dir, "config.json");
   writeFileSync(config, JSON.stringify({ handoffModels: ["p/m"] }));
   process.env.ZERODAWN_PI_CONFIG = config;

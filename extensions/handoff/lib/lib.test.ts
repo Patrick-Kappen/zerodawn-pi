@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { type Card, checkCard, HANDOFF_MAX_CHARS, openPrNumbers, render } from "./card.ts";
 import { decide, warmDecision, warning } from "./decider.ts";
 import { gitFacts, jobFacts, systemFacts } from "./facts.ts";
@@ -178,6 +178,7 @@ test("gitFacts reads branch, dirty files, worktrees and PRs, and names a failing
 
 test("jobFacts lists background jobs without a report, and handoff files keep their order", () => {
   const dir = mkdtempSync(join(tmpdir(), "handoff-"));
+  after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, "jobs"));
   const job = (id: string, extra: object) =>
     writeFileSync(join(dir, "jobs", `${id}.json`), JSON.stringify({ id, command: "sleep 9", bg: true, status: join(dir, `${id}.status`), ...extra }));
@@ -251,6 +252,7 @@ test("decide: warnings at 130k and 140k on turn_end, cut in the middle of the wo
 
 test("recall: readSession keeps messages and fails loud on a bad file; select keeps the chunks with the words of the question", async () => {
   const dir = mkdtempSync(join(tmpdir(), "recall-"));
+  after(() => rmSync(dir, { recursive: true, force: true }));
   const file = join(dir, "s.jsonl");
   writeFileSync(
     file,

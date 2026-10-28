@@ -16,7 +16,7 @@ import { createTmux, type Exec, sessionName } from "./tmux.ts";
 const socket = `pi-subagents-test-${process.pid}`;
 const exec: Exec = (command, args) =>
   new Promise((resolve) => {
-    execFile(command, args, (error, stdout, stderr) => {
+    execFile(command, args, { env: { ...process.env, HOME: work, XDG_RUNTIME_DIR: work } }, (error, stdout, stderr) => {
       const code = error === null ? 0 : typeof error.code === "number" ? error.code : 127;
       resolve({ stdout, stderr, code, killed: false });
     });
@@ -26,10 +26,10 @@ const sessionId = randomUUID();
 const fakePiScript = fileURLToPath(new URL("./fixtures/fake-pi.ts", import.meta.url));
 // The Nix test sandbox has no XDG_RUNTIME_DIR, no node and no /usr/bin/env: give the tmux server its own runtime dir,
 // and start the fake pi through /bin/sh with the runtime of this test.
+const parentHome = process.env.HOME;
+const parentRuntime = process.env.XDG_RUNTIME_DIR;
+// The supervisor puts worktrees under ~/.worktrees; only child commands use the temporary HOME.
 const work = await mkdtemp(join(tmpdir(), "pi-subagents-it-"));
-process.env.XDG_RUNTIME_DIR = work;
-// The supervisor puts worktrees under ~/.worktrees: a temp HOME keeps them in the temp dir.
-process.env.HOME = work;
 const repo = join(await realpath(work), "proj");
 await mkdir(repo);
 async function git(...args: string[]): Promise<string> {
@@ -76,6 +76,11 @@ function ensure(id: string, piCommand: string) {
     runtimeRoot: "/tmp",
   });
 }
+
+test("supervisor fixtures keep the parent HOME and runtime directory", () => {
+  assert.equal(process.env.HOME, parentHome);
+  assert.equal(process.env.XDG_RUNTIME_DIR, parentRuntime);
+});
 
 test("real supervisor: ensure, hello, status, close, session ends", { timeout: 30_000 }, async () => {
   const tmux = createTmux(exec, socket);

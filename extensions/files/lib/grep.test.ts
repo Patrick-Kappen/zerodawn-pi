@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { GREP_PER_FILE, registerGrep, rgArgs } from "./grep.ts";
 import { registerRead } from "./read.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "grep-"));
+after(() => rmSync(dir, { recursive: true, force: true }));
 const put = (path: string, text: string) => {
   mkdirSync(join(dir, path, ".."), { recursive: true });
   writeFileSync(join(dir, path), text);

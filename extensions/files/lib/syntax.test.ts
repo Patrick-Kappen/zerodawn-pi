@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { registerFiles } from "./files.ts";
 import { checked, language, newErrors, syntaxErrors } from "./syntax.ts";
 
 const nvim = { nvim: "nvim" };
 const good = "local x = 1\nreturn x\n";
-const tmp = () => mkdtempSync(join(tmpdir(), "syntax-"));
+const root = mkdtempSync(join(tmpdir(), "syntax-"));
+after(() => rmSync(root, { recursive: true, force: true }));
+const tmp = () => mkdtempSync(join(root, "case-"));
 
 test("language by file name", () => {
   assert.equal(language("a/b.ts"), "typescript");

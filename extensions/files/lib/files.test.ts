@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { registerFiles } from "./files.ts";
 
 function load() {
@@ -14,6 +14,7 @@ function load() {
 test("edit and write store the lines they put in context", async () => {
   const { tools } = load();
   const dir = mkdtempSync(join(tmpdir(), "files-"));
+  after(() => rmSync(dir, { recursive: true, force: true }));
   const ctx = { cwd: dir };
   const w = await tools.get("write").execute("w", { path: "a.txt", content: "a\nb\nc\n" }, undefined, undefined, ctx);
   assert.deepEqual(w.details.seen.path, join(dir, "a.txt"));
