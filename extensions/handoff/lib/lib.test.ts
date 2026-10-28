@@ -222,22 +222,28 @@ test("updateReasons: 20k characters, or a successful commit, push, PR create or 
   assert.deepEqual(updateReasons([call("6", "git push"), background], ["x"]), []);
 });
 
-test("decide: warnings at 130k and 140k on turn_end, cut at the next tool turn after a warning or at the end of a run from 150k, hard cut from 170k", () => {
-  assert.deepEqual(decide(120_000, "turn_end", 0, false, false), { action: "none" });
-  assert.deepEqual(decide(131_000, "turn_end", 0, false, false), { action: "warn", level: 1 });
-  assert.deepEqual(decide(135_000, "turn_end", 1, false, false), { action: "none" });
-  assert.deepEqual(decide(141_000, "turn_end", 1, false, false), { action: "warn", level: 2 });
-  assert.deepEqual(decide(155_000, "turn_end", 2, false, false), { action: "none" });
-  assert.deepEqual(decide(155_000, "settle", 2, false, false), { action: "cut", why: "context 155k at the end of the run" });
-  assert.deepEqual(decide(155_000, "settle", 2, true, false), { action: "none" });
-  assert.deepEqual(decide(142_000, "settle", 1, false, false), { action: "cut", why: "context 142k at the end of the run after the warning" });
-  assert.deepEqual(decide(142_000, "settle", 1, true, false), { action: "none" });
-  assert.deepEqual(decide(142_000, "settle", 0, false, false), { action: "none" });
-  assert.deepEqual(decide(171_000, "turn_end", 2, true, false), { action: "cut", why: "context 171k over the hard limit of 170k" });
-  assert.deepEqual(decide(133_000, "turn_end", 1, false, true), { action: "cut", why: "context 133k after the warning, in the middle of the work" });
-  assert.deepEqual(decide(133_000, "turn_end", 1, true, true), { action: "none" });
-  assert.deepEqual(decide(133_000, "turn_end", 0, false, true), { action: "warn", level: 1 });
-  assert.match(warning(132_000, true), /^System: context 132k of 150k\. After your next tool call.*final answer now.*running bash jobs end\.$/);
+test("decide: warnings at 130k and 140k on turn_end, cut in the middle of the work from 150k or on request, at the end of a run after a warning, hard cut from 170k", () => {
+  assert.deepEqual(decide(120_000, "turn_end", 0, false, false, false), { action: "none" });
+  assert.deepEqual(decide(131_000, "turn_end", 0, false, false, false), { action: "warn", level: 1 });
+  assert.deepEqual(decide(135_000, "turn_end", 1, false, false, false), { action: "none" });
+  assert.deepEqual(decide(141_000, "turn_end", 1, false, false, false), { action: "warn", level: 2 });
+  assert.deepEqual(decide(155_000, "turn_end", 2, false, false, false), { action: "none" });
+  assert.deepEqual(decide(155_000, "settle", 2, false, false, false), { action: "cut", why: "context 155k at the end of the run" });
+  assert.deepEqual(decide(155_000, "settle", 2, true, false, false), { action: "none" });
+  assert.deepEqual(decide(142_000, "settle", 1, false, false, false), { action: "cut", why: "context 142k at the end of the run after the warning" });
+  assert.deepEqual(decide(142_000, "settle", 1, true, false, false), { action: "none" });
+  assert.deepEqual(decide(142_000, "settle", 0, false, false, false), { action: "none" });
+  assert.deepEqual(decide(171_000, "turn_end", 2, true, false, false), { action: "cut", why: "context 171k over the hard limit of 170k" });
+  assert.deepEqual(decide(133_000, "turn_end", 1, false, true, false), { action: "none" }, "after a warning the agent continues working");
+  assert.deepEqual(decide(151_000, "turn_end", 2, false, true, false), { action: "cut", why: "context 151k in the middle of the work" });
+  assert.deepEqual(decide(151_000, "turn_end", 2, true, true, false), { action: "none" });
+  assert.deepEqual(decide(133_000, "turn_end", 0, false, true, false), { action: "warn", level: 1 });
+  assert.deepEqual(decide(90_000, "turn_end", 0, false, true, true), { action: "cut", why: "context 90k, the agent called handoff" });
+  assert.deepEqual(decide(90_000, "turn_end", 0, true, true, true), { action: "none" });
+  assert.deepEqual(decide(90_000, "turn_end", 0, false, false, true), { action: "none" }, "a final answer is no cut in the middle of the work");
+  assert.deepEqual(decide(90_000, "settle", 0, false, false, true), { action: "cut", why: "context 90k at the end of the run, the agent called handoff" });
+  assert.equal(warning(132_000), "System: context 88%; 18k tokens left. Continue working or call handoff for an early handoff.");
+  assert.equal(warning(155_000), "System: context 103%; 0k tokens left. Continue working or call handoff for an early handoff.");
   assert.equal(warmDecision(60_000, true), "warm");
   assert.equal(warmDecision(60_000, false), undefined);
   assert.equal(warmDecision(120_000, true), undefined);

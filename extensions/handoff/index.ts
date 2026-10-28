@@ -60,20 +60,22 @@ export default function (pi: ExtensionAPI) {
   };
 
   let warned = 0;
+  let requested = false;
   const boundary = async (ctx: ExtensionContext, at: Boundary, event: BoundaryEvent, toolCalls: boolean) => {
     const tokens = ctx.getContextUsage()?.tokens;
     if (tokens === undefined || tokens === null) return undefined;
     const jobs = jobsRunning(sessionDir(ctx));
-    const decision = decide(tokens, at, warned, jobs, toolCalls);
+    const decision = decide(tokens, at, warned, jobs, toolCalls, requested);
     if (decision.action === "warn") {
       warned = decision.level;
-      return { entries: [...event.entries, { type: "custom_message" as const, customType: "handoff-warning", content: warning(tokens, jobs), display: true }] };
+      return { entries: [...event.entries, { type: "custom_message" as const, customType: "handoff-warning", content: warning(tokens), display: true }] };
     }
     if (decision.action !== "cut") return undefined;
     if (running) await running;
     const branch = ctx.sessionManager.getBranch() as Entry[];
     const { handoff, path } = latest && latest.handoff.untilEntry === branch.at(-1)?.id ? latest : await buildHandoff(ctx, handoffModels());
     warned = 0;
+    requested = false;
     ctx.ui.notify(`handoff: ${decision.why}; the context is now the handoff (${path}).`, "warning");
     if (at === "settle") {
       const keep = lastAnswerId(branch) ?? null;
@@ -89,6 +91,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("agent_before_settle", (event, ctx) => boundary(ctx, "settle", event, false));
   pi.on("session_start", () => {
     warned = 0;
+    requested = false;
     latest = undefined;
   });
   pi.on("cache_warming_decision", (_event, ctx) => {
@@ -126,6 +129,18 @@ export default function (pi: ExtensionAPI) {
       const lines = select(strip(readSession(path), { ids: true, textMax: RECALL_TEXT_MAX }), params.question, RECALL_MAX_CHARS);
       const { answer, model } = await ask(ctx.modelRegistry as unknown as Registry, handoffModels(), params.question, lines, signal);
       return { content: [{ type: "text", text: answer }], details: { model, session: path, lines: lines.length } };
+    },
+  });
+
+  pi.registerTool({
+    name: "handoff",
+    label: "handoff",
+    description: "Hand off early: at the end of this turn a handoff replaces the context, and you continue from it.",
+    parameters: Type.Object({}),
+    async execute(_id, _params, _signal, _onUpdate, ctx) {
+      requested = true;
+      const when = jobsRunning(sessionDir(ctx)) ? "after the running bash jobs end" : "at the end of this turn";
+      return { content: [{ type: "text", text: `The handoff comes ${when}.` }], details: {} };
     },
   });
 
