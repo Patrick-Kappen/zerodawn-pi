@@ -25,7 +25,7 @@ const schema = Type.Object({
   limit: Type.Optional(Type.Number({ description: `Max result lines. Default: ${GREP_LIMIT}.` })),
 });
 
-type Params = {
+export type Params = {
   pattern: string;
   path?: string;
   glob?: string;
@@ -69,6 +69,54 @@ export function jsonLine(line: string, name: (path: string) => string): { text: 
   return { text: `${path}${sep}${e.data.line_number}${sep} ${text}`, match: e.type === "match", path };
 }
 
+/** Cuts each line above GREP_LINE_MAX characters. */
+export const cutLines = (text: string) =>
+  text
+    .split("\n")
+    .map((l) => (l.length > GREP_LINE_MAX ? `${l.slice(0, GREP_LINE_MAX)}… [${l.length} chars]` : l))
+    .join("\n");
+
+/** Collects the lines of rg output in the form of the grep tool. `cap` drops the matches of a file after that number. */
+export class GrepLines {
+  readonly out: string[] = [];
+  readonly perFile = new Map<string, number>();
+  full = false;
+
+  constructor(
+    private readonly p: Params,
+    private readonly name: (path: string) => string,
+    private readonly limit: number,
+    private readonly cap?: number,
+  ) {}
+
+  /** Adds one line of rg output. False when the limit is reached. */
+  take(line: string): boolean {
+    if (!line || this.full) return !this.full;
+    if (this.p.filesOnly || this.p.count) this.out.push(this.name(line.replace(/:(\d+)$/, "")) + (this.p.count ? `:${line.match(/:(\d+)$/)?.[1]}` : ""));
+    else {
+      const r = jsonLine(line, this.name);
+      if (!r) return true;
+      const n = this.perFile.get(r.path) ?? 0;
+      if (this.cap !== undefined && n >= this.cap) return true;
+      this.out.push(r.text);
+      if (r.match) this.perFile.set(r.path, n + 1);
+    }
+    if (this.out.length >= this.limit) this.full = true;
+    return !this.full;
+  }
+
+  /** The result text with its notes: limit, files with the max of matches, rg errors. */
+  text(isDir: boolean, stderr: string): string {
+    if (this.out.length === 0) return "No matches found";
+    const notes: string[] = [];
+    if (this.full) notes.push(`[Limit of ${this.limit} lines reached. Use a narrower path, glob or type, or a higher limit.]`);
+    const capped = [...this.perFile].filter(([, n]) => isDir && n >= GREP_PER_FILE).map(([p]) => p);
+    if (capped.length) notes.push(`[Max ${GREP_PER_FILE} matches per file in: ${capped.join(", ")}. Search that file for more.]`);
+    if (stderr.trim()) notes.push(`[rg errors: ${stderr.trim().split("\n").slice(0, 3).join("; ")}]`);
+    return [this.out.join("\n"), ...notes].join("\n\n");
+  }
+}
+
 export function registerGrep(pi: ExtensionAPI, cwd: string) {
   pi.registerTool({
     name: "grep",
@@ -87,24 +135,11 @@ export function registerGrep(pi: ExtensionAPI, cwd: string) {
       const name = (p: string) => (isDir ? relative(target, p) || p : (params.path ?? p));
       return new Promise((resolve, reject) => {
         const child = spawn("rg", args, { cwd: base, stdio: ["ignore", "pipe", "pipe"], signal });
-        const out: string[] = [];
-        const perFile = new Map<string, number>();
+        const found = new GrepLines(params, name, limit);
         let rest = "";
         let stderr = "";
-        let full = false;
         const take = (line: string) => {
-          if (!line || full) return;
-          if (params.filesOnly || params.count) out.push(name(line.replace(/:(\d+)$/, "")) + (params.count ? `:${line.match(/:(\d+)$/)?.[1]}` : ""));
-          else {
-            const r = jsonLine(line, name);
-            if (!r) return;
-            out.push(r.text);
-            if (r.match) perFile.set(r.path, (perFile.get(r.path) ?? 0) + 1);
-          }
-          if (out.length >= limit) {
-            full = true;
-            child.kill();
-          }
+          if (!found.full && !found.take(line)) child.kill();
         };
         child.stdout.on("data", (chunk: Buffer) => {
           const lines = (rest + chunk.toString()).split("\n");
@@ -120,15 +155,9 @@ export function registerGrep(pi: ExtensionAPI, cwd: string) {
         });
         child.on("close", (code) => {
           take(rest);
-          if (!full && code !== 0 && code !== 1 && out.length === 0)
+          if (!found.full && code !== 0 && code !== 1 && found.out.length === 0)
             return reject(new Error(`grep: rg exited with code ${code}: ${stderr.trim() || "no message"}`));
-          if (out.length === 0) return resolve({ content: [{ type: "text", text: "No matches found" }], details: undefined });
-          const notes: string[] = [];
-          if (full) notes.push(`[Limit of ${limit} lines reached. Use a narrower path, glob or type, or a higher limit.]`);
-          const capped = [...perFile].filter(([, n]) => isDir && n >= GREP_PER_FILE).map(([p]) => p);
-          if (capped.length) notes.push(`[Max ${GREP_PER_FILE} matches per file in: ${capped.join(", ")}. Search that file for more.]`);
-          if (stderr.trim()) notes.push(`[rg errors: ${stderr.trim().split("\n").slice(0, 3).join("; ")}]`);
-          resolve({ content: [{ type: "text", text: [out.join("\n"), ...notes].join("\n\n") }], details: undefined });
+          resolve({ content: [{ type: "text", text: found.text(isDir, stderr) }], details: undefined });
         });
       });
     },

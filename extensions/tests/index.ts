@@ -1,13 +1,22 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { splitChain } from "../../shared/chain.ts";
+import { onRoutePart, routedChain } from "../../shared/route.ts";
 import { textOf } from "../../shared/util.ts";
 import { isCheck, isTest, loadRecipes, promptText, type Recipes, Tracker } from "./lib/recipes.ts";
-import { type Replacement, RunTests, TOOL } from "./lib/run.ts";
+import { partReport, type Replacement, RunTests, TOOL } from "./lib/run.ts";
 
 /** Bash runs this in place of a test or check command; the extension runs the command itself. */
 const NO_OP = ":";
 const EDIT_TOOLS = new Set(["edit", "write"]);
+
+/** A chain with a part that is not a cd, a test or a check: bash runs it, and only its test and check parts get a short result. */
+const mixed = (command: string) =>
+  splitChain(command)?.some((p) => {
+    const text = p.text.trim();
+    return text && !/^cd(\s|$)/.test(text) && !isTest(text) && !isCheck(text);
+  }) === true;
 
 export default function (pi: ExtensionAPI) {
   let tracker = new Tracker();
@@ -24,6 +33,11 @@ export default function (pi: ExtensionAPI) {
       path: Type.Optional(Type.String({ description: "Project directory, such as a git worktree. Default: the current directory." })),
     }),
     execute: (toolCallId, params, signal, _onUpdate, ctx) => runTests.execute(toolCallId, params, signal, ctx),
+  });
+
+  onRoutePart(pi, (part) => {
+    const kind = isTest(part) ? "tests" : isCheck(part) ? "check" : undefined;
+    return kind && { command: part, format: (output, exit) => partReport(kind, output, exit) };
   });
 
   pi.on("session_start", () => {
@@ -58,6 +72,7 @@ export default function (pi: ExtensionAPI) {
     if (event.toolName !== "bash" || typeof command !== "string") return;
     const reason = tracker.check(command, recipes);
     if (reason && !isTest(command)) return { block: true, reason };
+    if (routedChain(pi, command) && mixed(command)) return;
     // Not awaited: pi runs the tool_call handlers of parallel calls one after another, so a wait here holds the other calls.
     const replacement = isTest(command)
       ? runTests.insteadOfBash(event.toolCallId, command, ctx)

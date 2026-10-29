@@ -1,6 +1,6 @@
 # tests
 
-Gives the agent the tool `run_tests`. It runs the tests for the files that changed since the last commit, and returns one line when they pass, or only the failures and warnings. Test and check commands in bash run through it, with the same short result. It also puts the recipes of the project's `justfile` or `Makefile` in the system prompt, as `just <name>: <doc>`. The file is read again when it changes.
+Gives the agent the tool `run_tests`. It runs the tests for the files that changed since the last commit, and returns one line when they pass, or only the failures and warnings. Test and check commands in bash run through it, with the same short result. In a chain with other commands, such as `git add . && bun test && git commit`, bash runs the whole chain, and the test and check parts get the short result (`tests green: 3 pass, 0 fail`). It also puts the recipes of the project's `justfile` or `Makefile` in the system prompt, as `just <name>: <doc>`. The file is read again when it changes.
 
 ## run_tests
 

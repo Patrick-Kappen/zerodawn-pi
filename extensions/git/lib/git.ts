@@ -86,6 +86,44 @@ function compactPatch(text: string): string {
   return out.join("\n");
 }
 
+/** The parameters of the git tool. */
+export type GitParams = { action: "status" | "diff" | "log" | "show"; ref?: string; staged?: boolean; paths?: string[]; n?: number };
+
+/** The git arguments of the tool, after the global options. */
+export function gitArgs(params: GitParams): string[] {
+  if (params.ref?.startsWith("-")) throw new Error(`git: ref "${params.ref}" starts with "-". Give a commit or range, not an option.`);
+  const paths = params.paths ?? [];
+  const ref = params.ref ? [params.ref] : [];
+  const pathArgs = paths.length ? ["--", ...paths] : [];
+  switch (params.action) {
+    case "status":
+      return ["status", "--porcelain=v1", "-b", ...pathArgs];
+    case "diff":
+      return ["diff", ...(params.staged ? ["--cached"] : []), ...(paths.length ? PATCH : ["--numstat"]), ...ref, ...pathArgs];
+    case "log":
+      return ["log", "--oneline", "--no-decorate", `-n${Math.min(params.n ?? LOG_DEFAULT, LOG_MAX)}`, ...ref, ...pathArgs];
+    case "show":
+      return paths.length
+        ? ["show", ...PATCH, "--format=%h %s", ...(ref.length ? ref : ["HEAD"]), ...pathArgs]
+        : ["show", "--numstat", "--format=%h %an %ad%n%s%n%b", "--date=short", ...(ref.length ? ref : ["HEAD"])];
+  }
+}
+
+/** The compact text of the tool for the output of gitArgs. */
+export function compact(params: GitParams, stdout: string): string {
+  const paths = params.paths ?? [];
+  let text = stdout.trimEnd();
+  if (params.action === "status") text = compactStatus(text);
+  else if ((params.action === "diff" || params.action === "show") && paths.length) text = compactPatch(text);
+  else if (params.action === "diff") text = text && compactNumstat(text);
+  else if (params.action === "show") {
+    const lines = text.split("\n");
+    const i = lines.findIndex((l) => /^(\d+|-)\t(\d+|-)\t/.test(l));
+    text = i < 0 ? text : `${lines.slice(0, i).join("\n").trimEnd()}\n${compactNumstat(lines.slice(i).join("\n"))}`;
+  }
+  return text.replace(/\n{3,}/g, "\n\n") || "(no output)";
+}
+
 export function registerGit(pi: ExtensionAPI) {
   pi.registerTool({
     name: "git",
@@ -103,29 +141,7 @@ export function registerGit(pi: ExtensionAPI) {
     }),
 
     async execute(toolCallId, params, signal, _onUpdate, ctx) {
-      if (params.ref?.startsWith("-")) throw new Error(`git: ref "${params.ref}" starts with "-". Give a commit or range, not an option.`);
-      const paths = params.paths ?? [];
-      const ref = params.ref ? [params.ref] : [];
-      const pathArgs = paths.length ? ["--", ...paths] : [];
-      let args: string[];
-      switch (params.action) {
-        case "status":
-          args = ["status", "--porcelain=v1", "-b", ...pathArgs];
-          break;
-        case "diff":
-          args = ["diff", ...(params.staged ? ["--cached"] : []), ...(paths.length ? PATCH : ["--numstat"]), ...ref, ...pathArgs];
-          break;
-        case "log": {
-          const n = Math.min(params.n ?? LOG_DEFAULT, LOG_MAX);
-          args = ["log", "--oneline", "--no-decorate", `-n${n}`, ...ref, ...pathArgs];
-          break;
-        }
-        case "show":
-          args = paths.length
-            ? ["show", ...PATCH, "--format=%h %s", ...(ref.length ? ref : ["HEAD"]), ...pathArgs]
-            : ["show", "--numstat", "--format=%h %an %ad%n%s%n%b", "--date=short", ...(ref.length ? ref : ["HEAD"])];
-          break;
-      }
+      const args = gitArgs(params);
 
       const cwd = params.repo ? absolutePath(params.repo, ctx.cwd, { toolPath: false }) : ctx.cwd;
       let stdout: string;
@@ -136,16 +152,7 @@ export function registerGit(pi: ExtensionAPI) {
         throw new Error(`git ${args.join(" ")} failed in ${cwd}: ${stderr || err.message}`, { cause: err });
       }
 
-      let text = stdout.trimEnd();
-      if (params.action === "status") text = compactStatus(text);
-      else if ((params.action === "diff" || params.action === "show") && paths.length) text = compactPatch(text);
-      else if (params.action === "diff") text = text && compactNumstat(text);
-      else if (params.action === "show") {
-        const lines = text.split("\n");
-        const i = lines.findIndex((l) => /^(\d+|-)\t(\d+|-)\t/.test(l));
-        text = i < 0 ? text : `${lines.slice(0, i).join("\n").trimEnd()}\n${compactNumstat(lines.slice(i).join("\n"))}`;
-      }
-      text = text.replace(/\n{3,}/g, "\n\n") || "(no output)";
+      const text = compact(params, stdout);
       if (text.length <= INLINE_MAX) return { content: [{ type: "text", text }], details: {} };
       const log = callOutFile(ctx, toolCallId, "git");
       writeFileSync(log, text);

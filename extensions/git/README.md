@@ -9,9 +9,9 @@
 - `log`: one line per commit, default 10, max 50.
 - A result above 4000 characters goes to `<session>/out/<id>.git.log`; the result gives the path.
 
-## Guard
+## bash
 
-`git status`, `git diff`, `git log` and `git show` in a bash command are blocked with a hint to use the tool. Add `# raw-git` to the bash command to run them anyway.
+bash runs a `git status`, `git diff`, `git log` or `git show` part of a command with the git command of the tool, and the part gets the compact output of the tool. The known options of the part go into the tool parameters: `--cached`, `-n 5`, `-5`, a ref, and the paths after `--`. Options that the tool replaces, such as `--short` or `--oneline`, have no effect. A part with another option, two refs without `--`, or shell syntax (pipe, quote, redirect, `$`) runs as written.
 
 ## Changes
 
