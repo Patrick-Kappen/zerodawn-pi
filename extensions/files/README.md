@@ -26,11 +26,9 @@ Registers pi's `read`, `edit` and `write` tools again with shorter descriptions 
 ## Changes
 
 <!-- changelog:start -->
-## 0.6.0 — 2026-10-28
+## 0.7.0 — 2026-10-29
 
-- tests: separate unit and integration suites
-
-- tests: clean fixtures and isolate the supervisor environment
+- bash: convert git reads, file views and searches without refusal
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

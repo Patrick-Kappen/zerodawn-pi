@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0 — 2026-10-29
+
+- bash: convert git reads, file views and searches without refusal
+
 ## 0.6.0 — 2026-10-28
 
 - tests: separate unit and integration suites

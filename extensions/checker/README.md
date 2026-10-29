@@ -43,9 +43,9 @@ Every check goes to the session as a custom entry `checker` and as one JSON line
 ## Changes
 
 <!-- changelog:start -->
-## 0.4.0 — 2026-10-28
+## 0.5.0 — 2026-10-29
 
-- tests: separate unit and integration suites
+- judge only open points of the request
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

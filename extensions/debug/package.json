@@ -1,6 +1,6 @@
 {
   "name": "debug",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "`debug` tool: debug a program or test through the user's Neovim server and nvim-dap",
   "type": "module"
 }
