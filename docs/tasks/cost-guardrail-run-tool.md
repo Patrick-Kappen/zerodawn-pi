@@ -2,6 +2,12 @@
 
 A block costs a full call and gives nothing. Guardrail blocks are half of all tool errors. Run the right tool and return its result.
 
+## Status 2026-10-29
+
+- PR #153: no git or file view guard. A git read, file view or search in bash gets the output of the git, read or grep tool.
+- PR #154: a lone file view runs the read tool, and a lone file write runs the write tool.
+- Open: `sed -i` ([task](cost-sed-to-edit.md)), the wait guard, the recipe block, and checks that run again.
+
 ## Source
 
 - zerodawn-pi branch todo-cost-analysis (PR #119): TODO.md

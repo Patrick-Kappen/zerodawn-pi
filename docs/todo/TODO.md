@@ -63,6 +63,7 @@
 - [ ] Keep reset per task and cache warming ([task](../tasks/cost-keep-reset-and-warming.md))
 - [ ] Decrease the number of calls per task ([task](../tasks/cost-fewer-calls-per-task.md))
 - [ ] Run the right tool in place of a guardrail block ([task](../tasks/cost-guardrail-run-tool.md))
+- [ ] Parse bash commands with one tree-sitter parser ([task](../tasks/bash-shell-parser.md))
 - [ ] Send sed -i in bash to the edit tool ([task](../tasks/cost-sed-to-edit.md))
 - [ ] Group tool errors by cause and catch the frequent ones ([task](../tasks/cost-error-causes.md))
 - [ ] Script the repeated ADO access token command ([task](../tasks/cost-script-az-token.md))
