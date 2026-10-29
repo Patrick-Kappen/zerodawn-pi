@@ -15,6 +15,7 @@ We did not let pi run the tools during the script: that needs a channel from the
 A chain of only `cd`, test and check commands keeps the run_tests replacement and its cache.
 No extension refuses a part. A git read or a file view gets the output of the git, read or grep tool. A part that the tool cannot express runs as written, inside the output limits of bash.
 The guards and the `# raw-git` escape went: a refusal cost a turn, and the escape gave the full output back.
+A command of one part can name a tool, such as `read` for `cat` or `write` for a heredoc into a file. bash then runs that tool with `ctx.executeTool`, so its checks, its `tool_result` handlers and its `details.seen` apply. In a chain the shell runs the part, because a tool between two shell parts loses `cd` and variables.
 
 ## 44. The agent can start a bash job at once (2026-10-28)
 

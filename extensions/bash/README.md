@@ -24,7 +24,7 @@ Replaces pi's `bash` tool. Every command runs as a job without a terminal, like 
 The tool splits a command at its top-level `&&`, `||`, `;` and new lines. A loop, `if`, `case`, group, subshell, `$( )` or heredoc stays in one part. For each part it asks the other extensions on the `pi.events` channel `bash:route-part` how to run it. The shell runs the whole chain, so `cd`, variables and the chain logic stay.
 
 - A routed part runs as the command of its extension, between two markers. After the job, the extension changes the output of that part, for example to the compact form of the git tool.
-- A single command is one part, and gets its route too.
+- A single command is one part, and gets its route too. When its extension names a tool for it, that tool runs in place of the shell, and its result is the result of bash. No job starts.
 - A part that ends with `&` is not routed: its output mixes with the next parts.
 - The result names the raw output too: `full output: out:<id>.raw.bash`.
 - Guards ask on `bash:routes-chains` whether the tool routes chains. Then they leave a chain to the routing.

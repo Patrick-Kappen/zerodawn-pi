@@ -19,6 +19,8 @@ const reported: Job[] = [];
 const tools: any[] = [];
 const events = createEventBus();
 onRoutePart({ events }, (part) => (part === "echo routed" ? { command: "echo raw", format: (out, exit) => `${out} formatted ${exit}` } : undefined));
+onRoutePart({ events }, (part) => (part.startsWith("view ") ? { tool: { name: "read", args: { path: part.slice(5) } } } : undefined));
+const nested: unknown[] = [];
 registerBash(
   { registerTool: (t: any) => tools.push(t), events } as any,
   s,
@@ -32,6 +34,10 @@ const ctx = {
   cwd: dir,
   sessionManager: { getSessionFile: () => join(dir, "session.jsonl"), getBranch: () => [] },
   ui: { setStatus() {}, theme: { fg: (_c: string, t: string) => t } },
+  executeTool: async (name: string, args: { path: string }) => {
+    nested.push({ name, args });
+    return { result: { content: [{ type: "text", text: `lines of ${args.path}` }], details: { seen: 1 } }, isError: args.path === "gone" };
+  },
 };
 const bash = (params: Record<string, unknown>, id: string) => tools[0].execute(id, params, undefined, undefined, ctx);
 
@@ -44,6 +50,17 @@ test("a quick command returns its result inline", async () => {
 test("a routed part of a chain gets its format, and the other parts stay as they are", async () => {
   const r = await bash({ command: "echo a && echo routed; echo b" }, "r");
   assert.match(r.content[0].text, /^exit 0 \(\d+s\)\na\nraw formatted 0\nb\nfull output: \S+\.raw\.bash\S*$/);
+});
+
+test("a command of one part with a tool route gets the result of that tool, without a job", async () => {
+  const jobs = s.jobs.size;
+  assert.deepEqual(await bash({ command: "view a.ts" }, "t"), { content: [{ type: "text", text: "lines of a.ts" }], details: { seen: 1 }, isError: false });
+  assert.equal((await bash({ command: "view gone" }, "u")).isError, true);
+  assert.deepEqual(nested, [
+    { name: "read", args: { path: "a.ts" } },
+    { name: "read", args: { path: "gone" } },
+  ]);
+  assert.equal(s.jobs.size, jobs);
 });
 
 test("a failing command throws its result", async () => {

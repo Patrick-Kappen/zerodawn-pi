@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fileRoute, grepSpec, readSpec, shellWords } from "./route.ts";
+import { fileRoute, grepSpec, readSpec, shellWords, writeSpec } from "./route.ts";
 
 test("shell words keep plain quotes and refuse other shell syntax", () => {
   assert.deepEqual(shellWords(`grep -rn "a b" 'c$d' e`), ["grep", "-rn", "a b", "c$d", "e"]);
@@ -43,6 +43,35 @@ test("a read part gets the form of the read tool", () => {
   assert.equal(route.format!("1\n2\n3\n4", 0), "2\n3\n\n[Showing lines 2-3 of 4. Use offset=4 to continue.]");
   assert.match(fileRoute("sed -n 9p a.ts")!.format!("1\n2", 0), /offset 9 is beyond the end of a\.ts/);
   assert.equal(route.format!("cat: a.ts: No such file", 1), "cat: a.ts: No such file");
+  assert.deepEqual(route.tool, { name: "read", args: { path: "a.ts", offset: 2, limit: 2 } });
+});
+
+test("a heredoc into cat or tee, or an echo into a file, gives the write parameters", () => {
+  assert.deepEqual(writeSpec("cat > a.ts <<'EOF'\nx = $y\n\nEOF"), { path: "a.ts", content: "x = $y\n\n" });
+  assert.deepEqual(writeSpec("cat <<EOF >'my file'\nplain\nEOF"), { path: "my file", content: "plain\n" });
+  assert.deepEqual(writeSpec("cat > a <<-EOF\n\tin\n\tEOF"), { path: "a", content: "in\n" });
+  assert.deepEqual(writeSpec('tee a >/dev/null <<"EOF"\nt\nEOF'), { path: "a", content: "t\n" });
+  assert.deepEqual(writeSpec("echo 'a b' c > out.txt"), { path: "out.txt", content: "a b c\n" });
+  assert.deepEqual(fileRoute("echo x > a"), { tool: { name: "write", args: { path: "a", content: "x\n" } } });
+});
+
+test("a write that the write tool cannot express runs as written", () => {
+  for (const part of [
+    "cat >> a <<'EOF'\nx\nEOF",
+    "cat > a <<EOF\n$HOME\nEOF",
+    "cat > a 2>/dev/null <<'EOF'\nx\nEOF",
+    "cat > a <<'EOF'\nx\nEOF\nmore",
+    "cat > a",
+    'echo "<<EOF" > a',
+    "echo -e 'a\\n' > a",
+    "echo x &> a",
+    "echo x >| a",
+    "echo $x > a",
+    "tee -a a <<'EOF'\nx\nEOF",
+    "tee a <<'EOF'\nx\nEOF\n",
+    "sort > a <<'EOF'\nx\nEOF",
+  ])
+    assert.equal(writeSpec(part), undefined, part);
 });
 
 const match = (path: string, line: number, text: string) =>

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createEventBus } from "@earendil-works/pi-coding-agent";
 import { onRoutePart, routedChain } from "../../../shared/route.ts";
-import { formatOutput, registerChainRouting, routeChain } from "./chain.ts";
+import { formatOutput, registerChainRouting, routeChain, toolRoute } from "./chain.ts";
 
 function api() {
   const pi = { events: createEventBus() };
@@ -10,6 +10,7 @@ function api() {
   onRoutePart(pi, (part) => {
     if (part === "git log") return { command: "git --no-pager log --oneline", format: (out, exit) => `log ${exit}: ${out.toUpperCase()}` };
     if (part === "git add .") return { command: "git add -A" };
+    if (part.startsWith("cat")) return { tool: { name: "read", args: { path: part.slice(4) } } };
     return undefined;
   });
   return pi;
@@ -30,6 +31,14 @@ test("no routed part gives undefined, and a single command is routed too", () =>
   assert.equal(routeChain(api(), "cd x && ls"), undefined);
   assert.equal(routeChain(api(), "ls"), undefined);
   assert.deepEqual([...routeChain(api(), "git log")!.formats.keys()], [0]);
+});
+
+test("a tool route runs a command of one part, and a chain runs its tool part as written", () => {
+  assert.deepEqual(toolRoute(api(), "  cat a\n"), { name: "read", args: { path: "a" } });
+  assert.equal(toolRoute(api(), "cat a &"), undefined);
+  assert.equal(toolRoute(api(), "cd x && cat a"), undefined);
+  assert.equal(toolRoute(api(), "git log"), undefined);
+  assert.equal(routeChain(api(), "cd x && cat a"), undefined);
 });
 
 test("the output of a routed part goes through its format, and the markers go", () => {
