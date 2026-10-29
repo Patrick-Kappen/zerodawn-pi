@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0 — 2026-10-29
+
+- judge only open points of the request
+
 ## 0.4.0 — 2026-10-28
 
 - tests: separate unit and integration suites

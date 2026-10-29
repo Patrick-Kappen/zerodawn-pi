@@ -116,6 +116,46 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.25.0 — 2026-10-29
+
+### shared 0.12.0
+
+- bash: convert git reads, file views and searches without refusal
+- bash: run each part of a chain with the tool of that part
+- add splitChain to split a bash chain into its parts
+
+### bash 0.13.0
+
+- convert git reads, file views and searches without refusal
+- run each part of a chain with the tool of that part
+
+### checker 0.5.0
+
+- judge only open points of the request
+
+### debug 0.1.2
+
+- use a plain template for the Lua source
+
+### files 0.7.0
+
+- bash: convert git reads, file views and searches without refusal
+
+### git 0.7.0
+
+- bash: convert git reads, file views and searches without refusal
+- bash: run each part of a chain with the tool of that part
+
+### tests 0.10.0
+
+- bash: run each part of a chain with the tool of that part
+
+### repository
+
+- checker: judge only open points of the request
+- bash: convert git reads, file views and searches without refusal
+- bash: run each part of a chain with the tool of that part
+
 ## 0.24.0 — 2026-10-28
 
 ### bash 0.12.0
@@ -137,24 +177,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 - lsp: end a clean file on quiet LSP progress, not a timeout
 - debug: add a debug tool that drives nvim-dap in the user's nvim
 - lsp: report LSP errors after edit and write from the user's nvim
-
-## 0.22.0 — 2026-10-28
-
-### bash 0.11.0
-
-- wait inline for a call alone in its message
-
-### tests 0.9.0
-
-- run the tests of a file after each edit, report only red (breaking)
-
-### repository
-
-- docs: put the test hook decision on top as 39
-- ci: read the bun pass lines also with colour codes
-- ci: keep the git variables of a hook away from the tests
-- ci: test staged files at commit, every test at push
-- bash: wait inline for a call alone in its message
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

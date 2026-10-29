@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.25.0 — 2026-10-29
+
+### shared 0.12.0
+
+- bash: convert git reads, file views and searches without refusal
+- bash: run each part of a chain with the tool of that part
+- add splitChain to split a bash chain into its parts
+
+### bash 0.13.0
+
+- convert git reads, file views and searches without refusal
+- run each part of a chain with the tool of that part
+
+### checker 0.5.0
+
+- judge only open points of the request
+
+### debug 0.1.2
+
+- use a plain template for the Lua source
+
+### files 0.7.0
+
+- bash: convert git reads, file views and searches without refusal
+
+### git 0.7.0
+
+- bash: convert git reads, file views and searches without refusal
+- bash: run each part of a chain with the tool of that part
+
+### tests 0.10.0
+
+- bash: run each part of a chain with the tool of that part
+
+### repository
+
+- checker: judge only open points of the request
+- bash: convert git reads, file views and searches without refusal
+- bash: run each part of a chain with the tool of that part
+
 ## 0.24.0 — 2026-10-28
 
 ### bash 0.12.0

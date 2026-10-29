@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.13.0 — 2026-10-29
+
+- convert git reads, file views and searches without refusal
+- run each part of a chain with the tool of that part
+
 ## 0.12.0 — 2026-10-28
 
 - let the agent start a job at once with background

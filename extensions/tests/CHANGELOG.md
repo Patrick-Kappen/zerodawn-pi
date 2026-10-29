@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0 — 2026-10-29
+
+- bash: run each part of a chain with the tool of that part
+
 ## 0.9.0 — 2026-10-28
 
 - run the tests of a file after each edit, report only red (breaking)

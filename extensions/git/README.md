@@ -16,9 +16,10 @@ bash runs a `git status`, `git diff`, `git log` or `git show` part of a command 
 ## Changes
 
 <!-- changelog:start -->
-## 0.6.0 — 2026-10-28
+## 0.7.0 — 2026-10-29
 
-- tests: separate unit and integration suites
+- bash: convert git reads, file views and searches without refusal
+- bash: run each part of a chain with the tool of that part
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

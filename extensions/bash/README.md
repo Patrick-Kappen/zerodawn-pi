@@ -65,9 +65,10 @@ Jobs survive a pi restart: `session_start` reads the job files, reports jobs tha
 ## Changes
 
 <!-- changelog:start -->
-## 0.12.0 — 2026-10-28
+## 0.13.0 — 2026-10-29
 
-- let the agent start a job at once with background
+- convert git reads, file views and searches without refusal
+- run each part of a chain with the tool of that part
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

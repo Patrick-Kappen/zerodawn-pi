@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.0 — 2026-10-29
+
+- bash: convert git reads, file views and searches without refusal
+- bash: run each part of a chain with the tool of that part
+- add splitChain to split a bash chain into its parts
+
 ## 0.11.0 — 2026-10-28
 
 - tests: separate unit and integration suites

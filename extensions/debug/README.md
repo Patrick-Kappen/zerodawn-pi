@@ -22,9 +22,9 @@ A stop reports the reason, `file:line`, the source line, the top 10 stack frames
 ## Changes
 
 <!-- changelog:start -->
-## 0.1.1 — 2026-10-28
+## 0.1.2 — 2026-10-29
 
-- README: add the changelog block
+- use a plain template for the Lua source
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

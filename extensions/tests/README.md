@@ -67,9 +67,9 @@ A command of 80 characters or more that runs for the third time gets a hint in i
 ## Changes
 
 <!-- changelog:start -->
-## 0.9.0 — 2026-10-28
+## 0.10.0 — 2026-10-29
 
-- run the tests of a file after each edit, report only red (breaking)
+- bash: run each part of a chain with the tool of that part
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
