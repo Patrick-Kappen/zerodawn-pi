@@ -5,11 +5,13 @@ import {
   BACKGROUND_JOBS_QUERY,
   backgroundJobRunning,
   buildState,
+  clipEnd,
   decide,
   FOLLOWUP_TYPE,
   followupText,
   newReasons,
   QUESTIONS,
+  REASONS,
   shouldCheck,
   shouldSkip,
 } from "./index.ts";
@@ -41,34 +43,36 @@ const handoffWarning = {
   display: true,
 };
 
-test("buildState takes only the run since the last user message", () => {
+test("buildState takes the request, the agent message before it, and the answers, but no tool log", () => {
   const entries = [
     msg({ role: "user", content: "old" }),
-    msg({ role: "assistant", content: [{ type: "text", text: "old answer" }] }),
-    msg({ role: "user", content: [{ type: "text", text: "fix the bug" }] }),
+    msg({ role: "assistant", content: [{ type: "text", text: "Shall I fix the bug in a.ts?" }, call("0", "read", { path: "a.ts" })] }),
+    result("0", "read", "ok"),
+    msg({ role: "user", content: [{ type: "text", text: "ja" }] }),
     msg({ role: "assistant", content: [call("1", "edit", { path: "a.ts" })] }),
     result("1", "edit", "ok"),
     msg({ role: "assistant", content: [call("2", "run_tests", {})] }),
     result("2", "run_tests", "1 failed", true),
-    msg({ role: "assistant", content: [call("3", "write", { path: "b.ts" })] }),
-    result("3", "write", "ok"),
     msg({ role: "assistant", content: [{ type: "text", text: "Half done." }] }),
     followup(["Finish the task."]),
     msg({ role: "assistant", content: [call("4", "bash", { command: "just check" })] }),
     result("4", "bash", "ok"),
     msg({ role: "assistant", content: [{ type: "text", text: "Done." }] }),
   ];
-  const s = buildState(entries);
-  assert.ok(s);
-  assert.equal(s.request, "fix the bug");
-  assert.equal(s.finalAnswer, "Half done.");
-  assert.equal(s.rebuttal, "Done.");
-  assert.deepEqual(s.edits, ["a.ts", "b.ts"]);
-  assert.deepEqual(s.toolErrors, [{ tool: "run_tests", text: "1 failed" }]);
-  assert.deepEqual(s.toolsUsed, { edit: 1, run_tests: 1, write: 1, bash: 1 });
-  assert.equal(s.followupsUsed, 1);
-  assert.deepEqual(s.sentReasons, ["Finish the task."]);
-  assert.equal(s.rebutted, false);
+  assert.deepEqual(buildState(entries), {
+    previousAnswer: "Shall I fix the bug in a.ts?",
+    request: "ja",
+    finalAnswer: "Half done.",
+    rebuttal: "Done.",
+    followupsUsed: 1,
+    sentReasons: ["Finish the task."],
+    rebutted: false,
+  });
+});
+
+test("clipEnd keeps the end of a long previous answer, where its question is", () => {
+  assert.equal(clipEnd("abcdef", 3), "…def");
+  assert.equal(clipEnd("abc", 3), "abc");
 });
 
 test("buildState takes finalAnswer from before the first follow-up and the rebuttal after the last", () => {
@@ -139,49 +143,35 @@ test("buildState returns undefined without a user message", () => {
 });
 
 const bool = (probability: number) => ({ type: "bool", probability });
-const done = {
-  status: { type: "choice", choice: "done", confidence: 0.9 },
-  open_error: bool(0.1),
-  in_scope: bool(0.1),
-  question_answerable: bool(0.1),
-  completeness: { type: "score", score: 3, confidence: 0.9 },
-  rule_violation: bool(0.9),
-};
+const settled = { open_point: bool(0.1), in_request: bool(0.1), agent_can_do: bool(0.1), question_answerable: bool(0.1) };
+const open = (inRequest: number, agentCanDo: number) => ({ ...settled, open_point: bool(0.9), in_request: bool(inRequest), agent_can_do: bool(agentCanDo) });
 
-test("QUESTIONS tell the classifier that a step for the user is not an open point", () => {
-  for (const text of [QUESTIONS.status.criteria.incomplete, QUESTIONS.open_error.instructions, QUESTIONS.in_scope.instructions])
-    assert.match(text, /step left for the user, such as a merge, rebuild, restart or decision, is not an open point/);
+test("QUESTIONS tell the classifier that a step for the user and a side finding are not work to do", () => {
+  assert.match(QUESTIONS.agent_can_do.instructions, /merge, push, release, rebuild, restart, reboot/);
+  assert.match(QUESTIONS.in_request.instructions, /side finding, a defect outside the request, an unrelated failing test/);
+  assert.match(QUESTIONS.in_request.instructions, /When request is a question, an answer to the question completes it/);
 });
 
-test("decide settles a finished run, also with a rule violation", () => {
-  assert.deepEqual(decide(done), []);
+test("decide settles an answer that names no open point", () => {
+  assert.deepEqual(decide(settled), []);
 });
 
-test("decide sends back an open error in scope only", () => {
-  assert.equal(decide({ ...done, open_error: bool(0.9), in_scope: bool(0.9) }).length, 1);
-  assert.equal(decide({ ...done, open_error: bool(0.9), in_scope: bool(0.3) }).length, 0);
+test("decide sends back an open point only when it is in the request and needs no user", () => {
+  assert.deepEqual(decide(open(0.9, 0.9)), [REASONS.open]);
+  assert.deepEqual(decide(open(0.2, 0.9)), [], "a side finding outside the request settles");
+  assert.deepEqual(decide(open(0.9, 0.2)), [], "a step for the user settles");
 });
 
-test("decide sends back a question the agent can answer, not one for the user", () => {
-  const q = { ...done, status: { type: "choice", choice: "question", confidence: 0.9 } };
-  assert.equal(decide({ ...q, question_answerable: bool(0.9) }).length, 1);
-  assert.equal(decide({ ...q, question_answerable: bool(0.2) }).length, 0);
+test("decide settles an answer to a question that also reports a side finding", () => {
+  const answered = { ...settled, open_point: bool(0.95), in_request: bool(0.15), agent_can_do: bool(0.9) };
+  assert.deepEqual(decide(answered), []);
 });
 
-test("decide sends back an offered step the agent can do, not one that needs a user choice", () => {
-  assert.deepEqual(decide({ ...done, next_step_offered: bool(0.9) }), ["Do the step that you offered."]);
-  assert.equal(decide({ ...done, next_step_offered: bool(0.3) }).length, 0);
-});
-
-test("decide sends back a check that the agent left open", () => {
-  assert.deepEqual(decide({ ...done, unchecked: bool(0.9) }), ["Do the check that you left open."]);
-  assert.equal(decide({ ...done, unchecked: bool(0.3) }).length, 0);
-});
-
-test("decide sends back incomplete work", () => {
-  assert.equal(decide({ ...done, status: { type: "choice", choice: "incomplete", confidence: 0.8 } }).length, 1);
-  assert.equal(decide({ ...done, status: { type: "choice", choice: "incomplete", confidence: 0.5 } }).length, 0);
-  assert.equal(decide({ ...done, completeness: { type: "score", score: 1, confidence: 0.6 } }).length, 1);
+test("decide sends back a question in the request that the agent can answer, not one for the user", () => {
+  const inRequest = { ...settled, in_request: bool(0.9) };
+  assert.deepEqual(decide({ ...inRequest, question_answerable: bool(0.9) }), [REASONS.question]);
+  assert.deepEqual(decide({ ...inRequest, question_answerable: bool(0.2) }), []);
+  assert.deepEqual(decide({ ...settled, question_answerable: bool(0.9) }), [], "a question outside the request settles");
 });
 
 test("followupText lists each reason", () => {

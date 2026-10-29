@@ -1,8 +1,8 @@
 /**
  * Checker: asks a classifier, before pi settles, whether the agent really finished.
  *
- * On agent_before_settle it builds a state of the run since the last user message
- * and asks all questions in one classify() call. Fixed thresholds in decide() turn the
+ * On agent_before_settle it builds a state from the last user message, the agent message before it,
+ * and the final answer, and asks all questions in one classify() call. Fixed thresholds in decide() turn the
  * answers into reasons. With a reason, a hidden message asks the agent for one more turn.
  * At most MAX_FOLLOWUPS per user message; tool calls do not reset the count. A follow-up answers only
  * with text and no tool call is a rebuttal, so the checker stops. Every check goes to the session and to a JSONL log.
@@ -20,7 +20,6 @@ const CLASSIFIER = (process.env.PI_CHECKER_CLASSIFIER ?? "typesafe/Decision-1").
 const LOG = process.env.PI_CHECKER_LOG ?? join(homedir(), ".pi", "agent", "checker.jsonl");
 export const MAX_FOLLOWUPS = 3;
 export const FOLLOWUP_TYPE = "checker-followup";
-const EDIT_TOOLS = new Set(["edit", "write"]);
 export const BACKGROUND_JOBS_QUERY = "bash:background-jobs";
 
 /** The bash extension answers synchronously; without it nothing answers and the result is false. */
@@ -64,7 +63,23 @@ export function shouldSkip(state: { rebutted: boolean }) {
   return state.rebutted;
 }
 
-/** State of the run since the last user message, from session branch entries. */
+const lastText = (entries: any[]) => {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i];
+    if (e.type !== "message" || e.message.role !== "assistant") continue;
+    const t = text(e.message.content);
+    if (t.trim()) return t;
+  }
+  return "";
+};
+
+/** The end of a long text, where an answer puts its question or offer. */
+export const clipEnd = (s: string, n: number) => (s.length > n ? `…${s.slice(-n)}` : s);
+
+/**
+ * State of the run since the last user message, from session branch entries.
+ * Only the request and the answers go in: the checker judges what the agent says is open, not the tool log.
+ */
 export function buildState(entries: any[]) {
   let start = -1;
   for (let i = entries.length - 1; i >= 0; i--) {
@@ -75,10 +90,6 @@ export function buildState(entries: any[]) {
   }
   if (start < 0) return undefined;
   const run = entries.slice(start + 1);
-  const calls = new Map<string, { name: string; args: any }>();
-  const toolErrors: { tool: string; text: string }[] = [];
-  const edits = new Set<string>();
-  const toolsUsed: Record<string, number> = {};
   let firstFollowup = -1;
   let lastFollowup = -1;
   let followups = 0;
@@ -104,104 +115,68 @@ export function buildState(entries: any[]) {
     if (firstFollowup < 0 || i < firstFollowup) {
       if (t.trim()) finalAnswer = t;
     }
-    if (lastFollowup >= 0 && i > lastFollowup && t.trim()) rebuttal = t;
-    for (const c of Array.isArray(m.content) ? m.content : []) {
-      if (c.type !== "toolCall") continue;
-      if (lastFollowup >= 0 && i > lastFollowup) toolCallsAfterFollowup++;
-      calls.set(c.id, { name: c.name, args: c.arguments });
-      toolsUsed[c.name] = (toolsUsed[c.name] ?? 0) + 1;
+    if (lastFollowup >= 0 && i > lastFollowup) {
+      if (t.trim()) rebuttal = t;
+      for (const c of Array.isArray(m.content) ? m.content : []) if (c.type === "toolCall") toolCallsAfterFollowup++;
     }
   }
-  for (let i = 0; i < run.length; i++) {
-    const e = run[i];
-    if (e.type !== "message" || e.message.role !== "toolResult") continue;
-    const m = e.message;
-    const call = calls.get(m.toolCallId);
-    const name = call?.name ?? m.toolName;
-    if (m.isError) toolErrors.push({ tool: name, text: clip(text(m.content), 600) });
-    if (EDIT_TOOLS.has(name) && !m.isError && call?.args?.path) edits.add(String(call.args.path));
-  }
   return {
+    previousAnswer: clipEnd(lastText(entries.slice(0, start)), 3000),
     request: clip(text(entries[start].message.content), 4000),
     finalAnswer: clip(finalAnswer, 6000),
     rebuttal: clip(rebuttal, 6000),
-    toolErrors: toolErrors.slice(-8),
-    edits: [...edits],
-    toolsUsed,
     followupsUsed: followups,
     sentReasons,
     rebutted: lastFollowup >= 0 && toolCallsAfterFollowup === 0 && rebuttal.trim().length > 0,
   };
 }
 
+const NEEDS_USER =
+  "A merge, push, release, rebuild, restart, reboot, a manual test in a GUI or on hardware, access, or a choice between options needs the user. Work that the answer hands to a next session needs the user.";
+
 export const QUESTIONS = {
-  status: {
-    type: "choice",
-    instructions: "A coding agent ended its turn with finalAnswer for the user's request. What is the state of the work?",
-    criteria: {
-      done: "The request is fully handled and the answer states the result.",
-      incomplete:
-        "Parts of the request are not done, or the answer stops halfway. A step left for the user, such as a merge, rebuild, restart or decision, is not an open point.",
-      blocked: "The agent cannot continue without something outside its reach: access, a decision of the user, a missing service.",
-      question: "The answer ends with a question to the user.",
-    },
-  },
-  open_error: {
+  open_point: {
     type: "bool",
     instructions:
-      "Does finalAnswer or toolErrors show an error, bug or failing check that the agent did not fix? A step left for the user, such as a merge, rebuild, restart or decision, is not an open point.",
-    criteria: { true: "An error stays unfixed.", false: "No unfixed error." },
+      "A coding agent ended its turn with finalAnswer to the user's request. previousAnswer is the agent message that request replies to. Does finalAnswer name a point that stays open: a part of the request that is not done, an error that is not fixed, a check that is not done, a next step that it offers, or a step that it announces (for example 'first I look at X') but did not do?",
+    criteria: { true: "finalAnswer names an open point.", false: "finalAnswer names no open point." },
   },
-  in_scope: {
+  in_request: {
     type: "bool",
     instructions:
-      "If an error or open point stays, is fixing it part of the request or of normal project rules (tests, lint, types)? A step left for the user, such as a merge, rebuild, restart or decision, is not an open point.",
-    criteria: { true: "Fixing it belongs to the task.", false: "It is outside the task, or nothing stays open." },
+      "If finalAnswer names an open point, did the user ask for that work in request (read request together with previousAnswer)? A side finding, a defect outside the request, an unrelated failing test, or an improvement that the user did not ask for is not part of the request. When request is a question, an answer to the question completes it.",
+    criteria: { true: "The open point is work that the user asked for.", false: "The open point is outside the request, or no point stays open." },
+  },
+  agent_can_do: {
+    type: "bool",
+    instructions: `If finalAnswer names an open point, can the agent close it now with its own tools (read files, logs or code, run commands, edit files), without an answer or action of the user? A step that the agent announced and can start with its tools needs no user. ${NEEDS_USER}`,
+    criteria: { true: "The agent can close the point now without the user.", false: "The point needs the user, or no point stays open." },
   },
   question_answerable: {
     type: "bool",
-    instructions: "If finalAnswer asks the user a question, can the agent find the answer itself by reading code, docs or running tools?",
-    criteria: { true: "The agent can find it itself.", false: "Only the user knows it, or there is no question." },
-  },
-  next_step_offered: {
-    type: "bool",
     instructions:
-      "Does finalAnswer propose or offer a next step (for example 'shall I do X?') that belongs to the request, that the agent can do itself with its tools, and that needs no choice that only the user can make?",
-    criteria: { true: "The agent offers a step that it can simply do.", false: "No such step, or the step needs a choice of the user." },
-  },
-  unchecked: {
-    type: "bool",
-    instructions:
-      "Does finalAnswer say that the agent did not check, test, look up or verify a point of the request, while the agent can do that now itself with its tools (read files, logs or code, run a command)? A step left for the user, such as a merge, push permission, rebuild, restart, a manual test in a GUI or on hardware, or a decision, is not such a point. Work that the answer hands to a next session is not such a point.",
+      "Is the last sentence of finalAnswer a question from the agent to the user, and can the agent find its answer itself by reading code, docs or logs, or by running tools? The request is not this question. A question about what the user wants, or whether to do work outside the request, needs the user.",
     criteria: {
-      true: "The agent left a check undone that it can do itself now.",
-      false: "Nothing is left unchecked, or only the user or a next session can do it.",
+      true: "finalAnswer ends with a question that the agent can answer itself.",
+      false: "finalAnswer does not end with a question, or only the user knows the answer.",
     },
-  },
-  completeness: {
-    type: "score",
-    instructions: "How completely does finalAnswer handle the request?",
-    criteria: ["Barely started", "Partly done", "Mostly done, small gaps", "Fully done"],
-  },
-  rule_violation: {
-    type: "bool",
-    instructions: "Did the agent do work outside the request, such as unrelated changes or actions the user did not ask for?",
-    criteria: { true: "It did work outside the request.", false: "It stayed inside the request." },
   },
 } as const;
 
 type Answers = Record<string, any>;
 
-/** Reasons for one more turn; empty means settle. rule_violation is only logged. */
+export const REASONS = {
+  open: "Close the open point of the request. You can do it without the user.",
+  question: "Find the answer to your question yourself.",
+};
+
+/** Reasons for one more turn; empty means settle. Only work inside the request that needs no user sends the agent back. */
 export function decide(a: Answers): string[] {
   const reasons: string[] = [];
   const p = (id: string) => (a[id]?.type === "bool" ? a[id].probability : 0);
-  if (p("open_error") > 0.7 && p("in_scope") > 0.6) reasons.push("Fix the error in scope.");
-  if (a.status?.choice === "question" && p("question_answerable") > 0.7) reasons.push("Find the answer yourself.");
-  if (p("next_step_offered") > 0.7) reasons.push("Do the step that you offered.");
-  if (p("unchecked") > 0.7) reasons.push("Do the check that you left open.");
-  if ((a.status?.choice === "incomplete" && a.status.confidence > 0.7) || (a.completeness?.type === "score" && a.completeness.score <= 1))
-    reasons.push("Finish the task.");
+  if (p("in_request") <= 0.7) return reasons;
+  if (p("open_point") > 0.7 && p("agent_can_do") > 0.7) reasons.push(REASONS.open);
+  if (p("question_answerable") > 0.7) reasons.push(REASONS.question);
   return reasons;
 }
 
