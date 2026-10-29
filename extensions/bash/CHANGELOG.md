@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.14.0 — 2026-10-29
+
+- run a lone file view with read and a file write with write
+
 ## 0.13.0 — 2026-10-29
 
 - convert git reads, file views and searches without refusal

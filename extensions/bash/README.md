@@ -65,10 +65,9 @@ Jobs survive a pi restart: `session_start` reads the job files, reports jobs tha
 ## Changes
 
 <!-- changelog:start -->
-## 0.13.0 — 2026-10-29
+## 0.14.0 — 2026-10-29
 
-- convert git reads, file views and searches without refusal
-- run each part of a chain with the tool of that part
+- run a lone file view with read and a file write with write
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

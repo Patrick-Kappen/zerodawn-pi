@@ -27,11 +27,9 @@ Unit tests: `util.test.ts` and `report.test.ts`. Integration tests: `store.integ
 ## Changes
 
 <!-- changelog:start -->
-## 0.12.0 — 2026-10-29
+## 0.13.0 — 2026-10-29
 
-- bash: convert git reads, file views and searches without refusal
-- bash: run each part of a chain with the tool of that part
-- add splitChain to split a bash chain into its parts
+- bash: run a lone file view with read and a file write with write
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

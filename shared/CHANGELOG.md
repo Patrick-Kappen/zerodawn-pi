@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.0 — 2026-10-29
+
+- bash: run a lone file view with read and a file write with write
+
 ## 0.12.0 — 2026-10-29
 
 - bash: convert git reads, file views and searches without refusal
