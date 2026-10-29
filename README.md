@@ -116,6 +116,29 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.26.0 — 2026-10-29
+
+### shared 0.13.0
+
+- bash: run a lone file view with read and a file write with write
+
+### bash 0.14.0
+
+- run a lone file view with read and a file write with write
+
+### files 0.8.0
+
+- bash: run a lone file view with read and a file write with write
+
+### repository
+
+- repo: lock the links between extensions before the core refactor
+- docs: core-owner: drop the guard defects that #153 fixed
+- docs: core-owner: count a job open until its report arrives
+- docs: plan one tree-sitter parser for bash commands, and sed -i to edit
+- docs: plan core as owner of the run outcome
+- bash: run a lone file view with read and a file write with write
+
 ## 0.25.0 — 2026-10-29
 
 ### shared 0.12.0
@@ -165,18 +188,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ### repository
 
 - bash: let the agent start a job at once with background
-
-## 0.23.0 — 2026-10-28
-
-### lsp 0.1.1
-
-- end a clean file on quiet LSP progress, not a timeout
-
-### repository
-
-- lsp: end a clean file on quiet LSP progress, not a timeout
-- debug: add a debug tool that drives nvim-dap in the user's nvim
-- lsp: report LSP errors after edit and write from the user's nvim
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->

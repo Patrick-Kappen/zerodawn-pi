@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.26.0 — 2026-10-29
+
+### shared 0.13.0
+
+- bash: run a lone file view with read and a file write with write
+
+### bash 0.14.0
+
+- run a lone file view with read and a file write with write
+
+### files 0.8.0
+
+- bash: run a lone file view with read and a file write with write
+
+### repository
+
+- repo: lock the links between extensions before the core refactor
+- docs: core-owner: drop the guard defects that #153 fixed
+- docs: core-owner: count a job open until its report arrives
+- docs: plan one tree-sitter parser for bash commands, and sed -i to edit
+- docs: plan core as owner of the run outcome
+- bash: run a lone file view with read and a file write with write
+
 ## 0.25.0 — 2026-10-29
 
 ### shared 0.12.0

@@ -27,9 +27,9 @@ Registers pi's `read`, `edit` and `write` tools again with shorter descriptions 
 ## Changes
 
 <!-- changelog:start -->
-## 0.7.0 — 2026-10-29
+## 0.8.0 — 2026-10-29
 
-- bash: convert git reads, file views and searches without refusal
+- bash: run a lone file view with read and a file write with write
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
