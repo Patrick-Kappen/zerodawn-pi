@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { splitChain } from "../../../shared/chain.ts";
-import { ROUTES_CHAINS, routePart } from "../../../shared/route.ts";
+import { ROUTES_CHAINS, type Route, routePart } from "../../../shared/route.ts";
 
 type Format = (output: string, exit: number) => string;
 
@@ -13,6 +13,13 @@ export function registerChainRouting(pi: Pick<ExtensionAPI, "events">): void {
   pi.events.on(ROUTES_CHAINS, (data) => {
     (data as { on: boolean }).on = true;
   });
+}
+
+/** The tool that runs a command of one part in place of the shell; undefined for a chain or a background command. */
+export function toolRoute(pi: Pick<ExtensionAPI, "events">, command: string): Route["tool"] {
+  const parts = splitChain(command)?.filter((part) => part.text.trim());
+  if (parts?.length !== 1 || parts[0].sep === "&") return undefined;
+  return routePart(pi, parts[0].text.trim())?.tool;
 }
 
 /**
@@ -30,7 +37,7 @@ export function routeChain(pi: Pick<ExtensionAPI, "events">, command: string): R
       const text = part.text.trim();
       // A background part writes into the output of the next parts, so its markers would not enclose it.
       const route = text && part.sep !== "&" ? routePart(pi, text) : undefined;
-      if (!route) return part.text + part.sep;
+      if (!route?.command) return part.text + part.sep;
       routed = true;
       const [before, after] = [part.text.match(/^\s*/)![0], part.text.match(/\s*$/)![0]];
       if (!route.format) return `${before}${route.command}${after}${part.sep}`;

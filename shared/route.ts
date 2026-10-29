@@ -8,9 +8,14 @@ export const ROUTES_CHAINS = "bash:routes-chains";
 
 /**
  * How the bash tool runs one part of a command. `command` runs in the shell in place of the part, and `format`
- * changes the output of that part after the job.
+ * changes the output of that part after the job. When the part is the whole command, `tool` runs in place of the
+ * shell, with the checks and the result of that tool. A part without `command` runs as written in a chain.
  */
-export type Route = { command: string; format?: (output: string, exit: number) => string };
+export type Route = {
+  command?: string;
+  format?: (output: string, exit: number) => string;
+  tool?: { name: string; args: Record<string, unknown> };
+};
 
 /** bash emits one query per part. The first extension that knows the part sets route. */
 export type RouteQuery = { part: string; route?: Route };

@@ -14,7 +14,7 @@ writeFileSync(join(dir, "src/b.ts"), "export const bar = 1;\nconst foo = bar;\n"
 
 function run(part: string): string {
   const route = fileRoute(part);
-  if (!route?.format) throw new Error(`no route for ${part}`);
+  if (!route?.format || !route.command) throw new Error(`no route for ${part}`);
   const r = spawnSync("bash", ["-c", route.command], { cwd: dir, encoding: "utf8" });
   return route.format((r.stdout + r.stderr).replace(/\n+$/, ""), r.status ?? -1);
 }

@@ -96,8 +96,10 @@ export function readSpec(words: string[]): ReadSpec | undefined {
   return undefined;
 }
 
+// In a chain the shell reads the file, because a cd before the part can change the path.
 function readRoute(spec: ReadSpec): Route {
   return {
+    tool: { name: "read", args: { ...spec } },
     command: `cat -- ${quote(spec.path)}`,
     format: (output, exit) => {
       if (exit !== 0 || output.includes("\0")) return output;
@@ -230,8 +232,48 @@ function grepRoute({ params, target }: GrepSpec): Route {
   };
 }
 
-/** The read or grep tool for a file view or search in bash. Other parts run as written. */
+type WriteSpec = { path: string; content: string };
+
+// One "> path" of a simple command; ">>", ">|", "2>" and "&>" stay in the rest, and shellWords refuses them.
+function outRedirect(line: string): { rest: string; target?: string } | undefined {
+  const m = line.match(/(^|\s)>\s*((?:'[^']*'|"[^"]*"|[^\s'"<>|&;()])+)/);
+  if (!m) return { rest: line };
+  const target = shellWords(m[2]);
+  if (target?.length !== 1) return undefined;
+  return { rest: `${line.slice(0, m.index)} ${line.slice(m.index! + m[0].length)}`, target: target[0] };
+}
+
+/** The write tool parameters for a file write in bash: cat or tee with a heredoc, or echo, into one file. */
+export function writeSpec(part: string): WriteSpec | undefined {
+  const lines = part.split("\n");
+  let head = lines[0];
+  let body: string[] | undefined;
+  const doc = head.match(/<<(-?)\s*(['"]?)([\w.-]+)\2/);
+  if (doc) {
+    const tabs = (line: string) => (doc[1] ? line.replace(/^\t+/, "") : line);
+    body = lines.slice(1).map(tabs);
+    if (!body.length || body.indexOf(doc[3]) !== body.length - 1) return undefined;
+    body.pop();
+    // Without quotes around the delimiter, the shell expands $, ` and \ in the body.
+    if (!doc[2] && body.some((line) => /[$`\\]/.test(line))) return undefined;
+    head = head.slice(0, doc.index) + head.slice(doc.index! + doc[0].length);
+  } else if (lines.length > 1) return undefined;
+  const out = outRedirect(head);
+  const words = out && shellWords(out.rest);
+  if (!out || !words?.length) return undefined;
+  const [cmd, ...args] = words;
+  const content = body?.map((line) => `${line}\n`).join("");
+  if (cmd === "cat" && content !== undefined && !args.length && out.target) return { path: out.target, content };
+  if (cmd === "tee" && content !== undefined && args.length === 1 && !args[0].startsWith("-") && (!out.target || out.target === "/dev/null"))
+    return { path: args[0], content };
+  if (cmd === "echo" && !body && out.target && !args[0]?.startsWith("-")) return { path: out.target, content: `${args.join(" ")}\n` };
+  return undefined;
+}
+
+/** The read, grep or write tool for a file view, search or write in bash. Other parts run as written. */
 export function fileRoute(part: string): Route | undefined {
+  const write = writeSpec(part);
+  if (write) return { tool: { name: "write", args: write } };
   const words = shellWords(part);
   if (!words?.length) return undefined;
   const read = readSpec(words);

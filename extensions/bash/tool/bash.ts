@@ -18,7 +18,7 @@ import {
 } from "../config.ts";
 import type { State } from "../state.ts";
 import type { Widget } from "../ui/dashboard.ts";
-import { formatOutput, routeChain } from "./chain.ts";
+import { formatOutput, routeChain, toolRoute } from "./chain.ts";
 import { aloneInMessage } from "./intent.ts";
 import { type Job, kill, limitText, type Meta, render, resultText, saveMeta, spawnJob, statsOf } from "./jobproc.ts";
 import type { Reports } from "./jobs.ts";
@@ -56,6 +56,11 @@ export function registerBash(pi: ExtensionAPI, s: State, widget: Widget, reports
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       if (!statSync(ctx.cwd, { throwIfNoEntry: false })?.isDirectory())
         throw new Error(`bash: the working directory ${ctx.cwd} does not exist. Restart pi in an existing directory.`);
+      const tool = toolRoute(pi, params.command);
+      if (tool) {
+        const { result, isError } = await ctx.executeTool(tool.name, tool.args, { signal, onUpdate });
+        return { ...result, isError };
+      }
       const outDir = storeDir(ctx, "out");
       const jobsDir = storeDir(ctx, "jobs");
       const id = freeId(callFileId(ctx, toolCallId), (i) => existsSync(join(outDir, `${i}.bash.log`)) || existsSync(join(jobsDir, `${i}.json`)));
