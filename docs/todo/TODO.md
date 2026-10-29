@@ -106,3 +106,4 @@
 - [ ] Run the full unit suite before push and keep integrations in CI ([task](../tasks/tests-push-units.md))
 - [ ] Report test coverage across the intended source set in CI ([task](../tasks/ci-test-coverage.md))
 - [ ] Review which required behaviors the tests protect ([task](../tasks/test-behavior-review.md))
+- [ ] Make core the owner of the run outcome and the stage order ([task](../tasks/core-owner.md))
