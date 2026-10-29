@@ -21,8 +21,9 @@ Extensions are versioned and tagged on their own, and `just compat` runs the tes
 | `report.ts` | `counts`, `diagnose`, `diagnostics`, `failures`, `warningCount`, `warnings`: the short parts of a test output | tests |
 | `recipes.ts` | `Recipe`, `Recipes`, `parseJust`, `parseMake`, `loadRecipes` (justfile or Makefile of a directory) | tests |
 | `testrun.ts` | `changedFiles` (git working tree against HEAD, with untracked files), `inGit`, `uncoveredOf`, `plan` (what to run for scope `changed` or `all`), `execute` (run argv in its own process group), `verdict` (red for a failed run, a time-out or a warning), `reader`, `Run`, `Plan`, `NO_TEST`, `CHANGED_RECIPE`, `TIMEOUT_MS` | tests, subagents |
+| `outcome.ts` | the contract with `core` for the end of a run: `workStart` and `workEnd` (work that keeps the run open until the agent gets its report), `stageResult` (the result of one stage for one file state), `onWork`, `onStageResult`, `WORK_START`, `WORK_END`, `STAGE_RESULT`, `WORK_KINDS`, `STAGES`, `Work`, `WorkRef`, `WorkKind`, `Stage`, `StageResult` | none yet |
 
-Unit tests: `util.test.ts` and `report.test.ts`. Integration tests: `store.integration.test.ts`, `config.integration.test.ts`, and `testrun.integration.test.ts`. The tests of `select.ts`, `report.ts` and `recipes.ts` are in `extensions/tests/lib/`, through the re-exports there.
+Unit tests: `util.test.ts`, `report.test.ts` and `outcome.test.ts`. Integration tests: `store.integration.test.ts`, `config.integration.test.ts`, and `testrun.integration.test.ts`. The tests of `select.ts`, `report.ts` and `recipes.ts` are in `extensions/tests/lib/`, through the re-exports there.
 
 ## Changes
 
