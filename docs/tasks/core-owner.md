@@ -10,6 +10,7 @@ Each extension keeps its tools and works alone. `core` decides which stage runs,
 
 - Five extensions handle `agent_before_settle`: `bash`, `checker`, `handoff`, `lsp`, `tests`. Each sees only a part of the open work. The result depends on the load order.
 - `checker` asks only `bash` for open work. `handoff` reads the job files of `bash`. Neither sees test runs, LSP checks, opencode or subagents.
+- `handoff` counts only a running job as open work. A job that ended, but whose report the agent did not get yet, does not stop a cut.
 - `bash`, `files`, `git` and `tests` each split a bash command with a different rule. `foo & git log` passes the git guard.
 - `tests` replaces a chained command with `:`. The other parts do not run, with no message.
 - The same change gets the same checks more than one time: tests after each edit, `just check`, `nix flake check`.
@@ -17,7 +18,7 @@ Each extension keeps its tools and works alone. `core` decides which stage runs,
 
 ## Stage order at the end of a run
 
-1. Wait while work is open: bash jobs, test runs, LSP checks, opencode, subagents.
+1. Wait while work is open: bash jobs, test runs, LSP checks, opencode, subagents. Work stays open until the agent gets its report.
 2. Format. This fixes files and needs no agent turn.
 3. Lint and types, in one stage, with one report.
 4. Tests.
