@@ -19,19 +19,17 @@ else process.env.PI_CHECKER_LOG = previousLog;
 after(() => rmSync(logRoot, { recursive: true, force: true }));
 
 const settled = () => ({
-  status: { type: "choice", choice: "done", confidence: 0.9 },
-  open_error: { type: "bool", probability: 0.05 },
-  in_scope: { type: "bool", probability: 0.05 },
+  open_point: { type: "bool", probability: 0.05 },
+  in_request: { type: "bool", probability: 0.05 },
+  agent_can_do: { type: "bool", probability: 0.05 },
   question_answerable: { type: "bool", probability: 0.05 },
-  next_step_offered: { type: "bool", probability: 0.05 },
-  unchecked: { type: "bool", probability: 0.05 },
-  completeness: { type: "score", score: 3, confidence: 0.9 },
-  rule_violation: { type: "bool", probability: 0.05 },
 });
 
 const unfinished = () => ({
-  ...settled(),
-  status: { type: "choice", choice: "incomplete", confidence: 0.9 },
+  open_point: { type: "bool", probability: 0.9 },
+  in_request: { type: "bool", probability: 0.9 },
+  agent_can_do: { type: "bool", probability: 0.9 },
+  question_answerable: { type: "bool", probability: 0.05 },
 });
 
 type Handler = (event: any, ctx?: any) => unknown;
@@ -265,7 +263,7 @@ test("checker resumes after a failed background job, keeps its failure output, a
     assert.equal(outcome.entries[0].customType, "checker");
     assert.equal(outcome.entries[1].type, "custom_message");
     assert.equal(outcome.entries[1].customType, "checker-followup");
-    assert.equal(outcome.entries[1].content, "checker:\n- Finish the task.\nIf wrong, say why in one sentence.");
+    assert.equal(outcome.entries[1].content, `checker:\n- ${checker.REASONS.open}\nIf wrong, say why in one sentence.`);
     assert.equal(h.reports().length, 1);
     await h.deliver();
     await delay(100);

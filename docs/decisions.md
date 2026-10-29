@@ -2,6 +2,10 @@
 
 Short records of choices that shape the repository. Newest at the top.
 
+## 46. The checker judges only open points of the request (2026-10-29)
+
+The checker sent the agent back for work that the user did not ask for. Of 161 follow-ups in the log, 30 of the 41 "check left open" notes had an `in_scope` below 0.5, because only the error rule used scope. Tool errors that the agent already worked past counted as open errors, and "normal project rules" made an unrelated flaky test part of the task. A short reply such as "ja" gave the classifier no request to judge. Now the state holds the agent message before the request, the request and the answers, and no tool log. Every follow-up needs a point that the user asked for; an open point also needs that the agent can close it without the user. The completeness and status rules are gone: a stop halfway counts only when the answer names the open part. A replay of the 161 old follow-ups with the new questions gave 0 follow-ups; the closest miss was an announced first step of an agreed plan, with `in_request` 0.56. The thresholds stay strict because a missed turn costs one user message, and an unwanted turn costs a change that the user did not ask for. This replaces the questions of 25.
+
 ## 45. bash runs each part of a command with the tool of that part (2026-10-29)
 
 A guard refused a whole chain for one part, such as a `git log` after a `cd`. The other parts did not run, and the agent sent each chain again.
