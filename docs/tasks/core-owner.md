@@ -11,8 +11,7 @@ Each extension keeps its tools and works alone. `core` decides which stage runs,
 - Five extensions handle `agent_before_settle`: `bash`, `checker`, `handoff`, `lsp`, `tests`. Each sees only a part of the open work. The result depends on the load order.
 - `checker` asks only `bash` for open work. `handoff` reads the job files of `bash`. Neither sees test runs, LSP checks, opencode or subagents.
 - `handoff` counts only a running job as open work. A job that ended, but whose report the agent did not get yet, does not stop a cut.
-- `bash`, `files`, `git` and `tests` each split a bash command with a different rule. `foo & git log` passes the git guard.
-- `tests` replaces a chained command with `:`. The other parts do not run, with no message.
+- `shared/chain.ts` splits a chain for the routes of `bash` and `tests` (#153). The wait guard and the quick check of `bash`, and the test detection of `tests`, still split with their own rule.
 - The same change gets the same checks more than one time: tests after each edit, `just check`, `nix flake check`.
 - The checker sends "Finish the task" when the agent asks the user for a choice.
 
@@ -36,8 +35,8 @@ Rules:
 ## Steps, one PR each
 
 1. Integration tests that lock the current behavior: the guards together, the routing between `tests` and `bash`, `checker` and `handoff` with open work. See [ci-refactor-tests](ci-refactor-tests.md).
-2. A contract in `shared/`, with new exports only: events for work start, work end and stage result, and one command splitter.
-3. The guards use the splitter. `tests` blocks a chained command. See [bash-chained-check](bash-chained-check.md).
+2. A contract in `shared/`, with new exports only: events for work start, work end and stage result.
+3. The wait guard and the quick check of `bash`, and the test detection of `tests`, use `splitChain`.
 4. `core` only observes: it keeps the list of open work and logs the decision that it would make. The log must agree with the current decisions.
 5. `checker` and `handoff` ask `core`. Each PR removes the old path.
 6. `core` decides the end of the run and the stage order. The other extensions remove their `agent_before_settle` handlers.
