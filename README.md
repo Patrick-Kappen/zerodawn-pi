@@ -116,6 +116,12 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changes
 
 <!-- changelog:start -->
+## 0.27.0 — 2026-10-31
+
+### shared 0.14.0
+
+- add the contract with core for the end of a run
+
 ## 0.26.0 — 2026-10-29
 
 ### shared 0.13.0
@@ -178,16 +184,6 @@ Release and maintenance commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 - checker: judge only open points of the request
 - bash: convert git reads, file views and searches without refusal
 - bash: run each part of a chain with the tool of that part
-
-## 0.24.0 — 2026-10-28
-
-### bash 0.12.0
-
-- let the agent start a job at once with background
-
-### repository
-
-- bash: let the agent start a job at once with background
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
