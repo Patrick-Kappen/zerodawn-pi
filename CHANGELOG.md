@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.27.0 — 2026-10-31
+
+### shared 0.14.0
+
+- add the contract with core for the end of a run
+
 ## 0.26.0 — 2026-10-29
 
 ### shared 0.13.0

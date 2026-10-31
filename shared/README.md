@@ -28,9 +28,9 @@ Unit tests: `util.test.ts`, `report.test.ts` and `outcome.test.ts`. Integration 
 ## Changes
 
 <!-- changelog:start -->
-## 0.13.0 — 2026-10-29
+## 0.14.0 — 2026-10-31
 
-- bash: run a lone file view with read and a file write with write
+- add the contract with core for the end of a run
 
 [All changes](CHANGELOG.md)
 <!-- changelog:end -->
